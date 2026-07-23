@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block title %}Server Error | CryoCheck{% endblock %}
+
+{% block content %}
+  <section class="error-panel" aria-labelledby="error-title">
+    <p class="error-panel__code">500</p>
+    <h1 id="error-title">Something went wrong</h1>
+    <p>CryoCheck could not complete that request. Please try again.</p>
+    <a class="button button--secondary" href="{{ url_for('main.index') }}">Return home</a>
+  </section>
+{% endblock %}

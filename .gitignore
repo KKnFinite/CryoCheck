@@ -1,0 +1,29 @@
+# Python virtual environments and local configuration
+.venv/
+.env
+
+# Python caches and test artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Flask instance data
+instance/
+
+# Editor settings
+.vscode/
+.idea/
+
+# Generated application files
+generated_exports/
+exports/
+uploads/
+temporary_uploads/
+
+# Operating system files
+.DS_Store
+Thumbs.db
+Desktop.ini

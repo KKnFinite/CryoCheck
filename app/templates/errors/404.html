@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block title %}Page Not Found | CryoCheck{% endblock %}
+
+{% block content %}
+  <section class="error-panel" aria-labelledby="error-title">
+    <p class="error-panel__code">404</p>
+    <h1 id="error-title">Page not found</h1>
+    <p>The page you requested is not available.</p>
+    <a class="button button--secondary" href="{{ url_for('main.index') }}">Return home</a>
+  </section>
+{% endblock %}

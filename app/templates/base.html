@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="CryoCheck standalone deice log audit system.">
+    <meta name="theme-color" content="#071b33">
+    <title>{% block title %}CryoCheck{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+
+    <div class="site-shell">
+      <header class="site-header">
+        <a class="brand" href="{{ url_for('main.index') }}" aria-label="CryoCheck home">
+          <span class="brand__mark" aria-hidden="true">&#10052;</span>
+          <span class="brand__name">CryoCheck</span>
+        </a>
+      </header>
+
+      <main id="main-content" class="site-main">
+        {% block content %}{% endblock %}
+      </main>
+
+      <footer class="site-footer">
+        <p class="site-footer__brand">CryoCheck</p>
+        <p>Standalone Deice Log Audit System</p>
+      </footer>
+    </div>
+  </body>
+</html>

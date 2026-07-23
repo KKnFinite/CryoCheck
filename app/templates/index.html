@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}CryoCheck | Deice Data Validation{% endblock %}
+
+{% block content %}
+  <section class="hero" aria-labelledby="page-title">
+    <div class="hero__heading">
+      <p class="eyebrow">Deice operations assurance</p>
+      <h1 id="page-title">Deice Data Validation</h1>
+      <p class="hero__intro">A clear, dependable workflow for auditing deice log data.</p>
+    </div>
+
+    <div class="glass-panel">
+      <div class="launch-control" aria-labelledby="launch-title">
+        <p id="launch-title" class="launch-control__label">Coming Soon</p>
+        <button class="button button--primary" type="button" disabled>
+          <span aria-hidden="true">&#8593;</span>
+          Import CSV
+        </button>
+      </div>
+
+      <ol class="workflow" aria-label="CryoCheck workflow">
+        <li class="workflow__card">
+          <span class="workflow__number" aria-hidden="true">01</span>
+          <h2>Import CSV</h2>
+        </li>
+        <li class="workflow__arrow" aria-hidden="true">&#8595;</li>
+        <li class="workflow__card">
+          <span class="workflow__number" aria-hidden="true">02</span>
+          <h2>Run Validation</h2>
+        </li>
+        <li class="workflow__arrow" aria-hidden="true">&#8595;</li>
+        <li class="workflow__card">
+          <span class="workflow__number" aria-hidden="true">03</span>
+          <h2>Review &amp; Export Exceptions</h2>
+        </li>
+      </ol>
+    </div>
+  </section>
+{% endblock %}
