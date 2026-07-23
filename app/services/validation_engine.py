@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
@@ -11,6 +10,11 @@ from typing import Final
 from app.services.csv_import import CSVImportResult, CSVSourceRow
 from app.services.rules import IMPLEMENTED_STATUS, RULES, RuleDefinition
 from app.services.settings import SettingsDefinition
+from app.services.time_of_day import (
+    crosses_midnight,
+    elapsed_minutes,
+    parse_military_time,
+)
 from app.services.type1_fluids import get_type1_fluid_profile
 from app.services.type4_fluids import get_type4_fluid_profile
 
@@ -26,6 +30,7 @@ _RULE_002 = _EXECUTED_RULES_BY_ID["CC-RULE-002"]
 _RULE_003 = _EXECUTED_RULES_BY_ID["CC-RULE-003"]
 _RULE_004 = _EXECUTED_RULES_BY_ID["CC-RULE-004"]
 _RULE_005 = _EXECUTED_RULES_BY_ID["CC-RULE-005"]
+_RULE_006 = _EXECUTED_RULES_BY_ID["CC-RULE-006"]
 _TIMESTAMP_RULES: Final = (_RULE_001, _RULE_002)
 _TYPE1_RULES: Final = (_RULE_003, _RULE_004)
 _REQUIRED_TYPE1_BUFFER: Final = Decimal("18.0")
@@ -50,9 +55,6 @@ _DATE_CREATED_FORMATS: Final[tuple[str, ...]] = (
     "%m/%d/%Y %I:%M:%S %p",
     "%m/%d/%Y %I:%M:%S.%f %p",
 )
-_MILITARY_TIME_PATTERN: Final = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
-
-
 @dataclass(frozen=True, slots=True)
 class RuleDetail:
     """One immutable label/value pair shown with an audit exception."""
@@ -187,6 +189,13 @@ def run_audit(
         exceptions.extend(type4_exceptions)
         warnings.extend(type4_warnings)
 
+        gap_exceptions, gap_warnings = _evaluate_step_gap_rule(
+            source_row,
+            active_settings,
+        )
+        exceptions.extend(gap_exceptions)
+        warnings.extend(gap_warnings)
+
     return AuditResult(
         filename=imported_csv.filename,
         rows_audited=imported_csv.row_count,
@@ -220,7 +229,7 @@ def _parse_local_timestamps(
         source_row.get("ApplicationDate"),
         _APPLICATION_DATE_FORMATS,
     )
-    start_time = _parse_military_time(source_row.get("StartTime"))
+    start_time = parse_military_time(source_row.get("StartTime"))
     date_created = _parse_with_formats(
         source_row.get("DateCreated"),
         _DATE_CREATED_FORMATS,
@@ -240,7 +249,7 @@ def _parse_local_timestamps(
 
     event_timestamp = datetime.combine(
         application_date.date(),
-        start_time.time(),
+        start_time,
     )
     return (event_timestamp, date_created), ()
 
@@ -259,13 +268,6 @@ def _parse_with_formats(
         except ValueError:
             continue
     return None
-
-
-def _parse_military_time(source_value: str) -> datetime | None:
-    value = source_value.strip()
-    if not _MILITARY_TIME_PATTERN.fullmatch(value):
-        return None
-    return datetime.strptime(value, "%H:%M")
 
 
 def _unable_to_evaluate(
@@ -573,6 +575,143 @@ def _valid_brix_range(profile: object) -> tuple[Decimal, Decimal] | None:
     return minimum_brix, maximum_brix
 
 
+def _evaluate_step_gap_rule(
+    source_row: CSVSourceRow,
+    active_settings: SettingsDefinition,
+) -> tuple[list[AuditException], list[UnableToEvaluate]]:
+    """Evaluate the whole-minute gap between positive Type I and Type IV use."""
+    exceptions: list[AuditException] = []
+    warnings: list[UnableToEvaluate] = []
+    malformed_usage_fields: list[str] = []
+
+    for field_name in ("Type1Used", "Type4Used"):
+        source_text = source_row.get(field_name)
+        if not source_text.strip():
+            return exceptions, warnings
+
+        parsed_value = _parse_decimal(source_text)
+        if parsed_value is None:
+            malformed_usage_fields.append(field_name)
+        elif parsed_value <= 0:
+            return exceptions, warnings
+
+    if malformed_usage_fields:
+        invalid_fields = tuple(malformed_usage_fields)
+        warnings.append(
+            _unable_to_evaluate(
+                source_row,
+                _RULE_006,
+                invalid_fields,
+                message=(
+                    "Step-gap applicability could not be determined because "
+                    "these usage values are malformed: "
+                    f"{', '.join(invalid_fields)}."
+                ),
+            )
+        )
+        return exceptions, warnings
+
+    allowed_gap = _valid_allowed_gap_minutes(active_settings)
+    if allowed_gap is None:
+        warnings.append(
+            _unable_to_evaluate(
+                source_row,
+                _RULE_006,
+                ("Allowed Gap setting",),
+                message=(
+                    "Allowed Gap must be an available whole number from 0 "
+                    "through 99 minutes."
+                ),
+            )
+        )
+        return exceptions, warnings
+
+    type1_end_text = source_row.get("EndTime1")
+    type4_start_text = source_row.get("StartTime4")
+    type1_end = parse_military_time(type1_end_text)
+    type4_start = parse_military_time(type4_start_text)
+    invalid_step_fields = tuple(
+        field_name
+        for field_name, value in (
+            ("EndTime1", type1_end),
+            ("StartTime4", type4_start),
+        )
+        if value is None
+    )
+    if invalid_step_fields:
+        warnings.append(
+            _unable_to_evaluate(
+                source_row,
+                _RULE_006,
+                invalid_step_fields,
+                message=(
+                    "Required whole-minute HH:MM values are blank or invalid: "
+                    f"{', '.join(invalid_step_fields)}."
+                ),
+            )
+        )
+        return exceptions, warnings
+
+    crossed_midnight = False
+    if elapsed_minutes(type1_end, type4_start) is None:
+        event_start = parse_military_time(source_row.get("StartTime"))
+        event_end = parse_military_time(source_row.get("EndTime"))
+        invalid_event_fields = tuple(
+            field_name
+            for field_name, value in (
+                ("StartTime", event_start),
+                ("EndTime", event_end),
+            )
+            if value is None
+        )
+        if invalid_event_fields:
+            warnings.append(
+                _unable_to_evaluate(
+                    source_row,
+                    _RULE_006,
+                    invalid_event_fields,
+                    message=(
+                        "The overall event time is needed to distinguish an "
+                        "overnight step gap from an overlap, but these values "
+                        "are blank or invalid: "
+                        f"{', '.join(invalid_event_fields)}."
+                    ),
+                )
+            )
+            return exceptions, warnings
+
+        crossed_midnight = crosses_midnight(event_start, event_end)
+        if not crossed_midnight:
+            return exceptions, warnings
+
+    actual_gap = elapsed_minutes(
+        type1_end,
+        type4_start,
+        crossed_midnight=crossed_midnight,
+    )
+    if actual_gap is not None and actual_gap > allowed_gap:
+        exceptions.append(
+            _rule_006_exception(
+                source_row,
+                type1_end_text=type1_end_text,
+                type4_start_text=type4_start_text,
+                actual_gap=actual_gap,
+                allowed_gap=allowed_gap,
+            )
+        )
+
+    return exceptions, warnings
+
+
+def _valid_allowed_gap_minutes(
+    active_settings: SettingsDefinition,
+) -> int | None:
+    allowed_gap = getattr(active_settings, "allowed_gap_minutes", None)
+    if type(allowed_gap) is not int or not 0 <= allowed_gap <= 99:
+        return None
+    return allowed_gap
+
+
 def _rule_001_exception(
     source_row: CSVSourceRow,
     created_before_event: timedelta,
@@ -735,6 +874,40 @@ def _rule_005_exception(
     )
 
 
+def _rule_006_exception(
+    source_row: CSVSourceRow,
+    *,
+    type1_end_text: str,
+    type4_start_text: str,
+    actual_gap: int,
+    allowed_gap: int,
+) -> AuditException:
+    amount_over = actual_gap - allowed_gap
+    actual_gap_text = _format_minutes(actual_gap)
+    allowed_gap_text = _format_minutes(allowed_gap)
+    amount_over_text = _format_minutes(amount_over)
+    return _build_exception(
+        source_row,
+        _RULE_006,
+        details=(
+            RuleDetail("Type I end time", type1_end_text),
+            RuleDetail("Type IV start time", type4_start_text),
+            RuleDetail("Actual calculated gap", actual_gap_text),
+            RuleDetail("Configured Allowed Gap", allowed_gap_text),
+            RuleDetail("Amount over setting", amount_over_text),
+            RuleDetail(
+                "Comparison",
+                (
+                    f"Type I ended at {type1_end_text}. Type IV began at "
+                    f"{type4_start_text}. Actual gap: {actual_gap_text}. "
+                    f"Allowed gap: {allowed_gap_text}. Exceeded by "
+                    f"{amount_over_text}."
+                ),
+            ),
+        ),
+    )
+
+
 def _build_exception(
     source_row: CSVSourceRow,
     rule: RuleDefinition,
@@ -785,6 +958,10 @@ def _format_duration(duration: timedelta) -> str:
             parts.append(f"{value} {label}{'' if value == 1 else 's'}")
 
     return ", ".join(parts) if parts else "0 minutes"
+
+
+def _format_minutes(minutes: int) -> str:
+    return f"{minutes} minute{'s' if minutes != 1 else ''}"
 
 
 def _format_temperature(value: Decimal) -> str:

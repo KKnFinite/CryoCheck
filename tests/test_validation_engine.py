@@ -19,6 +19,7 @@ def _source_row(
     source_row_number: int = 2,
     application_date: str = "2026-01-15",
     start_time: str = "08:00",
+    end_time: str = "08:30",
     date_created: str = "2026-01-15 08:00",
     date_created_utc: str = "",
     last_modified_utc: str = "",
@@ -26,9 +27,11 @@ def _source_row(
     type1_used: str = "",
     type1_concentration: str = "",
     freezing_point1: str = "",
+    end_time1: str = "08:10",
     ambient_temp: str = "",
     type4_used: str = "",
     type4_brix: str = "",
+    start_time4: str = "08:15",
 ) -> CSVSourceRow:
     values = {
         "RecordID": record_id,
@@ -38,6 +41,7 @@ def _source_row(
         "TailNumber": "N12345",
         "ApplicationDate": application_date,
         "StartTime": start_time,
+        "EndTime": end_time,
         "DateCreated": date_created,
         "TruckNumber": "TRUCK-1",
         "Operator": "Test Operator",
@@ -47,9 +51,11 @@ def _source_row(
         "Type1Used": type1_used,
         "Type1Concentration": type1_concentration,
         "FreezingPoint1": freezing_point1,
+        "EndTime1": end_time1,
         "AmbientTemp": ambient_temp,
         "Type4Used": type4_used,
         "Type4ABrix": type4_brix,
+        "StartTime4": start_time4,
     }
     return CSVSourceRow(
         source_row_number=source_row_number,
@@ -79,6 +85,28 @@ def _audit_one(**row_values):
     return run_audit(
         _import_result(_source_row(**row_values)),
         DEFAULT_SETTINGS,
+    )
+
+
+def _audit_gap(
+    *,
+    settings=DEFAULT_SETTINGS,
+    **row_values,
+):
+    values = {
+        "type1_used": "10",
+        "type1_concentration": "50",
+        "freezing_point1": "-17.3",
+        "ambient_temp": "1",
+        "type4_used": "10",
+        "type4_brix": "35",
+        "end_time1": "08:10",
+        "start_time4": "08:15",
+    }
+    values.update(row_values)
+    return run_audit(
+        _import_result(_source_row(**values)),
+        settings,
     )
 
 
@@ -120,10 +148,10 @@ def test_utc_fields_do_not_influence_rule_001_or_rule_002():
     assert result.unable_to_evaluate_count == 0
 
 
-def test_audit_reports_five_rules_executed():
+def test_audit_reports_six_rules_executed():
     result = _audit_one()
 
-    assert result.rules_executed == 5
+    assert result.rules_executed == 6
 
 
 def test_rule_002_23_hours_59_minutes_passes_at_24_hours():
@@ -707,6 +735,300 @@ def test_type1_and_type4_exceptions_are_ordered_by_rule_id_on_same_row():
     assert tuple(
         exception.rule_id for exception in result.exceptions
     ) == ("CC-RULE-003", "CC-RULE-005")
+
+
+@pytest.mark.parametrize(
+    ("field_name", "field_value"),
+    (
+        ("type1_used", ""),
+        ("type1_used", "0"),
+        ("type1_used", "-1"),
+        ("type4_used", ""),
+        ("type4_used", "0"),
+        ("type4_used", "-1"),
+    ),
+)
+def test_rule_006_blank_or_nonpositive_usage_skips(field_name, field_value):
+    result = _audit_gap(**{field_name: field_value, "start_time4": "08:30"})
+
+    assert all(
+        exception.rule_id != "CC-RULE-006"
+        for exception in result.exceptions
+    )
+    assert all(
+        warning.rule_id != "CC-RULE-006"
+        for warning in result.unable_to_evaluate
+    )
+
+
+@pytest.mark.parametrize("field_name", ("type1_used", "type4_used"))
+def test_rule_006_malformed_usage_is_unable_to_evaluate(field_name):
+    result = _audit_gap(**{field_name: "malformed"})
+
+    rule_warnings = tuple(
+        warning
+        for warning in result.unable_to_evaluate
+        if warning.rule_id == "CC-RULE-006"
+    )
+
+    assert result.exception_count == 0
+    assert len(rule_warnings) == 1
+    assert rule_warnings[0].invalid_fields == (
+        "Type1Used" if field_name == "type1_used" else "Type4Used",
+    )
+
+
+def test_rule_006_nonpositive_usage_skips_when_other_usage_is_malformed():
+    result = _audit_gap(type1_used="malformed", type4_used="0")
+
+    assert all(
+        warning.rule_id != "CC-RULE-006"
+        for warning in result.unable_to_evaluate
+    )
+
+
+@pytest.mark.parametrize(
+    ("type1_end", "type4_start"),
+    (
+        ("08:10", "08:10"),
+        ("08:10", "08:11"),
+        ("23:44", "23:49"),
+    ),
+)
+def test_rule_006_gaps_at_or_below_default_pass(type1_end, type4_start):
+    result = _audit_gap(
+        end_time1=type1_end,
+        start_time4=type4_start,
+    )
+
+    assert result.exception_count == 0
+    assert result.unable_to_evaluate_count == 0
+
+
+def test_rule_006_six_minute_gap_fails_with_required_details():
+    result = _audit_gap(
+        end_time1="23:44",
+        start_time4="23:50",
+    )
+
+    assert result.exception_count == 1
+    exception = result.exceptions[0]
+    assert exception.rule_id == "CC-RULE-006"
+    assert exception.rule_name == "Excessive Gap Between Steps"
+    assert exception.exception_message == "Excessive gap between steps."
+    assert tuple(
+        (detail.label, detail.value) for detail in exception.details
+    ) == (
+        ("Type I end time", "23:44"),
+        ("Type IV start time", "23:50"),
+        ("Actual calculated gap", "6 minutes"),
+        ("Configured Allowed Gap", "5 minutes"),
+        ("Amount over setting", "1 minute"),
+        (
+            "Comparison",
+            (
+                "Type I ended at 23:44. Type IV began at 23:50. "
+                "Actual gap: 6 minutes. Allowed gap: 5 minutes. "
+                "Exceeded by 1 minute."
+            ),
+        ),
+    )
+
+
+def test_rule_006_ten_minute_gap_reports_five_minutes_over():
+    result = _audit_gap(
+        end_time1="08:10",
+        start_time4="08:20",
+    )
+
+    exception = result.exceptions[0]
+    assert exception.rule_id == "CC-RULE-006"
+    assert exception.details[2].value == "10 minutes"
+    assert exception.details[4].value == "5 minutes"
+
+
+def test_rule_006_setting_zero_allows_only_zero_minute_gap():
+    settings = replace(DEFAULT_SETTINGS, allowed_gap_minutes=0)
+
+    passing = _audit_gap(
+        settings=settings,
+        end_time1="08:10",
+        start_time4="08:10",
+    )
+    failing = _audit_gap(
+        settings=settings,
+        end_time1="08:10",
+        start_time4="08:11",
+    )
+
+    assert passing.exception_count == 0
+    assert failing.exceptions[0].rule_id == "CC-RULE-006"
+    assert failing.exceptions[0].details[3].value == "0 minutes"
+    assert failing.exceptions[0].details[4].value == "1 minute"
+
+
+def test_rule_006_setting_99_passes_99_and_fails_100_minutes():
+    settings = replace(DEFAULT_SETTINGS, allowed_gap_minutes=99)
+
+    passing = _audit_gap(
+        settings=settings,
+        end_time1="08:00",
+        start_time4="09:39",
+    )
+    failing = _audit_gap(
+        settings=settings,
+        end_time1="08:00",
+        start_time4="09:40",
+    )
+
+    assert passing.exception_count == 0
+    assert failing.exceptions[0].rule_id == "CC-RULE-006"
+    assert failing.exceptions[0].details[2].value == "100 minutes"
+    assert failing.exceptions[0].details[4].value == "1 minute"
+
+
+@pytest.mark.parametrize(
+    ("type4_start", "expected_gap", "should_fail"),
+    (
+        ("00:03", "5 minutes", False),
+        ("00:04", "6 minutes", True),
+        ("00:00", "1 minute", False),
+    ),
+)
+def test_rule_006_overnight_gap_uses_overall_event(
+    type4_start,
+    expected_gap,
+    should_fail,
+):
+    result = _audit_gap(
+        start_time="23:45",
+        end_time="00:10",
+        date_created="2026-01-15 23:45",
+        end_time1="23:58" if type4_start != "00:00" else "23:59",
+        start_time4=type4_start,
+    )
+
+    rule_exceptions = tuple(
+        exception
+        for exception in result.exceptions
+        if exception.rule_id == "CC-RULE-006"
+    )
+    assert bool(rule_exceptions) is should_fail
+    if should_fail:
+        assert rule_exceptions[0].details[2].value == expected_gap
+
+
+@pytest.mark.parametrize(
+    ("field_name", "field_value", "expected_invalid_field"),
+    (
+        ("start_time", "malformed", "StartTime"),
+        ("end_time", "malformed", "EndTime"),
+    ),
+)
+def test_rule_006_invalid_overall_time_warns_only_when_midnight_is_needed(
+    field_name,
+    field_value,
+    expected_invalid_field,
+):
+    overnight_result = _audit_gap(
+        end_time1="23:58",
+        start_time4="00:03",
+        **{field_name: field_value},
+    )
+    forward_result = _audit_gap(
+        end_time1="08:10",
+        start_time4="08:15",
+        **{field_name: field_value},
+    )
+
+    overnight_warnings = tuple(
+        warning
+        for warning in overnight_result.unable_to_evaluate
+        if warning.rule_id == "CC-RULE-006"
+    )
+    forward_warnings = tuple(
+        warning
+        for warning in forward_result.unable_to_evaluate
+        if warning.rule_id == "CC-RULE-006"
+    )
+    assert len(overnight_warnings) == 1
+    assert overnight_warnings[0].invalid_fields == (expected_invalid_field,)
+    assert forward_warnings == ()
+
+
+def test_rule_006_same_day_overlap_is_not_a_24_hour_gap():
+    result = _audit_gap(
+        start_time="08:00",
+        end_time="09:00",
+        end_time1="08:40",
+        start_time4="08:30",
+    )
+
+    assert all(
+        exception.rule_id != "CC-RULE-006"
+        for exception in result.exceptions
+    )
+    assert all(
+        warning.rule_id != "CC-RULE-006"
+        for warning in result.unable_to_evaluate
+    )
+
+
+@pytest.mark.parametrize(
+    ("field_name", "field_value", "expected_invalid_field"),
+    (
+        ("end_time1", "", "EndTime1"),
+        ("end_time1", "8:10 AM", "EndTime1"),
+        ("start_time4", "", "StartTime4"),
+        ("start_time4", "08:10:00", "StartTime4"),
+    ),
+)
+def test_rule_006_missing_or_malformed_step_time_is_warning(
+    field_name,
+    field_value,
+    expected_invalid_field,
+):
+    result = _audit_gap(**{field_name: field_value})
+
+    rule_warnings = tuple(
+        warning
+        for warning in result.unable_to_evaluate
+        if warning.rule_id == "CC-RULE-006"
+    )
+    assert result.exception_count == 0
+    assert len(rule_warnings) == 1
+    assert rule_warnings[0].invalid_fields == (expected_invalid_field,)
+
+
+@pytest.mark.parametrize("allowed_gap", (None, 5.0, True, -1, 100))
+def test_rule_006_invalid_allowed_gap_setting_is_warning(allowed_gap):
+    settings = replace(
+        DEFAULT_SETTINGS,
+        allowed_gap_minutes=allowed_gap,
+    )
+
+    result = _audit_gap(settings=settings)
+
+    rule_warnings = tuple(
+        warning
+        for warning in result.unable_to_evaluate
+        if warning.rule_id == "CC-RULE-006"
+    )
+    assert result.exception_count == 0
+    assert len(rule_warnings) == 1
+    assert rule_warnings[0].invalid_fields == ("Allowed Gap setting",)
+
+
+def test_rule_005_and_rule_006_exceptions_are_ordered_on_same_row():
+    result = _audit_gap(
+        type4_brix="33.9",
+        end_time1="08:10",
+        start_time4="08:16",
+    )
+
+    assert tuple(
+        exception.rule_id for exception in result.exceptions
+    ) == ("CC-RULE-005", "CC-RULE-006")
 
 
 def test_audit_result_and_exception_structures_are_immutable():

@@ -235,14 +235,29 @@ RULES: Final[tuple[RuleDefinition, ...]] = (
             "start against the allowed maximum."
         ),
         logic_summary=(
-            "Applies when Type I and Type IV are both used.",
+            (
+                "Applies only when Type1Used and Type4Used are both "
+                "numerically greater than 0."
+            ),
             "Compare EndTime1 with StartTime4.",
-            "Times are whole-minute military time in HH:MM format.",
+            "Use exact whole-minute military HH:MM arithmetic.",
             (
                 "Generate an exception only when the calculated gap is greater "
                 "than the configured allowed gap."
             ),
             "A gap equal to the setting passes.",
+            (
+                "When the overall event crosses midnight, treat an earlier "
+                "StartTime4 as occurring on the next calendar day."
+            ),
+            (
+                "An earlier StartTime4 during a same-day event is an overlap "
+                "left to pending CC-RULE-013, not a 24-hour gap."
+            ),
+            (
+                "Blank or malformed required values produce an "
+                "unable-to-evaluate warning when applicability is positive."
+            ),
         ),
         settings_defaults=(
             "Allowed Gap accepts 0–99 whole minutes",
@@ -254,10 +269,12 @@ RULES: Final[tuple[RuleDefinition, ...]] = (
         output_details=(
             "Type I end time",
             "Type IV start time",
-            "Actual gap",
-            "Configured allowed gap",
-            "Minutes over the setting",
+            "Actual gap in whole minutes",
+            "Configured Allowed Gap",
+            "Whole minutes over the setting",
+            "Concise comparison",
         ),
+        implementation_status=IMPLEMENTED_STATUS,
     ),
     RuleDefinition(
         rule_id="CC-RULE-007",

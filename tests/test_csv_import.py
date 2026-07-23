@@ -36,6 +36,7 @@ def _synthetic_csv(
             "GatewayCode": "SYNTHETIC-GATEWAY",
             "ApplicationDate": f"2026-01-{index + 1:02d}",
             "StartTime": "08:00",
+            "EndTime": "08:30",
             "DateCreated": f"2026-01-{index + 1:02d} 08:00",
             "AircraftType": "A320",
             "TailNumber": f"N{index:05d}",
@@ -46,7 +47,9 @@ def _synthetic_csv(
             "Type1Used": "10",
             "Type1Concentration": "50",
             "FreezingPoint1": "-17.3",
+            "EndTime1": "08:10",
             "Type4Used": "0",
+            "StartTime4": "08:15",
             "Type4ABrix": "",
         }
         row.update(
@@ -480,6 +483,181 @@ def test_rule_005_no_type4_use_skips_without_warning(client):
     assert b"CC-RULE-005" not in response.data
     assert b"Some rule evaluations could not run" not in response.data
     assert b"No exceptions found" in response.data
+
+
+def test_rule_006_default_five_minute_gap_passes_on_results_screen(client):
+    response = _upload(
+        client,
+        _synthetic_csv(
+            overrides={
+                0: {
+                    "Type4Used": "1",
+                    "Type4ABrix": "35",
+                    "EndTime1": "23:44",
+                    "StartTime4": "23:49",
+                }
+            }
+        ),
+    )
+
+    assert response.status_code == 200
+    assert b"CC-RULE-006" not in response.data
+    assert b"No exceptions found" in response.data
+    assert b"Rules executed</dt>" in response.data
+    assert b"<dd>6</dd>" in response.data
+
+
+def test_rule_006_default_six_minute_gap_renders_required_details(client):
+    response = _upload(
+        client,
+        _synthetic_csv(
+            overrides={
+                0: {
+                    "Type4Used": "1",
+                    "Type4ABrix": "35",
+                    "EndTime1": "23:44",
+                    "StartTime4": "23:50",
+                }
+            }
+        ),
+    )
+
+    assert response.status_code == 200
+    assert b"CC-RULE-006" in response.data
+    assert b"Excessive gap between steps." in response.data
+    assert b"Actual calculated gap" in response.data
+    assert b"6 minutes" in response.data
+    assert b"Configured Allowed Gap" in response.data
+    assert b"5 minutes" in response.data
+    assert b"Exceeded by 1 minute." in response.data
+
+
+@pytest.mark.parametrize(
+    ("type4_start", "should_fail"),
+    (("00:03", False), ("00:04", True)),
+)
+def test_rule_006_overnight_results_screen(client, type4_start, should_fail):
+    response = _upload(
+        client,
+        _synthetic_csv(
+            overrides={
+                0: {
+                    "StartTime": "23:45",
+                    "EndTime": "00:10",
+                    "DateCreated": "2026-01-01 23:45",
+                    "Type4Used": "1",
+                    "Type4ABrix": "35",
+                    "EndTime1": "23:58",
+                    "StartTime4": type4_start,
+                }
+            }
+        ),
+    )
+
+    assert response.status_code == 200
+    assert (b"CC-RULE-006" in response.data) is should_fail
+
+
+def test_rule_006_same_day_overlap_does_not_render_exception(client):
+    response = _upload(
+        client,
+        _synthetic_csv(
+            overrides={
+                0: {
+                    "StartTime": "08:00",
+                    "EndTime": "09:00",
+                    "Type4Used": "1",
+                    "Type4ABrix": "35",
+                    "EndTime1": "08:40",
+                    "StartTime4": "08:30",
+                }
+            }
+        ),
+    )
+
+    assert response.status_code == 200
+    assert b"CC-RULE-006" not in response.data
+    assert b"No exceptions found" in response.data
+
+
+def test_personal_allowed_gap_affects_next_upload_and_reset(app, client):
+    with app.app_context():
+        user = User(
+            username="GapAuditUser",
+            username_normalized="gapaudituser",
+        )
+        user.set_password(VALID_PASSWORD)
+        create_default_user_settings(user)
+        db.session.add(user)
+        db.session.commit()
+
+    login_response = client.post(
+        "/login",
+        data={
+            "username": "GapAuditUser",
+            "password": VALID_PASSWORD,
+        },
+    )
+    save_response = client.post(
+        "/settings",
+        data={
+            "late_entry_threshold_hours": "24",
+            "type1_fluid": "Cryotech Polar Plus LT",
+            "type4_fluid": "Cryotech Polar Guard Xtend",
+            "allowed_gap_minutes": "10",
+            "max_type1_rate_gpm": "60",
+            "max_type4_rate_gpm": "30",
+            "max_event_time_minutes": "30",
+        },
+    )
+    personal_response = _upload(
+        client,
+        _synthetic_csv(
+            row_count=2,
+            overrides={
+                0: {
+                    "Type4Used": "1",
+                    "Type4ABrix": "35",
+                    "EndTime1": "08:10",
+                    "StartTime4": "08:20",
+                },
+                1: {
+                    "Type4Used": "1",
+                    "Type4ABrix": "35",
+                    "EndTime1": "08:10",
+                    "StartTime4": "08:21",
+                },
+            },
+        ),
+    )
+    reset_response = client.post(
+        "/settings/reset",
+        data={"confirm_reset": "y"},
+    )
+    reset_audit_response = _upload(
+        client,
+        _synthetic_csv(
+            overrides={
+                0: {
+                    "Type4Used": "1",
+                    "Type4ABrix": "35",
+                    "EndTime1": "08:10",
+                    "StartTime4": "08:16",
+                }
+            }
+        ),
+    )
+
+    assert login_response.status_code == 302
+    assert save_response.status_code == 302
+    assert personal_response.status_code == 200
+    assert b"Personal \xe2\x80\x94 GapAuditUser" in personal_response.data
+    assert personal_response.data.count(b"CC-RULE-006") == 1
+    assert b"Actual gap: 11 minutes" in personal_response.data
+    assert b"Allowed gap: 10 minutes" in personal_response.data
+    assert reset_response.status_code == 302
+    assert b"CC-RULE-006" in reset_audit_response.data
+    assert b"Allowed gap: 5 minutes" in reset_audit_response.data
 
 
 def test_invalid_timestamp_warning_is_separate_from_exceptions(client):
