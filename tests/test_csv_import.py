@@ -6,9 +6,15 @@ import csv
 import io
 
 from sqlalchemy import event
+from werkzeug.datastructures import FileStorage
 
 from app.extensions import db
-from app.services.csv_import import EXPECTED_COLUMNS
+from app.models import User
+from app.services.csv_import import EXPECTED_COLUMNS, parse_csv_upload
+from app.services.settings import create_default_user_settings
+
+
+VALID_PASSWORD = "SyntheticPassphrase-42"
 
 
 def _synthetic_csv(
@@ -29,6 +35,7 @@ def _synthetic_csv(
             "GatewayCode": "SYNTHETIC-GATEWAY",
             "ApplicationDate": f"2026-01-{index + 1:02d}",
             "StartTime": "08:00",
+            "DateCreated": f"2026-01-{index + 1:02d} 08:00",
             "AircraftType": "A320",
             "TailNumber": f"N{index:05d}",
             "TruckNumber": "TRUCK-TEST",
@@ -72,21 +79,58 @@ def test_valid_baseline_csv_imports_successfully(client):
     payload = _synthetic_csv(
         row_count=2,
         overrides={
-            0: {"GatewayCode": "GATEWAY-A", "ApplicationDate": "2026-01-02"},
-            1: {"GatewayCode": "GATEWAY-B", "ApplicationDate": "2026-01-05"},
+            0: {
+                "GatewayCode": "GATEWAY-A",
+                "ApplicationDate": "2026-01-02",
+                "DateCreated": "2026-01-02 08:00",
+            },
+            1: {
+                "GatewayCode": "GATEWAY-B",
+                "ApplicationDate": "2026-01-05",
+                "DateCreated": "2026-01-05 08:00",
+            },
         },
     )
 
     response = _upload(client, payload)
 
     assert response.status_code == 200
-    assert b"CSV Import Summary" in response.data
-    assert b"CSV parsed successfully. Audit rules have not been run." in response.data
+    assert b"Audit Results" in response.data
+    assert b"No exceptions found" in response.data
     assert b"synthetic-deice.csv" in response.data
     assert b"GATEWAY-A" in response.data
     assert b"GATEWAY-B" in response.data
     assert b"2026-01-02" in response.data
     assert b"2026-01-05" in response.data
+
+
+def test_complete_source_dataset_is_available_unchanged_after_parsing():
+    columns = (*EXPECTED_COLUMNS, "Original Extra")
+    payload = _synthetic_csv(
+        columns=columns,
+        row_count=12,
+        overrides={
+            11: {
+                "RecordID": " final-record ",
+                "Operator": "Mixed CASE value",
+                "Original Extra": "=SOURCE-VALUE",
+            }
+        },
+    )
+
+    result = parse_csv_upload(
+        FileStorage(
+            stream=io.BytesIO(payload),
+            filename="complete-source.csv",
+        )
+    )
+
+    assert result.column_names == columns
+    assert len(result.rows) == 12
+    assert result.rows[11].source_row_number == 13
+    assert result.rows[11].get("RecordID") == " final-record "
+    assert result.rows[11].get("Operator") == "Mixed CASE value"
+    assert result.rows[11].get("Original Extra") == "=SOURCE-VALUE"
 
 
 def test_expected_columns_may_arrive_in_a_different_order(client):
@@ -98,7 +142,7 @@ def test_expected_columns_may_arrive_in_a_different_order(client):
     )
 
     assert response.status_code == 200
-    assert b"CSV Import Summary" in response.data
+    assert b"Audit Results" in response.data
 
 
 def test_missing_expected_column_rejects_file(client):
@@ -259,6 +303,74 @@ def test_uploaded_markup_is_escaped_and_formula_text_is_not_evaluated(client):
     assert b"&lt;script&gt;alert" in response.data
     assert b'<script>alert("unsafe")</script>' not in response.data
     assert b"=1+1" in response.data
+
+
+def test_rule_exception_is_rendered_on_results_screen(client):
+    response = _upload(
+        client,
+        _synthetic_csv(
+            overrides={0: {"DateCreated": "2026-01-01 07:59"}}
+        ),
+    )
+
+    assert response.status_code == 200
+    assert b"Audit Results" in response.data
+    assert b"CC-RULE-001" in response.data
+    assert b"Application entry proceeds event." in response.data
+    assert b"CSV row <strong>2</strong>" in response.data
+    assert b"1 minute" in response.data
+
+
+def test_invalid_timestamp_warning_is_separate_from_exceptions(client):
+    response = _upload(
+        client,
+        _synthetic_csv(overrides={0: {"DateCreated": "invalid"}}),
+    )
+
+    assert response.status_code == 200
+    assert b"Some rule evaluations could not run" in response.data
+    assert b"2 rule" in response.data
+    assert b"not included in the exception count" in response.data
+    assert b"No exceptions found" in response.data
+
+
+def test_personal_48_hour_threshold_overrides_anonymous_default(app, client):
+    payload = _synthetic_csv(
+        overrides={0: {"DateCreated": "2026-01-02 08:00"}}
+    )
+
+    anonymous_response = _upload(client, payload)
+
+    assert anonymous_response.status_code == 200
+    assert b"CC-RULE-002" in anonymous_response.data
+    assert b"Late entry." in anonymous_response.data
+    assert b"Default" in anonymous_response.data
+
+    with app.app_context():
+        user = User(
+            username="AuditUser",
+            username_normalized="audituser",
+        )
+        user.set_password(VALID_PASSWORD)
+        settings = create_default_user_settings(user)
+        settings.late_entry_threshold_hours = 48
+        db.session.add(user)
+        db.session.commit()
+
+    login_response = client.post(
+        "/login",
+        data={
+            "username": "AuditUser",
+            "password": VALID_PASSWORD,
+        },
+    )
+    personal_response = _upload(client, payload)
+
+    assert login_response.status_code == 302
+    assert personal_response.status_code == 200
+    assert b"Personal \xe2\x80\x94 AuditUser" in personal_response.data
+    assert b"No exceptions found" in personal_response.data
+    assert b"Late entry." not in personal_response.data
 
 
 def test_successful_import_performs_no_database_operations(app, client):

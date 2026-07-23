@@ -8,7 +8,12 @@ from pathlib import Path
 
 import pytest
 
-from app.services.rules import IMPLEMENTATION_STATUS, RULES, RuleDefinition
+from app.services.rules import (
+    IMPLEMENTATION_PENDING_STATUS,
+    IMPLEMENTED_STATUS,
+    RULES,
+    RuleDefinition,
+)
 
 
 EXPECTED_RULE_IDS = tuple(f"CC-RULE-{number:03d}" for number in range(1, 14))
@@ -79,12 +84,22 @@ def test_exact_exception_messages_appear(client):
         assert page.count(message) == 1
 
 
-def test_every_rule_is_marked_implementation_pending(client):
+def test_first_two_rules_are_implemented_and_remaining_rules_are_pending(client):
     page = client.get("/rules").get_data(as_text=True)
 
-    assert IMPLEMENTATION_STATUS == "Documented — implementation pending"
-    assert page.count(IMPLEMENTATION_STATUS) == len(RULES)
-    assert "not executed during CSV import" in page
+    assert IMPLEMENTED_STATUS == "Implemented"
+    assert IMPLEMENTATION_PENDING_STATUS == "Documented — implementation pending"
+    assert tuple(rule.implementation_status for rule in RULES[:2]) == (
+        IMPLEMENTED_STATUS,
+        IMPLEMENTED_STATUS,
+    )
+    assert all(
+        rule.implementation_status == IMPLEMENTATION_PENDING_STATUS
+        for rule in RULES[2:]
+    )
+    assert page.count(IMPLEMENTED_STATUS) == 2
+    assert page.count(IMPLEMENTATION_PENDING_STATUS) == 11
+    assert "remaining rules are implementation pending" in page
 
 
 def test_import_and_rules_navigation_active_states(client):
@@ -133,7 +148,10 @@ def test_rules_documentation_stays_synchronized_with_registry():
         ):
             assert " ".join(detail.split()) in normalized_documentation
 
-    assert "documented but not executed yet" in normalized_documentation
+    assert "CC-RULE-001 and CC-RULE-002 are implemented" in normalized_documentation
+    assert "CC-RULE-003 through CC-RULE-013 remain implementation pending" in (
+        normalized_documentation
+    )
     assert "must remain synchronized" in normalized_documentation
     assert "Rule IDs are permanent" in normalized_documentation
     assert "No rule categories are used" in normalized_documentation

@@ -1,10 +1,10 @@
 # CryoCheck
 
-CryoCheck is a standalone deice log audit application. This repository contains the production-ready Flask application shell, Neon PostgreSQL integration, in-memory CSV inspection workflow, optional local accounts with private Personal Settings, and a read-only catalog of approved audit rule specifications. Rule execution, results, and Excel export will be added in later development phases.
+CryoCheck is a standalone deice log audit application. This repository contains the production-ready Flask application, Neon PostgreSQL integration, an in-memory CSV audit workflow, optional local accounts with private Personal Settings, and the approved audit-rule registry. The first two rules now execute and produce reviewable Results; the remaining rules and Excel export will be added in later development phases.
 
 ## Purpose
 
-The application provides a focused workflow for importing and safely inspecting deice log data without requiring an account. Its public Rules page documents the checks planned for future validation. Optional accounts let users save private settings for those future audits without changing CryoCheck’s immutable Default values.
+The application provides a focused workflow for importing and auditing deice log data without requiring an account. Its public Rules page documents implemented and pending checks. Optional accounts let users save private settings without changing CryoCheck’s immutable Default values.
 
 ## Windows setup
 
@@ -55,15 +55,22 @@ The command runs `SELECT 1` and prints a success message. Connection failures re
 
 ## CSV import workflow
 
-The landing page accepts one `.csv` file through file browsing or drag and drop. CryoCheck parses the file in memory with pandas, validates its header, and shows an import summary plus the first 10 data rows. Uploaded content is not written to the repository, retained on the server, stored in Neon, or added to an upload history.
+The landing page accepts one `.csv` file through file browsing or drag and drop. CryoCheck validates its structure, keeps the complete source dataset in memory with original column order, row order, source strings, and physical CSV row numbers, then immediately audits every row. Results show audit metrics, ordered exceptions, any non-exception timestamp warnings, and the first 10 source rows.
 
-Importing only inspects the CSV structure and display values. It does not normalize values or run audit rules.
+Uploaded content, audit results, and exceptions are request-scoped. They are not written to disk, stored in the browser session, persisted to Neon, retained as audit history, or logged. Source values are never normalized or corrected.
+
+The current pipeline executes:
+
+- `CC-RULE-001` — Application Entry Proceeds Event
+- `CC-RULE-002` — Late Entry
+
+Both rules compare the local `ApplicationDate + StartTime` event timestamp with local `DateCreated`; UTC columns are not used. Blank or malformed required timestamps produce clearly separated unable-to-evaluate warnings, not rule exceptions. `CC-RULE-002` uses the active profile’s 24- or 48-hour late-entry threshold and fails at exact equality.
 
 The upload limit is configured with `MAX_UPLOAD_MB` and defaults to 10 MB. Oversized requests receive a branded HTTP 413 response.
 
 ## Optional accounts
 
-Accounts are optional. Anonymous users can continue to import CSV files, inspect import summaries, view the Rules catalog, and view the built-in Default settings.
+Accounts are optional. Anonymous users can continue to import and audit CSV files, review Results, view the Rules catalog, and view the built-in Default settings.
 
 - Create an account at `/register`.
 - Sign in at `/login`.
@@ -79,11 +86,11 @@ Login and registration are protected by CSRF validation and IP-based rate limits
 
 The `/settings` page is public. Anonymous users see the authoritative, immutable **Default** profile in read-only form. Default is the fallback for all anonymous use and is never stored as an editable database row.
 
-Registering creates exactly one private `UserSettings` record copied from the current Default values. A signed-in user can explicitly save changes to that record or reset it to the current Default. Personal changes affect only the owning account and never modify Default or another user’s settings. Settings are not yet attached to imports or used to execute audit rules.
+Registering creates exactly one private `UserSettings` record copied from the current Default values. A signed-in user can explicitly save changes to that record or reset it to the current Default. Personal changes affect only the owning account and never modify Default or another user’s settings. Anonymous audits use **Default**; signed-in audits use that account’s **Personal** profile. The Personal late-entry threshold currently affects `CC-RULE-002`; settings for pending rules are retained for later implementation.
 
 ## Rules catalog
 
-The read-only Rules page at `/rules` documents all 13 approved audit checks in permanent rule-ID order. The application registry in `app/services/rules.py` and [the detailed rules specification](docs/rules.md) must remain synchronized. The documented rules are not executed during CSV import.
+The read-only Rules page at `/rules` documents all 13 approved audit checks in permanent rule-ID order and shows each implementation status. The application registry in `app/services/rules.py` and [the detailed rules specification](docs/rules.md) must remain synchronized. `CC-RULE-001` and `CC-RULE-002` are implemented; `CC-RULE-003` through `CC-RULE-013` remain implementation pending.
 
 ### Required baseline columns
 

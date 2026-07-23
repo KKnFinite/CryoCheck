@@ -96,12 +96,29 @@ PREVIEW_ROW_LIMIT = 10
 
 
 @dataclass(frozen=True, slots=True)
+class CSVSourceRow:
+    """One immutable CSV row with its original fields and physical row number."""
+
+    source_row_number: int
+    fields: tuple[tuple[str, str], ...]
+
+    def get(self, column_name: str, default: str = "") -> str:
+        """Return an original source value without normalizing it."""
+        for name, value in self.fields:
+            if name == column_name:
+                return value
+        return default
+
+
+@dataclass(frozen=True, slots=True)
 class CSVImportResult:
-    """Safe, presentation-ready details from one parsed upload."""
+    """Complete in-memory source data and safe presentation details."""
 
     filename: str
     row_count: int
     column_count: int
+    column_names: tuple[str, ...]
+    rows: tuple[CSVSourceRow, ...]
     expected_columns_found: tuple[str, ...]
     missing_columns: tuple[str, ...]
     unexpected_columns: tuple[str, ...]
@@ -168,7 +185,7 @@ def parse_csv_upload(upload: FileStorage | None) -> CSVImportResult:
             filename=display_filename,
         )
 
-    header, source_row_numbers = _inspect_csv_structure(
+    header, source_rows = _inspect_csv_structure(
         csv_text,
         display_filename,
     )
@@ -211,7 +228,7 @@ def parse_csv_upload(upload: FileStorage | None) -> CSVImportResult:
             filename=display_filename,
         )
 
-    if len(dataframe.index) != len(source_row_numbers):
+    if len(dataframe.index) != len(source_rows):
         raise CSVImportError(
             "The file could not be parsed as a consistent CSV.",
             filename=display_filename,
@@ -228,12 +245,14 @@ def parse_csv_upload(upload: FileStorage | None) -> CSVImportResult:
     earliest_date, latest_date = _application_date_range(
         dataframe["ApplicationDate"]
     )
-    preview_records = _build_preview(dataframe, source_row_numbers)
+    preview_records = _build_preview(source_rows)
 
     return CSVImportResult(
         filename=display_filename,
         row_count=len(dataframe.index),
         column_count=len(dataframe.columns),
+        column_names=header,
+        rows=source_rows,
         expected_columns_found=tuple(
             name for name in EXPECTED_COLUMNS if name in dataframe.columns
         ),
@@ -256,7 +275,7 @@ def _safe_display_filename(raw_filename: str) -> str:
 def _inspect_csv_structure(
     csv_text: str,
     filename: str,
-) -> tuple[tuple[str, ...], tuple[int, ...]]:
+) -> tuple[tuple[str, ...], tuple[CSVSourceRow, ...]]:
     reader = csv.reader(io.StringIO(csv_text, newline=""), strict=True)
     try:
         header = next(reader)
@@ -277,7 +296,7 @@ def _inspect_csv_structure(
             filename=filename,
         )
 
-    source_row_numbers: list[int] = []
+    source_rows: list[CSVSourceRow] = []
     previous_line_end = reader.line_num
     try:
         for row in reader:
@@ -290,14 +309,19 @@ def _inspect_csv_structure(
                     "The CSV contains a row with a different number of fields than its header.",
                     filename=filename,
                 )
-            source_row_numbers.append(row_start)
+            source_rows.append(
+                CSVSourceRow(
+                    source_row_number=row_start,
+                    fields=tuple(zip(header, row, strict=True)),
+                )
+            )
     except csv.Error:
         raise CSVImportError(
             "The CSV contains malformed quoting or an incomplete row.",
             filename=filename,
         ) from None
 
-    return tuple(header), tuple(source_row_numbers)
+    return tuple(header), tuple(source_rows)
 
 
 def _application_date_range(
@@ -324,21 +348,17 @@ def _application_date_range(
 
 
 def _build_preview(
-    dataframe: pd.DataFrame,
-    source_row_numbers: tuple[int, ...],
+    source_rows: tuple[CSVSourceRow, ...],
 ) -> tuple[dict[str, str | int], ...]:
     preview_records: list[dict[str, str | int]] = []
-    preview_frame = dataframe.loc[:, PREVIEW_COLUMNS].head(PREVIEW_ROW_LIMIT)
 
-    for source_row, record in zip(
-        source_row_numbers[:PREVIEW_ROW_LIMIT],
-        preview_frame.to_dict(orient="records"),
-        strict=True,
-    ):
-        preview_record: dict[str, str | int] = {"CSV Row": source_row}
+    for source_row in source_rows[:PREVIEW_ROW_LIMIT]:
+        preview_record: dict[str, str | int] = {
+            "CSV Row": source_row.source_row_number
+        }
         preview_record.update(
             {
-                column: "" if pd.isna(record[column]) else str(record[column])
+                column: source_row.get(column)
                 for column in PREVIEW_COLUMNS
             }
         )
@@ -350,6 +370,7 @@ def _build_preview(
 __all__ = [
     "CSVImportError",
     "CSVImportResult",
+    "CSVSourceRow",
     "EXPECTED_COLUMNS",
     "PREVIEW_DISPLAY_COLUMNS",
     "parse_csv_upload",

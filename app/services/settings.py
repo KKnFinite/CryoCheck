@@ -18,7 +18,7 @@ TYPE4_FLUID_OPTIONS: Final[tuple[str, ...]] = ("Cryotech Polar Guard Xtend",)
 
 @dataclass(frozen=True, slots=True)
 class SettingsDefinition:
-    """Read-only settings values suitable for future audit-engine use."""
+    """Read-only settings values used by the active audit profile."""
 
     name: str
     is_default: bool

@@ -1,17 +1,23 @@
 # CryoCheck Rules
 
 This document is the approved specification for CryoCheck’s audit rules.
-These rules are documented but not executed yet.
+CC-RULE-001 and CC-RULE-002 are implemented and execute automatically after
+a structurally valid CSV upload. CC-RULE-003 through CC-RULE-013 remain
+implementation pending.
 
 The in-application registry and this documentation must remain synchronized.
 Rule IDs are permanent: they must never be reused or renumbered. No rule
 categories are used. Rules are mandatory unless a future specification
 explicitly says otherwise.
 
-Every rule currently has the implementation status **Documented —
-implementation pending**.
+Audits use original local `ApplicationDate`, `StartTime`, and `DateCreated`
+values in memory. UTC fields are not used. Anonymous audits use the immutable
+Default settings profile; signed-in audits use that account’s private Personal
+Settings. Uploaded rows, audit results, and exceptions are not persisted.
 
 ## CC-RULE-001 — Application Entry Proceeds Event
+
+**Implementation status:** Implemented
 
 ### Logic
 
@@ -33,9 +39,11 @@ implementation pending**.
 
 - Application date/time
 - Entry date/time
-- How far before the event the entry was created
+- How far before the application event the entry was created
 
 ## CC-RULE-002 — Late Entry
+
+**Implementation status:** Implemented
 
 ### Logic
 
@@ -65,6 +73,8 @@ implementation pending**.
 
 ## CC-RULE-003 — Incorrect Freeze Point
 
+**Implementation status:** Documented — implementation pending
+
 ### Logic
 
 - Applies to Type I.
@@ -93,6 +103,8 @@ implementation pending**.
 - Expected manufacturer-chart freeze point
 
 ## CC-RULE-004 — 18 Degree Buffer Not Met
+
+**Implementation status:** Documented — implementation pending
 
 ### Logic
 
@@ -128,6 +140,8 @@ implementation pending**.
 
 ## CC-RULE-005 — BRIX Out of Range
 
+**Implementation status:** Documented — implementation pending
+
 ### Logic
 
 - Applies to Type IV BRIX.
@@ -155,6 +169,8 @@ implementation pending**.
 - Amount below or above the range
 
 ## CC-RULE-006 — Excessive Gap Between Steps
+
+**Implementation status:** Documented — implementation pending
 
 ### Logic
 
@@ -186,6 +202,8 @@ implementation pending**.
 
 ## CC-RULE-007 — No Type IV During Active Precipitation
 
+**Implementation status:** Documented — implementation pending
+
 ### Logic
 
 - Treat blank Precipitation as no active precipitation.
@@ -210,6 +228,8 @@ implementation pending**.
 - Statement that no Type IV was recorded during active precipitation
 
 ## CC-RULE-008 — Excessive Type I
+
+**Implementation status:** Documented — implementation pending
 
 ### Logic
 
@@ -243,6 +263,8 @@ implementation pending**.
 
 ## CC-RULE-009 — Excessive Type IV
 
+**Implementation status:** Documented — implementation pending
+
 ### Logic
 
 - Use the CSV’s existing whole-number ProcessTime4 value directly.
@@ -272,6 +294,8 @@ implementation pending**.
 - Configured maximum
 
 ## CC-RULE-010 — Excessive Event Time
+
+**Implementation status:** Documented — implementation pending
 
 ### Logic
 
@@ -305,6 +329,8 @@ implementation pending**.
 
 ## CC-RULE-011 — Incorrect Type IV Concentration
 
+**Implementation status:** Documented — implementation pending
+
 ### Logic
 
 - Run only when Type4Used is greater than 0.
@@ -331,6 +357,8 @@ implementation pending**.
 - Required concentration
 
 ## CC-RULE-012 — Incorrect Tail Number
+
+**Implementation status:** Documented — implementation pending
 
 ### Logic
 
@@ -363,6 +391,8 @@ implementation pending**.
 - Required format or reason for failure
 
 ## CC-RULE-013 — Pass Overlap
+
+**Implementation status:** Documented — implementation pending
 
 ### Logic
 

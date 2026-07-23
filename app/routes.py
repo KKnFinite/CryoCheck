@@ -39,6 +39,7 @@ from app.services.settings import (
     get_active_settings,
     reset_user_settings,
 )
+from app.services.validation_engine import run_audit
 
 
 main = Blueprint("main", __name__)
@@ -58,7 +59,7 @@ def index() -> str:
 
 @main.post("/import")
 def import_csv():
-    """Parse one deicing CSV and render a non-persistent summary."""
+    """Parse and audit one deicing CSV entirely in memory."""
     try:
         uploads = request.files.getlist("csv_file")
         if len(uploads) > 1:
@@ -74,17 +75,20 @@ def import_csv():
             400,
         )
 
+    active_settings = get_active_settings()
+    audit_result = run_audit(result, active_settings)
     return render_template(
-        "import_summary.html",
+        "results.html",
         active_page="import",
-        result=result,
+        audit=audit_result,
+        import_result=result,
         preview_columns=PREVIEW_DISPLAY_COLUMNS,
     )
 
 
 @main.get("/rules")
 def rules() -> str:
-    """Render the approved, documentation-only audit rule catalog."""
+    """Render the approved audit rule catalog and implementation status."""
     return render_template(
         "rules.html",
         active_page="rules",

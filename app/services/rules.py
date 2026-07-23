@@ -1,8 +1,4 @@
-"""Read-only documentation registry for approved CryoCheck audit rules.
-
-The definitions in this module describe future audit behavior. They are not
-executed by the CSV import workflow.
-"""
+"""Authoritative registry for approved CryoCheck audit rules."""
 
 from __future__ import annotations
 
@@ -10,7 +6,8 @@ from dataclasses import dataclass
 from typing import Final
 
 
-IMPLEMENTATION_STATUS: Final = "Documented — implementation pending"
+IMPLEMENTED_STATUS: Final = "Implemented"
+IMPLEMENTATION_PENDING_STATUS: Final = "Documented — implementation pending"
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,7 +21,11 @@ class RuleDefinition:
     settings_defaults: tuple[str, ...]
     exception_message: str
     output_details: tuple[str, ...]
-    implementation_status: str = IMPLEMENTATION_STATUS
+    implementation_status: str = IMPLEMENTATION_PENDING_STATUS
+
+    @property
+    def is_implemented(self) -> bool:
+        return self.implementation_status == IMPLEMENTED_STATUS
 
 
 RULES: Final[tuple[RuleDefinition, ...]] = (
@@ -52,8 +53,9 @@ RULES: Final[tuple[RuleDefinition, ...]] = (
         output_details=(
             "Application date/time",
             "Entry date/time",
-            "How far before the event the entry was created",
+            "How far before the application event the entry was created",
         ),
+        implementation_status=IMPLEMENTED_STATUS,
     ),
     RuleDefinition(
         rule_id="CC-RULE-002",
@@ -84,6 +86,7 @@ RULES: Final[tuple[RuleDefinition, ...]] = (
             "Actual delay",
             "Amount beyond the threshold",
         ),
+        implementation_status=IMPLEMENTED_STATUS,
     ),
     RuleDefinition(
         rule_id="CC-RULE-003",
@@ -491,4 +494,9 @@ def _validate_registry() -> None:
 _validate_registry()
 
 
-__all__ = ["IMPLEMENTATION_STATUS", "RULES", "RuleDefinition"]
+__all__ = [
+    "IMPLEMENTATION_PENDING_STATUS",
+    "IMPLEMENTED_STATUS",
+    "RULES",
+    "RuleDefinition",
+]

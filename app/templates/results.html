@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+
+{% block title %}Audit Results | CryoCheck{% endblock %}
+
+{% block content %}
+  <section class="results-page" aria-labelledby="page-title">
+    <header class="results-heading">
+      <div>
+        <p class="eyebrow">Audit complete</p>
+        <h1 id="page-title">Audit Results</h1>
+        <p class="hero__intro">
+          CryoCheck audited every imported row with the two implemented
+          local-timestamp rules.
+        </p>
+      </div>
+      <a class="button button--secondary" href="{{ url_for('main.index') }}">
+        Import Another CSV
+      </a>
+    </header>
+
+    <section class="audit-overview" aria-labelledby="overview-heading">
+      <div class="summary-file">
+        <span class="summary-file__icon" aria-hidden="true">&#10003;</span>
+        <div>
+          <p id="overview-heading" class="summary-file__label">Audited filename</p>
+          <p class="summary-file__name">{{ audit.filename }}</p>
+        </div>
+      </div>
+
+      <dl class="audit-metrics">
+        <div class="summary-metric summary-metric--profile">
+          <dt>Settings profile</dt>
+          <dd>{{ audit.active_settings_profile_name }}</dd>
+        </div>
+        <div class="summary-metric">
+          <dt>Rows audited</dt>
+          <dd>{{ audit.rows_audited }}</dd>
+        </div>
+        <div class="summary-metric">
+          <dt>Total exceptions</dt>
+          <dd>{{ audit.exception_count }}</dd>
+        </div>
+        <div class="summary-metric">
+          <dt>Rules executed</dt>
+          <dd>{{ audit.rules_executed }}</dd>
+        </div>
+        {% if audit.unable_to_evaluate_count %}
+          <div class="summary-metric summary-metric--warning">
+            <dt>Unable to evaluate</dt>
+            <dd>{{ audit.unable_to_evaluate_count }}</dd>
+          </div>
+        {% endif %}
+      </dl>
+
+      {% if import_result.unexpected_columns %}
+        <div class="audit-schema-note">
+          <p>Unexpected columns retained</p>
+          <ul class="tag-list">
+            {% for column in import_result.unexpected_columns %}
+              <li>{{ column }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+    </section>
+
+    {% if audit.unable_to_evaluate_count %}
+      <section class="audit-warning-summary" aria-labelledby="warning-heading">
+        <div>
+          <p class="eyebrow">Non-exception warning</p>
+          <h2 id="warning-heading">Some rule evaluations could not run</h2>
+          <p>
+            {{ audit.unable_to_evaluate_count }} rule
+            evaluation{% if audit.unable_to_evaluate_count != 1 %}s{% endif %}
+            across {{ audit.unable_to_evaluate_row_count }} CSV
+            row{% if audit.unable_to_evaluate_row_count != 1 %}s{% endif %}
+            could not use the required local timestamps. These warnings are
+            not included in the exception count.
+          </p>
+        </div>
+        <ul class="audit-warning-list">
+          {% for warning in audit.unable_to_evaluate %}
+            <li>
+              <strong>CSV row {{ warning.source_row_number }} · {{ warning.rule_id }}</strong>
+              {% if warning.record_id %}
+                <span>RecordID {{ warning.record_id }}</span>
+              {% endif %}
+              <span>{{ warning.message }}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      </section>
+    {% endif %}
+
+    <section class="exceptions-section" aria-labelledby="exceptions-heading">
+      <div class="exceptions-heading">
+        <div>
+          <p class="eyebrow">Review findings</p>
+          <h2 id="exceptions-heading">Exceptions</h2>
+        </div>
+        <p>
+          Ordered by source CSV row, then rule ID.
+        </p>
+      </div>
+
+      {% if audit.exceptions %}
+        <ol class="exception-list">
+          {% for exception in audit.exceptions %}
+            <li>
+              <article class="exception-card" aria-labelledby="exception-{{ loop.index }}-title">
+                <header class="exception-card__header">
+                  <div>
+                    <p class="exception-card__rule">{{ exception.rule_id }}</p>
+                    <h3 id="exception-{{ loop.index }}-title">
+                      {{ exception.exception_message }}
+                    </h3>
+                    <p>{{ exception.rule_name }}</p>
+                  </div>
+                  <p class="exception-card__row">
+                    CSV row <strong>{{ exception.source_row_number }}</strong>
+                  </p>
+                </header>
+
+                <dl class="exception-record">
+                  <div>
+                    <dt>RecordID</dt>
+                    <dd>{{ exception.record_id or "Not reported" }}</dd>
+                  </div>
+                  <div>
+                    <dt>ApplicationNumber</dt>
+                    <dd>{{ exception.application_number or "Not reported" }}</dd>
+                  </div>
+                  <div>
+                    <dt>Gateway</dt>
+                    <dd>{{ exception.gateway_code or "Not reported" }}</dd>
+                  </div>
+                  <div>
+                    <dt>Aircraft / tail</dt>
+                    <dd>
+                      {{ exception.aircraft_type or "Not reported" }}
+                      /
+                      {{ exception.tail_number or "Not reported" }}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Application date/time</dt>
+                    <dd>{{ exception.application_date }} {{ exception.start_time }}</dd>
+                  </div>
+                  <div>
+                    <dt>Entry date/time</dt>
+                    <dd>{{ exception.date_created }}</dd>
+                  </div>
+                  <div class="exception-record__wide">
+                    <dt>Truck / operator / driver</dt>
+                    <dd>
+                      {{ exception.truck_number or "Not reported" }}
+                      /
+                      {{ exception.operator or "Not reported" }}
+                      /
+                      {{ exception.driver or "Not reported" }}
+                    </dd>
+                  </div>
+                </dl>
+
+                <section class="exception-details" aria-label="Calculated rule details">
+                  <h4>Calculated rule details</h4>
+                  <dl>
+                    {% for detail in exception.details %}
+                      <div>
+                        <dt>{{ detail.label }}</dt>
+                        <dd>{{ detail.value }}</dd>
+                      </div>
+                    {% endfor %}
+                  </dl>
+                </section>
+              </article>
+            </li>
+          {% endfor %}
+        </ol>
+      {% else %}
+        <div class="audit-empty-state">
+          <span aria-hidden="true">&#10003;</span>
+          <h3>No exceptions found</h3>
+          <p>
+            All evaluable rows passed CC-RULE-001 and CC-RULE-002 with
+            {{ audit.active_settings_profile_name }} settings.
+          </p>
+        </div>
+      {% endif %}
+    </section>
+
+    <section class="preview-panel" aria-labelledby="preview-heading">
+      <div class="preview-panel__heading">
+        <div>
+          <p class="eyebrow">Source preview</p>
+          <h2 id="preview-heading">
+            First {{ import_result.preview_records | length }} data rows
+          </h2>
+        </div>
+        <p>
+          Values are shown exactly as imported. The complete dataset was
+          audited in memory.
+        </p>
+      </div>
+
+      <div class="table-scroll" tabindex="0" aria-label="Imported CSV preview table">
+        <table class="preview-table">
+          <thead>
+            <tr>
+              {% for column in preview_columns %}
+                <th scope="col">{{ column }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for record in import_result.preview_records %}
+              <tr>
+                {% for column in preview_columns %}
+                  <td{% if column == "CSV Row" %} class="preview-table__row"{% endif %}>
+                    {{ record[column] }}
+                  </td>
+                {% endfor %}
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <div class="results-actions">
+      <a class="button button--primary" href="{{ url_for('main.index') }}">
+        Import Another CSV
+      </a>
+    </div>
+  </section>
+{% endblock %}

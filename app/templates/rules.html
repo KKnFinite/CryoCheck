@@ -10,8 +10,8 @@
         <h1 id="page-title">CryoCheck Rules</h1>
         <p class="hero__intro">
           This page documents CryoCheck’s mandatory audit checks and their
-          current configurable behavior. These rules are specifications only
-          and are not executed during CSV import.
+          current configurable behavior. CC-RULE-001 and CC-RULE-002 execute
+          during CSV import; the remaining rules are implementation pending.
         </p>
       </div>
       <p class="rule-count" aria-label="{{ rules | length }} documented rules">
@@ -30,7 +30,7 @@
                 <h2 id="rule-{{ loop.index }}-title">{{ rule.name }}</h2>
                 <p class="rule-card__description">{{ rule.description }}</p>
               </div>
-              <p class="rule-card__status">
+              <p class="rule-card__status{% if rule.is_implemented %} rule-card__status--implemented{% endif %}">
                 <span aria-hidden="true"></span>
                 {{ rule.implementation_status }}
               </p>
