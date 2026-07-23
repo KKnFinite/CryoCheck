@@ -9,8 +9,8 @@
         <p class="eyebrow">Audit complete</p>
         <h1 id="page-title">Audit Results</h1>
         <p class="hero__intro">
-          CryoCheck audited every imported row with the two implemented
-          local-timestamp rules.
+          CryoCheck audited every imported row with the four implemented
+          rules.
         </p>
       </div>
       <a class="button button--secondary" href="{{ url_for('main.index') }}">
@@ -74,8 +74,7 @@
             evaluation{% if audit.unable_to_evaluate_count != 1 %}s{% endif %}
             across {{ audit.unable_to_evaluate_row_count }} CSV
             row{% if audit.unable_to_evaluate_row_count != 1 %}s{% endif %}
-            could not use the required local timestamps. These warnings are
-            not included in the exception count.
+            could not use required rule inputs. These warnings are not included in the exception count.
           </p>
         </div>
         <ul class="audit-warning-list">
@@ -182,7 +181,7 @@
           <span aria-hidden="true">&#10003;</span>
           <h3>No exceptions found</h3>
           <p>
-            All evaluable rows passed CC-RULE-001 and CC-RULE-002 with
+            All evaluable rows passed the four implemented rules with
             {{ audit.active_settings_profile_name }} settings.
           </p>
         </div>

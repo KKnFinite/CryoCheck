@@ -5,17 +5,28 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from decimal import Decimal, InvalidOperation
 from typing import Final
 
 from app.services.csv_import import CSVImportResult, CSVSourceRow
 from app.services.rules import IMPLEMENTED_STATUS, RULES, RuleDefinition
 from app.services.settings import SettingsDefinition
+from app.services.type1_fluids import get_type1_fluid_profile
 
 
 EXECUTED_RULES: Final[tuple[RuleDefinition, ...]] = tuple(
     rule for rule in RULES if rule.implementation_status == IMPLEMENTED_STATUS
 )
-_RULE_001, _RULE_002 = EXECUTED_RULES
+_EXECUTED_RULES_BY_ID: Final = {
+    rule.rule_id: rule for rule in EXECUTED_RULES
+}
+_RULE_001 = _EXECUTED_RULES_BY_ID["CC-RULE-001"]
+_RULE_002 = _EXECUTED_RULES_BY_ID["CC-RULE-002"]
+_RULE_003 = _EXECUTED_RULES_BY_ID["CC-RULE-003"]
+_RULE_004 = _EXECUTED_RULES_BY_ID["CC-RULE-004"]
+_TIMESTAMP_RULES: Final = (_RULE_001, _RULE_002)
+_TYPE1_RULES: Final = (_RULE_003, _RULE_004)
+_REQUIRED_TYPE1_BUFFER: Final = Decimal("18.0")
 
 _APPLICATION_DATE_FORMATS: Final[tuple[str, ...]] = (
     "%Y-%m-%d",
@@ -122,36 +133,50 @@ def run_audit(
     for source_row in imported_csv.rows:
         timestamps, invalid_fields = _parse_local_timestamps(source_row)
         if timestamps is None:
-            for rule in EXECUTED_RULES:
+            for rule in _TIMESTAMP_RULES:
                 warnings.append(
-                    _unable_to_evaluate(source_row, rule, invalid_fields)
+                    _unable_to_evaluate(
+                        source_row,
+                        rule,
+                        invalid_fields,
+                        message=(
+                            "Required local timestamp values are blank or "
+                            f"invalid: {', '.join(invalid_fields)}."
+                        ),
+                    )
                 )
-            continue
+        else:
+            event_timestamp, entry_timestamp = timestamps
+            if entry_timestamp < event_timestamp:
+                exceptions.append(
+                    _rule_001_exception(
+                        source_row,
+                        event_timestamp - entry_timestamp,
+                    )
+                )
 
-        event_timestamp, entry_timestamp = timestamps
-        if entry_timestamp < event_timestamp:
-            exceptions.append(
-                _rule_001_exception(
-                    source_row,
-                    event_timestamp - entry_timestamp,
-                )
+            threshold = timedelta(
+                hours=active_settings.late_entry_threshold_hours
             )
+            delay = entry_timestamp - event_timestamp
+            if delay >= threshold:
+                exceptions.append(
+                    _rule_002_exception(
+                        source_row,
+                        threshold_hours=(
+                            active_settings.late_entry_threshold_hours
+                        ),
+                        delay=delay,
+                        beyond_threshold=delay - threshold,
+                    )
+                )
 
-        threshold = timedelta(
-            hours=active_settings.late_entry_threshold_hours
+        type1_exceptions, type1_warnings = _evaluate_type1_rules(
+            source_row,
+            active_settings,
         )
-        delay = entry_timestamp - event_timestamp
-        if delay >= threshold:
-            exceptions.append(
-                _rule_002_exception(
-                    source_row,
-                    threshold_hours=(
-                        active_settings.late_entry_threshold_hours
-                    ),
-                    delay=delay,
-                    beyond_threshold=delay - threshold,
-                )
-            )
+        exceptions.extend(type1_exceptions)
+        warnings.extend(type1_warnings)
 
     return AuditResult(
         filename=imported_csv.filename,
@@ -238,19 +263,185 @@ def _unable_to_evaluate(
     source_row: CSVSourceRow,
     rule: RuleDefinition,
     invalid_fields: tuple[str, ...],
+    *,
+    message: str,
 ) -> UnableToEvaluate:
-    field_list = ", ".join(invalid_fields)
     return UnableToEvaluate(
         rule_id=rule.rule_id,
         rule_name=rule.name,
         source_row_number=source_row.source_row_number,
         record_id=source_row.get("RecordID"),
         invalid_fields=invalid_fields,
-        message=(
-            "Required local timestamp values are blank or invalid: "
-            f"{field_list}."
-        ),
+        message=message,
     )
+
+
+def _evaluate_type1_rules(
+    source_row: CSVSourceRow,
+    active_settings: SettingsDefinition,
+) -> tuple[list[AuditException], list[UnableToEvaluate]]:
+    """Evaluate the two chart-backed rules independently of timestamp rules."""
+    exceptions: list[AuditException] = []
+    warnings: list[UnableToEvaluate] = []
+    type1_used_text = source_row.get("Type1Used")
+
+    if not type1_used_text.strip():
+        return exceptions, warnings
+
+    type1_used = _parse_decimal(type1_used_text)
+    if type1_used is None:
+        return exceptions, [
+            _unable_to_evaluate(
+                source_row,
+                rule,
+                ("Type1Used",),
+                message=(
+                    "Type1Used is malformed, so Type I rule applicability "
+                    "could not be determined."
+                ),
+            )
+            for rule in _TYPE1_RULES
+        ]
+    if type1_used <= 0:
+        return exceptions, warnings
+
+    profile = get_type1_fluid_profile(active_settings.type1_fluid)
+    if profile is None:
+        return exceptions, [
+            _unable_to_evaluate(
+                source_row,
+                rule,
+                ("Type I fluid setting",),
+                message=(
+                    "The selected Type I fluid does not have an available "
+                    f"manufacturer chart: {active_settings.type1_fluid}."
+                ),
+            )
+            for rule in _TYPE1_RULES
+        ]
+
+    concentration_text = source_row.get("Type1Concentration")
+    concentration_decimal = _parse_decimal(concentration_text)
+    if (
+        concentration_decimal is None
+        or concentration_decimal
+        != concentration_decimal.to_integral_value()
+    ):
+        return exceptions, [
+            _unable_to_evaluate(
+                source_row,
+                rule,
+                ("Type1Concentration",),
+                message=(
+                    "Type1Concentration must be a supported whole-number "
+                    "percentage."
+                ),
+            )
+            for rule in _TYPE1_RULES
+        ]
+
+    available_concentrations = profile.freezing_points.keys()
+    minimum_concentration = min(available_concentrations)
+    maximum_concentration = max(available_concentrations)
+    if (
+        concentration_decimal < minimum_concentration
+        or concentration_decimal > maximum_concentration
+    ):
+        return exceptions, [
+            _unable_to_evaluate(
+                source_row,
+                rule,
+                ("Type1Concentration",),
+                message=(
+                    f"Type1Concentration {concentration_text} is outside the "
+                    f"available {minimum_concentration}–"
+                    f"{maximum_concentration}% manufacturer chart."
+                ),
+            )
+            for rule in _TYPE1_RULES
+        ]
+
+    concentration = int(concentration_decimal)
+    expected_freeze_point = profile.freeze_point_for(concentration)
+    if expected_freeze_point is None:
+        return exceptions, [
+            _unable_to_evaluate(
+                source_row,
+                rule,
+                ("Type1Concentration",),
+                message=(
+                    f"Type1Concentration {concentration_text} is not available "
+                    f"in the {profile.name} manufacturer chart."
+                ),
+            )
+            for rule in _TYPE1_RULES
+        ]
+
+    entered_freeze_point_text = source_row.get("FreezingPoint1")
+    entered_freeze_point = _parse_decimal(entered_freeze_point_text)
+    if entered_freeze_point is None:
+        warnings.append(
+            _unable_to_evaluate(
+                source_row,
+                _RULE_003,
+                ("FreezingPoint1",),
+                message=(
+                    "FreezingPoint1 is blank or malformed, so it could not be "
+                    "compared with the manufacturer chart."
+                ),
+            )
+        )
+    elif entered_freeze_point != expected_freeze_point:
+        exceptions.append(
+            _rule_003_exception(
+                source_row,
+                fluid_name=profile.name,
+                concentration=concentration,
+                entered_freeze_point_text=entered_freeze_point_text,
+                expected_freeze_point=expected_freeze_point,
+            )
+        )
+
+    ambient_temperature_text = source_row.get("AmbientTemp")
+    ambient_temperature = _parse_decimal(ambient_temperature_text)
+    if ambient_temperature is None:
+        warnings.append(
+            _unable_to_evaluate(
+                source_row,
+                _RULE_004,
+                ("AmbientTemp",),
+                message=(
+                    "AmbientTemp is blank or malformed, so the Type I buffer "
+                    "could not be calculated."
+                ),
+            )
+        )
+    else:
+        actual_buffer = ambient_temperature - expected_freeze_point
+        if actual_buffer < _REQUIRED_TYPE1_BUFFER:
+            exceptions.append(
+                _rule_004_exception(
+                    source_row,
+                    fluid_name=profile.name,
+                    concentration=concentration,
+                    ambient_temperature_text=ambient_temperature_text,
+                    expected_freeze_point=expected_freeze_point,
+                    actual_buffer=actual_buffer,
+                )
+            )
+
+    return exceptions, warnings
+
+
+def _parse_decimal(source_value: str) -> Decimal | None:
+    value = source_value.strip()
+    if not value:
+        return None
+    try:
+        parsed = Decimal(value)
+    except InvalidOperation:
+        return None
+    return parsed if parsed.is_finite() else None
 
 
 def _rule_001_exception(
@@ -295,6 +486,81 @@ def _rule_002_exception(
             RuleDetail(
                 "Amount beyond the threshold",
                 _format_duration(beyond_threshold),
+            ),
+        ),
+    )
+
+
+def _rule_003_exception(
+    source_row: CSVSourceRow,
+    *,
+    fluid_name: str,
+    concentration: int,
+    entered_freeze_point_text: str,
+    expected_freeze_point: Decimal,
+) -> AuditException:
+    expected_text = _format_temperature(expected_freeze_point)
+    entered_temperature_text = f"{entered_freeze_point_text}°F"
+    return _build_exception(
+        source_row,
+        _RULE_003,
+        details=(
+            RuleDetail("Selected Type I fluid", fluid_name),
+            RuleDetail("Recorded concentration", f"{concentration}%"),
+            RuleDetail(
+                "Entered freeze point",
+                entered_temperature_text,
+            ),
+            RuleDetail(
+                "Expected manufacturer-chart freeze point",
+                expected_text,
+            ),
+            RuleDetail(
+                "Comparison",
+                (
+                    f"Expected {expected_text} at {concentration}% "
+                    f"concentration. Entered {entered_temperature_text}."
+                ),
+            ),
+        ),
+    )
+
+
+def _rule_004_exception(
+    source_row: CSVSourceRow,
+    *,
+    fluid_name: str,
+    concentration: int,
+    ambient_temperature_text: str,
+    expected_freeze_point: Decimal,
+    actual_buffer: Decimal,
+) -> AuditException:
+    amount_short = _REQUIRED_TYPE1_BUFFER - actual_buffer
+    return _build_exception(
+        source_row,
+        _RULE_004,
+        details=(
+            RuleDetail("Selected Type I fluid", fluid_name),
+            RuleDetail("Recorded concentration", f"{concentration}%"),
+            RuleDetail(
+                "Outside air temperature",
+                f"{ambient_temperature_text}°F",
+            ),
+            RuleDetail(
+                "Authoritative manufacturer-chart freeze point",
+                _format_temperature(expected_freeze_point),
+            ),
+            RuleDetail(
+                "Actual calculated buffer",
+                _format_temperature(actual_buffer),
+            ),
+            RuleDetail(
+                "Required buffer",
+                _format_temperature(_REQUIRED_TYPE1_BUFFER),
+            ),
+            RuleDetail(
+                "Amount short",
+                _format_temperature(amount_short),
             ),
         ),
     )
@@ -350,6 +616,10 @@ def _format_duration(duration: timedelta) -> str:
             parts.append(f"{value} {label}{'' if value == 1 else 's'}")
 
     return ", ".join(parts) if parts else "0 minutes"
+
+
+def _format_temperature(value: Decimal) -> str:
+    return f"{format(value, 'f')}°F"
 
 
 __all__ = [

@@ -41,9 +41,10 @@ def _synthetic_csv(
             "TruckNumber": "TRUCK-TEST",
             "Operator": "Synthetic Operator",
             "Driver": "Synthetic Driver",
+            "AmbientTemp": "1",
             "Type1Used": "10",
             "Type1Concentration": "50",
-            "FreezingPoint1": "-25",
+            "FreezingPoint1": "-17.3",
             "Type4Used": "0",
             "Type4ABrix": "",
         }
@@ -319,6 +320,90 @@ def test_rule_exception_is_rendered_on_results_screen(client):
     assert b"Application entry proceeds event." in response.data
     assert b"CSV row <strong>2</strong>" in response.data
     assert b"1 minute" in response.data
+
+
+def test_rule_003_exception_is_rendered_on_results_screen(client):
+    response = _upload(
+        client,
+        _synthetic_csv(
+            overrides={
+                0: {
+                    "Type1Concentration": "65",
+                    "FreezingPoint1": "-20",
+                    "AmbientTemp": "-32",
+                }
+            }
+        ),
+    )
+
+    assert response.status_code == 200
+    assert b"CC-RULE-003" in response.data
+    assert b"Incorrect freeze point." in response.data
+    assert b"Cryotech Polar Plus LT" in response.data
+    assert b"Expected -50.0" in response.data
+    assert b"CC-RULE-004" not in response.data
+
+
+def test_rule_004_exception_is_rendered_on_results_screen(client):
+    response = _upload(
+        client,
+        _synthetic_csv(
+            overrides={
+                0: {
+                    "Type1Concentration": "65",
+                    "FreezingPoint1": "-50.0",
+                    "AmbientTemp": "-33",
+                }
+            }
+        ),
+    )
+
+    assert response.status_code == 200
+    assert b"CC-RULE-003" not in response.data
+    assert b"CC-RULE-004" in response.data
+    assert b"18 degree buffer not met." in response.data
+    assert b"17.0" in response.data
+    assert b"1.0" in response.data
+
+
+def test_rule_003_and_rule_004_render_together_in_rule_order(client):
+    response = _upload(
+        client,
+        _synthetic_csv(
+            overrides={
+                0: {
+                    "Type1Concentration": "65",
+                    "FreezingPoint1": "-20",
+                    "AmbientTemp": "-33",
+                }
+            }
+        ),
+    )
+    page = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert page.index("CC-RULE-003") < page.index("CC-RULE-004")
+    assert page.count("Incorrect freeze point.") == 1
+    assert page.count("18 degree buffer not met.") == 1
+
+
+def test_exact_18_degree_buffer_does_not_render_rule_004(client):
+    response = _upload(
+        client,
+        _synthetic_csv(
+            overrides={
+                0: {
+                    "Type1Concentration": "65",
+                    "FreezingPoint1": "-50.0",
+                    "AmbientTemp": "-32",
+                }
+            }
+        ),
+    )
+
+    assert response.status_code == 200
+    assert b"CC-RULE-004" not in response.data
+    assert b"No exceptions found" in response.data
 
 
 def test_invalid_timestamp_warning_is_separate_from_exceptions(client):

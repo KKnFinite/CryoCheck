@@ -1,8 +1,8 @@
 # CryoCheck Rules
 
 This document is the approved specification for CryoCheck’s audit rules.
-CC-RULE-001 and CC-RULE-002 are implemented and execute automatically after
-a structurally valid CSV upload. CC-RULE-003 through CC-RULE-013 remain
+CC-RULE-001 through CC-RULE-004 are implemented and execute automatically
+after a structurally valid CSV upload. CC-RULE-005 through CC-RULE-013 remain
 implementation pending.
 
 The in-application registry and this documentation must remain synchronized.
@@ -73,16 +73,20 @@ Settings. Uploaded rows, audit results, and exceptions are not persisted.
 
 ## CC-RULE-003 — Incorrect Freeze Point
 
-**Implementation status:** Documented — implementation pending
+**Implementation status:** Implemented
 
 ### Logic
 
-- Applies to Type I.
-- Use the Type I fluid selected for the gateway.
+- Runs only when Type1Used is numerically greater than 0.
+- Use the Type I fluid selected in active audit settings.
 - Use the recorded Type1Concentration to find the exact expected freeze point
   from that fluid’s manufacturer chart.
+- Concentrations 60 and 60.0 both select the 60% chart row.
+- The current Cryotech Polar Plus LT chart supports whole-number
+  concentrations from 0–70%.
+- A non-whole or unsupported concentration is unable to evaluate.
 - Compare the expected value with FreezingPoint1.
-- Whole-number forms such as -39 and -39.0 are equivalent.
+- Numerically equal decimal forms such as -50 and -50.0 are equivalent.
 - Any other difference fails.
 
 ### Settings/defaults
@@ -101,19 +105,25 @@ Settings. Uploaded rows, audit results, and exceptions are not persisted.
 - Recorded concentration
 - Entered freeze point
 - Expected manufacturer-chart freeze point
+- Concise comparison
 
 ## CC-RULE-004 — 18 Degree Buffer Not Met
 
-**Implementation status:** Documented — implementation pending
+**Implementation status:** Implemented
 
 ### Logic
 
-- Applies to Type I only.
-- Required buffer is 18°F.
+- Runs only when Type1Used is numerically greater than 0.
+- Required buffer is 18.0°F.
 - Buffer = AmbientTemp minus the correct manufacturer-chart Type I freeze
   point.
-- A buffer of 18°F or greater passes.
-- A buffer of 17°F or less fails.
+- Always use the authoritative manufacturer-chart freeze point, never an
+  incorrectly entered FreezingPoint1 value.
+- A buffer below 18.0°F fails.
+- A buffer of 18.0°F or greater passes.
+- The current Cryotech Polar Plus LT chart supports whole-number
+  concentrations from 0–70%.
+- A non-whole or unsupported concentration is unable to evaluate.
 - Do not create a false buffer exception solely because the entered freeze
   point is wrong.
 - If the entered freeze point is wrong but the correct chart value passes the
@@ -123,7 +133,7 @@ Settings. Uploaded rows, audit results, and exceptions are not persisted.
 
 ### Settings
 
-- Required buffer: fixed at 18°F
+- Required buffer: fixed at 18.0°F
 - Mandatory
 
 ### Exception message
@@ -132,11 +142,13 @@ Settings. Uploaded rows, audit results, and exceptions are not persisted.
 
 ### Output details
 
+- Selected Type I fluid
+- Recorded concentration
 - Outside air temperature
-- Correct chart freeze point
-- Actual buffer
+- Authoritative manufacturer-chart freeze point
+- Actual calculated buffer
 - Required buffer
-- Degrees short
+- Amount short
 
 ## CC-RULE-005 — BRIX Out of Range
 

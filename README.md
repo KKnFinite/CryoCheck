@@ -1,6 +1,6 @@
 # CryoCheck
 
-CryoCheck is a standalone deice log audit application. This repository contains the production-ready Flask application, Neon PostgreSQL integration, an in-memory CSV audit workflow, optional local accounts with private Personal Settings, and the approved audit-rule registry. The first two rules now execute and produce reviewable Results; the remaining rules and Excel export will be added in later development phases.
+CryoCheck is a standalone deice log audit application. This repository contains the production-ready Flask application, Neon PostgreSQL integration, an in-memory CSV audit workflow, optional local accounts with private Personal Settings, and the approved audit-rule registry. The first four rules now execute and produce reviewable Results; the remaining rules and Excel export will be added in later development phases.
 
 ## Purpose
 
@@ -55,7 +55,7 @@ The command runs `SELECT 1` and prints a success message. Connection failures re
 
 ## CSV import workflow
 
-The landing page accepts one `.csv` file through file browsing or drag and drop. CryoCheck validates its structure, keeps the complete source dataset in memory with original column order, row order, source strings, and physical CSV row numbers, then immediately audits every row. Results show audit metrics, ordered exceptions, any non-exception timestamp warnings, and the first 10 source rows.
+The landing page accepts one `.csv` file through file browsing or drag and drop. CryoCheck validates its structure, keeps the complete source dataset in memory with original column order, row order, source strings, and physical CSV row numbers, then immediately audits every row. Results show audit metrics, ordered exceptions, any non-exception unable-to-evaluate warnings, and the first 10 source rows.
 
 Uploaded content, audit results, and exceptions are request-scoped. They are not written to disk, stored in the browser session, persisted to Neon, retained as audit history, or logged. Source values are never normalized or corrected.
 
@@ -63,8 +63,14 @@ The current pipeline executes:
 
 - `CC-RULE-001` — Application Entry Proceeds Event
 - `CC-RULE-002` — Late Entry
+- `CC-RULE-003` — Incorrect Freeze Point
+- `CC-RULE-004` — 18 Degree Buffer Not Met
 
-Both rules compare the local `ApplicationDate + StartTime` event timestamp with local `DateCreated`; UTC columns are not used. Blank or malformed required timestamps produce clearly separated unable-to-evaluate warnings, not rule exceptions. `CC-RULE-002` uses the active profile’s 24- or 48-hour late-entry threshold and fails at exact equality.
+The first two rules compare the local `ApplicationDate + StartTime` event timestamp with local `DateCreated`; UTC columns are not used. Blank or malformed required timestamps produce clearly separated unable-to-evaluate warnings, not rule exceptions. `CC-RULE-002` uses the active profile’s 24- or 48-hour late-entry threshold and fails at exact equality.
+
+The Type I rules run only when `Type1Used` is numerically greater than zero. `CC-RULE-003` compares `FreezingPoint1` with the exact manufacturer value for the recorded whole-number concentration. `CC-RULE-004` calculates the buffer from `AmbientTemp` and that authoritative chart value, never from the entered freeze point; a buffer below 18.0°F fails and an exact 18.0°F passes. Decimal parsing and comparisons use Python `Decimal`, so equivalent numeric forms compare equally without rounding.
+
+Cryotech Polar Plus LT manufacturer data is stored as a version-controlled, read-only CSV under `app/reference_data` and loaded by the reusable registry in `app/services/type1_fluids.py`. Loading profiles requires no database or network access. The chart is validated at startup for its schema, malformed or missing values, duplicate concentrations, and complete concentration coverage. Its current reference-data boundary is whole-number concentrations from 0 through 70%; non-whole and unsupported concentrations produce unable-to-evaluate warnings rather than exceptions.
 
 The upload limit is configured with `MAX_UPLOAD_MB` and defaults to 10 MB. Oversized requests receive a branded HTTP 413 response.
 
@@ -86,11 +92,11 @@ Login and registration are protected by CSRF validation and IP-based rate limits
 
 The `/settings` page is public. Anonymous users see the authoritative, immutable **Default** profile in read-only form. Default is the fallback for all anonymous use and is never stored as an editable database row.
 
-Registering creates exactly one private `UserSettings` record copied from the current Default values. A signed-in user can explicitly save changes to that record or reset it to the current Default. Personal changes affect only the owning account and never modify Default or another user’s settings. Anonymous audits use **Default**; signed-in audits use that account’s **Personal** profile. The Personal late-entry threshold currently affects `CC-RULE-002`; settings for pending rules are retained for later implementation.
+Registering creates exactly one private `UserSettings` record copied from the current Default values. A signed-in user can explicitly save changes to that record or reset it to the current Default. Personal changes affect only the owning account and never modify Default or another user’s settings. Anonymous audits use **Default**; signed-in audits use that account’s **Personal** profile. The Personal late-entry threshold affects `CC-RULE-002`, and the active Type I fluid selection affects `CC-RULE-003` and `CC-RULE-004`; settings for pending rules are retained for later implementation.
 
 ## Rules catalog
 
-The read-only Rules page at `/rules` documents all 13 approved audit checks in permanent rule-ID order and shows each implementation status. The application registry in `app/services/rules.py` and [the detailed rules specification](docs/rules.md) must remain synchronized. `CC-RULE-001` and `CC-RULE-002` are implemented; `CC-RULE-003` through `CC-RULE-013` remain implementation pending.
+The read-only Rules page at `/rules` documents all 13 approved audit checks in permanent rule-ID order and shows each implementation status. The application registry in `app/services/rules.py` and [the detailed rules specification](docs/rules.md) must remain synchronized. `CC-RULE-001` through `CC-RULE-004` are implemented; `CC-RULE-005` through `CC-RULE-013` remain implementation pending.
 
 ### Required baseline columns
 

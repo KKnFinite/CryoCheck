@@ -96,14 +96,23 @@ RULES: Final[tuple[RuleDefinition, ...]] = (
             "the selected fluid’s manufacturer chart."
         ),
         logic_summary=(
-            "Applies to Type I.",
-            "Use the Type I fluid selected for the gateway.",
+            "Runs only when Type1Used is numerically greater than 0.",
+            "Use the Type I fluid selected in active audit settings.",
             (
                 "Use the recorded Type1Concentration to find the exact expected "
                 "freeze point from that fluid’s manufacturer chart."
             ),
+            "Concentrations 60 and 60.0 both select the 60% chart row.",
+            (
+                "The current Cryotech Polar Plus LT chart supports whole-number "
+                "concentrations from 0–70%."
+            ),
+            (
+                "A non-whole or unsupported concentration is unable to "
+                "evaluate."
+            ),
             "Compare the expected value with FreezingPoint1.",
-            "Whole-number forms such as -39 and -39.0 are equivalent.",
+            "Numerically equal decimal forms such as -50 and -50.0 are equivalent.",
             "Any other difference fails.",
         ),
         settings_defaults=(
@@ -117,7 +126,9 @@ RULES: Final[tuple[RuleDefinition, ...]] = (
             "Recorded concentration",
             "Entered freeze point",
             "Expected manufacturer-chart freeze point",
+            "Concise comparison",
         ),
+        implementation_status=IMPLEMENTED_STATUS,
     ),
     RuleDefinition(
         rule_id="CC-RULE-004",
@@ -127,14 +138,26 @@ RULES: Final[tuple[RuleDefinition, ...]] = (
             "required 18°F temperature buffer."
         ),
         logic_summary=(
-            "Applies to Type I only.",
-            "Required buffer is 18°F.",
+            "Runs only when Type1Used is numerically greater than 0.",
+            "Required buffer is 18.0°F.",
             (
                 "Buffer = AmbientTemp minus the correct manufacturer-chart "
                 "Type I freeze point."
             ),
-            "A buffer of 18°F or greater passes.",
-            "A buffer of 17°F or less fails.",
+            (
+                "Always use the authoritative manufacturer-chart freeze point, "
+                "never an incorrectly entered FreezingPoint1 value."
+            ),
+            "A buffer below 18.0°F fails.",
+            "A buffer of 18.0°F or greater passes.",
+            (
+                "The current Cryotech Polar Plus LT chart supports whole-number "
+                "concentrations from 0–70%."
+            ),
+            (
+                "A non-whole or unsupported concentration is unable to "
+                "evaluate."
+            ),
             (
                 "Do not create a false buffer exception solely because the "
                 "entered freeze point is wrong."
@@ -150,17 +173,20 @@ RULES: Final[tuple[RuleDefinition, ...]] = (
             ),
         ),
         settings_defaults=(
-            "Required buffer: fixed at 18°F",
+            "Required buffer: fixed at 18.0°F",
             "Mandatory",
         ),
         exception_message="18 degree buffer not met.",
         output_details=(
+            "Selected Type I fluid",
+            "Recorded concentration",
             "Outside air temperature",
-            "Correct chart freeze point",
-            "Actual buffer",
+            "Authoritative manufacturer-chart freeze point",
+            "Actual calculated buffer",
             "Required buffer",
-            "Degrees short",
+            "Amount short",
         ),
+        implementation_status=IMPLEMENTED_STATUS,
     ),
     RuleDefinition(
         rule_id="CC-RULE-005",
