@@ -8,6 +8,15 @@
       <p class="eyebrow">Deice operations assurance</p>
       <h1 id="page-title">Deice Data Validation</h1>
       <p class="hero__intro">A clear, dependable workflow for auditing deice log data.</p>
+      <a class="active-settings" href="{{ url_for('main.settings') }}">
+        <span class="active-settings__dot" aria-hidden="true"></span>
+        Settings:
+        {% if active_settings.is_default %}
+          Default
+        {% else %}
+          Personal &mdash; {{ current_user.username }}
+        {% endif %}
+      </a>
     </div>
 
     <div class="glass-panel">
@@ -20,6 +29,7 @@
           enctype="multipart/form-data"
           data-upload-form
         >
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <label class="upload-dropzone" for="csv-file" data-drop-zone>
             <input
               class="visually-hidden"

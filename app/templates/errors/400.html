@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block title %}Security Check Failed | CryoCheck{% endblock %}
+
+{% block content %}
+  <section class="error-panel" aria-labelledby="error-title">
+    <p class="error-panel__code">Request rejected</p>
+    <h1 id="error-title">Security check failed</h1>
+    <p>Your form session expired or could not be verified. Reload the page and try again.</p>
+    <a class="button button--secondary" href="{{ url_for('main.index') }}">Return to Import</a>
+  </section>
+{% endblock %}

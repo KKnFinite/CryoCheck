@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from datetime import timedelta
 
 from dotenv import load_dotenv
 
@@ -50,6 +51,20 @@ class Config:
     SQLALCHEMY_DATABASE_URI = prepare_database_url(os.getenv("DATABASE_URL"))
     SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True}
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = "Lax"
+    SESSION_COOKIE_SECURE = False
+    REMEMBER_COOKIE_HTTPONLY = True
+    REMEMBER_COOKIE_SAMESITE = "Lax"
+    REMEMBER_COOKIE_SECURE = False
+    REMEMBER_COOKIE_DURATION = timedelta(days=30)
+    PERMANENT_SESSION_LIFETIME = timedelta(days=30)
+    WTF_CSRF_ENABLED = True
+    RATELIMIT_ENABLED = True
+    RATELIMIT_HEADERS_ENABLED = True
+    RATELIMIT_STORAGE_URI = "memory://"
+    LOGIN_RATE_LIMIT = "10 per 15 minutes"
+    REGISTRATION_RATE_LIMIT = "5 per hour"
 
 
 class DevelopmentConfig(Config):
@@ -66,14 +81,15 @@ class TestingConfig(Config):
     SECRET_KEY = "testing-only-secret"
     SQLALCHEMY_DATABASE_URI = "sqlite+pysqlite:///:memory:"
     SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True}
+    WTF_CSRF_ENABLED = False
+    RATELIMIT_ENABLED = False
 
 
 class ProductionConfig(Config):
     """Production-safe defaults for Render."""
 
     SESSION_COOKIE_SECURE = True
-    SESSION_COOKIE_HTTPONLY = True
-    SESSION_COOKIE_SAMESITE = "Lax"
+    REMEMBER_COOKIE_SECURE = True
 
 
 CONFIGURATIONS = {

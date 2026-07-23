@@ -389,11 +389,98 @@ RULES: Final[tuple[RuleDefinition, ...]] = (
             "Required concentration",
         ),
     ),
+    RuleDefinition(
+        rule_id="CC-RULE-012",
+        name="Incorrect Tail Number",
+        description=(
+            "Checks a tail number against the approved format requirement for "
+            "its recorded aircraft type."
+        ),
+        logic_summary=(
+            (
+                "Trim surrounding whitespace and compare letters "
+                "case-insensitively."
+            ),
+            (
+                "When AircraftType = 1, TailNumber must match the UPS format "
+                "NxxxUP, where each x is a digit."
+            ),
+            "Normalized UPS pattern: ^N[0-9]{3}UP$",
+            "When AircraftType = 2:",
+            "TailNumber must not be blank.",
+            "TailNumber must not match the UPS NxxxUP pattern.",
+            (
+                "Apply only a loose syntax check allowing letters, numbers, "
+                "and hyphens."
+            ),
+            (
+                "Do not perform FAA, ICAO, registry, country-specific, "
+                "carrier-list, or ownership validation."
+            ),
+            (
+                "Generate an exception when the tail does not meet the "
+                "requirement for its aircraft type."
+            ),
+        ),
+        settings_defaults=(
+            "None",
+            "Mandatory",
+        ),
+        exception_message="Incorrect tail number.",
+        output_details=(
+            "AircraftType",
+            "Entered TailNumber",
+            "Required format or reason for failure",
+        ),
+    ),
+    RuleDefinition(
+        rule_id="CC-RULE-013",
+        name="Pass Overlap",
+        description=(
+            "Checks that a Type IV pass does not begin before the Type I pass "
+            "ends, while accounting for events that cross midnight."
+        ),
+        logic_summary=(
+            "Applies when both Type I and Type IV are used.",
+            "Equality between EndTime1 and StartTime4 passes.",
+            "Type IV must not begin before Type I ends.",
+            (
+                "Use overall StartTime and EndTime to determine whether the "
+                "event crossed midnight."
+            ),
+            (
+                "If overall EndTime is earlier than overall StartTime, treat "
+                "the event as crossing midnight and allow the Type IV time to "
+                "roll into the next day."
+            ),
+            (
+                "If the overall event did not cross midnight and StartTime4 is "
+                "earlier than EndTime1, generate an exception."
+            ),
+            "Example overnight pass:",
+            "EndTime1 = 23:59",
+            "StartTime4 = 00:01",
+            "Overall event crosses midnight",
+            "Result: pass with a two-minute gap",
+        ),
+        settings_defaults=(
+            "None",
+            "Mandatory",
+        ),
+        exception_message="Pass overlap.",
+        output_details=(
+            "Overall event StartTime",
+            "Overall event EndTime",
+            "Type I EndTime1",
+            "Type IV StartTime4",
+            "Calculated overlap in minutes when an exception occurs",
+        ),
+    ),
 )
 
 
 def _validate_registry() -> None:
-    expected_ids = tuple(f"CC-RULE-{number:03d}" for number in range(1, 12))
+    expected_ids = tuple(f"CC-RULE-{number:03d}" for number in range(1, 14))
     actual_ids = tuple(rule.rule_id for rule in RULES)
     if actual_ids != expected_ids or len(actual_ids) != len(set(actual_ids)):
         raise RuntimeError(

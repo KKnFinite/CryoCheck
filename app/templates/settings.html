@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+
+{% block title %}Settings | CryoCheck{% endblock %}
+
+{% block content %}
+  <section class="settings-page" aria-labelledby="page-title">
+    {% if not current_user.is_authenticated %}
+      <header class="settings-heading">
+        <div>
+          <p class="eyebrow">Read-only profile</p>
+          <h1 id="page-title">Default Settings</h1>
+          <p class="hero__intro">
+            You are using Default settings. An account is required to save
+            personal settings; importing CSV files does not require one.
+          </p>
+        </div>
+        <div class="settings-heading__actions">
+          <a class="button button--primary" href="{{ url_for('main.login', next=url_for('main.settings')) }}">
+            Sign In
+          </a>
+          <a class="button button--secondary" href="{{ url_for('main.register') }}">
+            Create Account
+          </a>
+        </div>
+      </header>
+
+      <div class="settings-panel">
+        <div class="settings-panel__banner">
+          <span aria-hidden="true">&#10052;</span>
+          <div>
+            <strong>You are using Default settings.</strong>
+            <p>These built-in values are immutable and cannot be deleted.</p>
+          </div>
+        </div>
+
+        <dl class="settings-readonly">
+          <div><dt>Late-entry threshold</dt><dd>{{ default_settings.late_entry_threshold_hours }} hours</dd></div>
+          <div><dt>Type I fluid</dt><dd>{{ default_settings.type1_fluid }}</dd></div>
+          <div><dt>Type IV fluid</dt><dd>{{ default_settings.type4_fluid }}</dd></div>
+          <div><dt>Allowed gap</dt><dd>{{ default_settings.allowed_gap_minutes }} minutes</dd></div>
+          <div><dt>Maximum Type I adjusted rate</dt><dd>{{ default_settings.max_type1_rate_gpm }} GPM</dd></div>
+          <div><dt>Maximum Type IV adjusted rate</dt><dd>{{ default_settings.max_type4_rate_gpm }} GPM</dd></div>
+          <div><dt>Maximum event time</dt><dd>{{ default_settings.max_event_time_minutes }} minutes</dd></div>
+          <div><dt>Include gap in event time</dt><dd>{{ "On" if default_settings.include_gap_in_event_time else "Off" }}</dd></div>
+        </dl>
+      </div>
+    {% else %}
+      <header class="settings-heading">
+        <div>
+          <p class="eyebrow">Private account profile</p>
+          <h1 id="page-title">Personal Settings</h1>
+          <p class="hero__intro">
+            Signed in as <strong>{{ current_user.username }}</strong>. Changes
+            affect only this account and are saved only when you choose
+            Save Changes.
+          </p>
+        </div>
+        <p class="settings-updated">
+          <span>Last updated</span>
+          {{ updated_at_display }}
+        </p>
+      </header>
+
+      <form class="settings-form" method="post" novalidate>
+        {{ settings_form.hidden_tag() }}
+
+        <section class="settings-group" aria-labelledby="timing-settings">
+          <div class="settings-group__heading">
+            <p class="eyebrow">Timing</p>
+            <h2 id="timing-settings">Entry and event timing</h2>
+          </div>
+          <div class="settings-fields">
+            <div class="form-field">
+              {{ settings_form.late_entry_threshold_hours.label }}
+              {{ settings_form.late_entry_threshold_hours() }}
+              {% if settings_form.late_entry_threshold_hours.errors %}
+                <ul class="form-errors" role="alert">{% for error in settings_form.late_entry_threshold_hours.errors %}<li>{{ error }}</li>{% endfor %}</ul>
+              {% endif %}
+            </div>
+            <div class="form-field">
+              {{ settings_form.allowed_gap_minutes.label }}
+              <div class="input-suffix">
+                {{ settings_form.allowed_gap_minutes(min="0", max="99", step="1") }}
+                <span>minutes</span>
+              </div>
+              {% if settings_form.allowed_gap_minutes.errors %}
+                <ul class="form-errors" role="alert">{% for error in settings_form.allowed_gap_minutes.errors %}<li>{{ error }}</li>{% endfor %}</ul>
+              {% endif %}
+            </div>
+            <div class="form-field">
+              {{ settings_form.max_event_time_minutes.label }}
+              <div class="input-suffix">
+                {{ settings_form.max_event_time_minutes(min="1", max="999", step="1") }}
+                <span>minutes</span>
+              </div>
+              {% if settings_form.max_event_time_minutes.errors %}
+                <ul class="form-errors" role="alert">{% for error in settings_form.max_event_time_minutes.errors %}<li>{{ error }}</li>{% endfor %}</ul>
+              {% endif %}
+            </div>
+            <label class="check-field check-field--panel">
+              {{ settings_form.include_gap_in_event_time() }}
+              <span>{{ settings_form.include_gap_in_event_time.label.text }}</span>
+            </label>
+          </div>
+        </section>
+
+        <section class="settings-group" aria-labelledby="fluid-settings">
+          <div class="settings-group__heading">
+            <p class="eyebrow">Fluids</p>
+            <h2 id="fluid-settings">Gateway fluid selections</h2>
+          </div>
+          <div class="settings-fields settings-fields--two">
+            <div class="form-field">
+              {{ settings_form.type1_fluid.label }}
+              {{ settings_form.type1_fluid() }}
+              {% if settings_form.type1_fluid.errors %}
+                <ul class="form-errors" role="alert">{% for error in settings_form.type1_fluid.errors %}<li>{{ error }}</li>{% endfor %}</ul>
+              {% endif %}
+            </div>
+            <div class="form-field">
+              {{ settings_form.type4_fluid.label }}
+              {{ settings_form.type4_fluid() }}
+              {% if settings_form.type4_fluid.errors %}
+                <ul class="form-errors" role="alert">{% for error in settings_form.type4_fluid.errors %}<li>{{ error }}</li>{% endfor %}</ul>
+              {% endif %}
+            </div>
+          </div>
+        </section>
+
+        <section class="settings-group" aria-labelledby="rate-settings">
+          <div class="settings-group__heading">
+            <p class="eyebrow">Application rates</p>
+            <h2 id="rate-settings">Adjusted maximums</h2>
+          </div>
+          <div class="settings-fields settings-fields--two">
+            <div class="form-field">
+              {{ settings_form.max_type1_rate_gpm.label }}
+              <div class="input-suffix">
+                {{ settings_form.max_type1_rate_gpm(min="0.000001", max="999", step="any") }}
+                <span>GPM</span>
+              </div>
+              {% if settings_form.max_type1_rate_gpm.errors %}
+                <ul class="form-errors" role="alert">{% for error in settings_form.max_type1_rate_gpm.errors %}<li>{{ error }}</li>{% endfor %}</ul>
+              {% endif %}
+            </div>
+            <div class="form-field">
+              {{ settings_form.max_type4_rate_gpm.label }}
+              <div class="input-suffix">
+                {{ settings_form.max_type4_rate_gpm(min="0.000001", max="999", step="any") }}
+                <span>GPM</span>
+              </div>
+              {% if settings_form.max_type4_rate_gpm.errors %}
+                <ul class="form-errors" role="alert">{% for error in settings_form.max_type4_rate_gpm.errors %}<li>{{ error }}</li>{% endfor %}</ul>
+              {% endif %}
+            </div>
+          </div>
+        </section>
+
+        <div class="settings-save">
+          <p>Nothing is saved until you select Save Changes.</p>
+          {{ settings_form.submit(class_="button button--primary") }}
+        </div>
+      </form>
+
+      <section class="reset-panel" aria-labelledby="reset-heading">
+        <div>
+          <p class="eyebrow">Restore baseline</p>
+          <h2 id="reset-heading">Reset to Default</h2>
+          <p>Replace every Personal Settings value with the current built-in Default.</p>
+        </div>
+        <form method="post" action="{{ url_for('main.reset_settings') }}">
+          {{ reset_form.hidden_tag() }}
+          <label class="check-field">
+            {{ reset_form.confirm_reset() }}
+            <span>{{ reset_form.confirm_reset.label.text }}</span>
+          </label>
+          {% if reset_form.confirm_reset.errors %}
+            <ul class="form-errors" role="alert">{% for error in reset_form.confirm_reset.errors %}<li>{{ error }}</li>{% endfor %}</ul>
+          {% endif %}
+          {{ reset_form.submit(class_="button button--secondary") }}
+        </form>
+      </section>
+    {% endif %}
+  </section>
+{% endblock %}

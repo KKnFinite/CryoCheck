@@ -40,6 +40,10 @@ def create_app(config_name: str | None = None) -> Flask:
 
     Path(app.instance_path).mkdir(parents=True, exist_ok=True)
 
+    # Import models before extension setup so migration metadata is complete.
+    from app import models as application_models
+
+    del application_models
     init_extensions(app)
     register_cli_commands(app)
     app.register_blueprint(main)

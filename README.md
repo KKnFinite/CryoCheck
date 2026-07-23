@@ -1,10 +1,10 @@
 # CryoCheck
 
-CryoCheck is a standalone deice log audit application. This repository currently contains the production-ready Flask application shell, Neon PostgreSQL integration foundation, in-memory CSV inspection workflow, and a read-only catalog of approved audit rule specifications. Rule execution, settings, results, and Excel export will be added in later development phases.
+CryoCheck is a standalone deice log audit application. This repository contains the production-ready Flask application shell, Neon PostgreSQL integration, in-memory CSV inspection workflow, optional local accounts with private Personal Settings, and a read-only catalog of approved audit rule specifications. Rule execution, results, and Excel export will be added in later development phases.
 
 ## Purpose
 
-The application provides a focused starting workflow for importing and safely inspecting deice log data. Its public Rules page documents the checks planned for future validation. Future phases will execute those checks and support reviewing or exporting exceptions.
+The application provides a focused workflow for importing and safely inspecting deice log data without requiring an account. Its public Rules page documents the checks planned for future validation. Optional accounts let users save private settings for those future audits without changing CryoCheck’s immutable Default values.
 
 ## Windows setup
 
@@ -61,9 +61,29 @@ Importing only inspects the CSV structure and display values. It does not normal
 
 The upload limit is configured with `MAX_UPLOAD_MB` and defaults to 10 MB. Oversized requests receive a branded HTTP 413 response.
 
+## Optional accounts
+
+Accounts are optional. Anonymous users can continue to import CSV files, inspect import summaries, view the Rules catalog, and view the built-in Default settings.
+
+- Create an account at `/register`.
+- Sign in at `/login`.
+- Sign out with the Logout action in the application header.
+- Account names are unique without regard to casing.
+- CryoCheck does not request or store email addresses.
+- Password recovery is not available. Users must retain their own passwords securely.
+- Passwords are stored only as Werkzeug scrypt hashes.
+
+Login and registration are protected by CSRF validation and IP-based rate limits. The current single-instance Render deployment uses in-memory rate-limit storage. Counters reset when the process restarts and are not shared across multiple application instances; move to a shared supported backend before scaling horizontally.
+
+## Default and Personal Settings
+
+The `/settings` page is public. Anonymous users see the authoritative, immutable **Default** profile in read-only form. Default is the fallback for all anonymous use and is never stored as an editable database row.
+
+Registering creates exactly one private `UserSettings` record copied from the current Default values. A signed-in user can explicitly save changes to that record or reset it to the current Default. Personal changes affect only the owning account and never modify Default or another user’s settings. Settings are not yet attached to imports or used to execute audit rules.
+
 ## Rules catalog
 
-The read-only Rules page at `/rules` documents all approved audit checks in permanent rule-ID order. The application registry in `app/services/rules.py` and [the detailed rules specification](docs/rules.md) must remain synchronized. The documented rules are not executed during CSV import.
+The read-only Rules page at `/rules` documents all 13 approved audit checks in permanent rule-ID order. The application registry in `app/services/rules.py` and [the detailed rules specification](docs/rules.md) must remain synchronized. The documented rules are not executed during CSV import.
 
 ### Required baseline columns
 
@@ -153,24 +173,29 @@ Select a profile with the `FLASK_CONFIG` environment variable.
 
 ## Database migrations
 
-Flask-Migrate infrastructure is initialized in `migrations/`, but there are no migration revisions because CryoCheck has no domain models yet. Do not run `flask db migrate` until a meaningful model change is ready.
+The initial migration creates the `users` and `user_settings` tables. The migration repository was initialized once with `flask db init`; do not run that initialization command again.
 
-The migration repository was initialized once with `flask db init`; do not run that initialization command again.
+Apply committed migrations locally:
 
-Future migration workflow:
+```powershell
+flask db upgrade
+flask db-check
+```
+
+Workflow for future model changes:
 
 ```powershell
 flask db migrate -m "Describe the model change"
 flask db upgrade
 ```
 
-Review every generated revision before applying it. Production migrations must be committed with the related model change and applied as a controlled Render operation using `flask db upgrade`. They are not currently part of the Render build command.
+Review every generated revision before applying it. Production migrations must be committed with the related model change and applied before the new application code handles production traffic.
 
 ## Render deployment
 
 Create a Render Web Service connected to this repository and use:
 
-- Build command: `pip install -r requirements.txt`
+- Build command: `pip install -r requirements.txt && flask db upgrade`
 - Start command: `gunicorn run:app`
 - Health check path: `/health`
 
@@ -181,4 +206,4 @@ Configure these Render environment variables:
 - `FLASK_CONFIG=production`
 - `MAX_UPLOAD_MB`: optional CSV upload limit in megabytes; defaults to `10`
 
-Do not add `flask db upgrade` to the build command yet because there are no migrations or domain models. The `/health` endpoint intentionally remains database-independent so Render can verify the web process during a temporary database outage. Use `flask db-check` separately when database connectivity must be confirmed.
+The `/health` endpoint intentionally remains database-independent so Render can verify the web process during a temporary database outage. Use `flask db-check` separately when database connectivity must be confirmed. The build must fail rather than start application code against an unapplied schema migration.

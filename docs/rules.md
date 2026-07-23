@@ -329,3 +329,71 @@ implementation pending**.
 - Selected Type IV fluid
 - Entered Type IV concentration
 - Required concentration
+
+## CC-RULE-012 — Incorrect Tail Number
+
+### Logic
+
+- Trim surrounding whitespace and compare letters case-insensitively.
+- When AircraftType = 1, TailNumber must match the UPS format NxxxUP, where
+  each x is a digit.
+- Normalized UPS pattern: ^N[0-9]{3}UP$
+- When AircraftType = 2:
+  - TailNumber must not be blank.
+  - TailNumber must not match the UPS NxxxUP pattern.
+  - Apply only a loose syntax check allowing letters, numbers, and hyphens.
+  - Do not perform FAA, ICAO, registry, country-specific, carrier-list, or
+    ownership validation.
+- Generate an exception when the tail does not meet the requirement for its
+  aircraft type.
+
+### Settings
+
+- None
+- Mandatory
+
+### Exception message
+
+`Incorrect tail number.`
+
+### Output details
+
+- AircraftType
+- Entered TailNumber
+- Required format or reason for failure
+
+## CC-RULE-013 — Pass Overlap
+
+### Logic
+
+- Applies when both Type I and Type IV are used.
+- Equality between EndTime1 and StartTime4 passes.
+- Type IV must not begin before Type I ends.
+- Use overall StartTime and EndTime to determine whether the event crossed
+  midnight.
+- If overall EndTime is earlier than overall StartTime, treat the event as
+  crossing midnight and allow the Type IV time to roll into the next day.
+- If the overall event did not cross midnight and StartTime4 is earlier than
+  EndTime1, generate an exception.
+- Example overnight pass:
+  - EndTime1 = 23:59
+  - StartTime4 = 00:01
+  - Overall event crosses midnight
+  - Result: pass with a two-minute gap
+
+### Settings
+
+- None
+- Mandatory
+
+### Exception message
+
+`Pass overlap.`
+
+### Output details
+
+- Overall event StartTime
+- Overall event EndTime
+- Type I EndTime1
+- Type IV StartTime4
+- Calculated overlap in minutes when an exception occurs

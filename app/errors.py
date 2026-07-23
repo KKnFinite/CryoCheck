@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from flask import Flask, current_app, render_template
+from flask_limiter.errors import RateLimitExceeded
+from flask_wtf.csrf import CSRFError
 from werkzeug.exceptions import RequestEntityTooLarge
 
 
@@ -29,3 +31,13 @@ def register_error_handlers(app: Flask) -> None:
             ),
             413,
         )
+
+    @app.errorhandler(CSRFError)
+    def csrf_failed(error):
+        del error
+        return render_template("errors/400.html"), 400
+
+    @app.errorhandler(RateLimitExceeded)
+    def rate_limit_exceeded(error):
+        del error
+        return render_template("errors/429.html"), 429

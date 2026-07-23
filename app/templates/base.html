@@ -17,25 +17,68 @@
           <span class="brand__mark" aria-hidden="true">&#10052;</span>
           <span class="brand__name">CryoCheck</span>
         </a>
-        <nav class="site-nav" aria-label="Primary navigation">
-          <a
-            class="site-nav__link{% if active_page == 'import' %} site-nav__link--active{% endif %}"
-            href="{{ url_for('main.index') }}"
-            {% if active_page == "import" %}aria-current="page"{% endif %}
-          >
-            Import
-          </a>
-          <a
-            class="site-nav__link{% if active_page == 'rules' %} site-nav__link--active{% endif %}"
-            href="{{ url_for('main.rules') }}"
-            {% if active_page == "rules" %}aria-current="page"{% endif %}
-          >
-            Rules
-          </a>
-        </nav>
+        <div class="header-actions">
+          <nav class="site-nav" aria-label="Primary navigation">
+            <a
+              class="site-nav__link{% if active_page == 'import' %} site-nav__link--active{% endif %}"
+              href="{{ url_for('main.index') }}"
+              {% if active_page == "import" %}aria-current="page"{% endif %}
+            >
+              Import
+            </a>
+            <a
+              class="site-nav__link{% if active_page == 'rules' %} site-nav__link--active{% endif %}"
+              href="{{ url_for('main.rules') }}"
+              {% if active_page == "rules" %}aria-current="page"{% endif %}
+            >
+              Rules
+            </a>
+            <a
+              class="site-nav__link{% if active_page == 'settings' %} site-nav__link--active{% endif %}"
+              href="{{ url_for('main.settings') }}"
+              {% if active_page == "settings" %}aria-current="page"{% endif %}
+            >
+              Settings
+            </a>
+          </nav>
+
+          <nav class="account-nav" aria-label="Account navigation">
+            {% if current_user.is_authenticated %}
+              <span class="account-nav__name">{{ current_user.username }}</span>
+              <form action="{{ url_for('main.logout') }}" method="post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="account-nav__action" type="submit">Logout</button>
+              </form>
+            {% else %}
+              <a
+                class="account-nav__action{% if active_page == 'login' %} account-nav__action--active{% endif %}"
+                href="{{ url_for('main.login') }}"
+                {% if active_page == "login" %}aria-current="page"{% endif %}
+              >
+                Sign In
+              </a>
+              <a
+                class="account-nav__action account-nav__action--primary{% if active_page == 'register' %} account-nav__action--active{% endif %}"
+                href="{{ url_for('main.register') }}"
+                {% if active_page == "register" %}aria-current="page"{% endif %}
+              >
+                Create Account
+              </a>
+            {% endif %}
+          </nav>
+        </div>
       </header>
 
       <main id="main-content" class="site-main">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <div class="flash-stack" aria-live="polite">
+              {% for category, message in messages %}
+                <p class="flash-message flash-message--{{ category }}">{{ message }}</p>
+              {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
         {% block content %}{% endblock %}
       </main>
 

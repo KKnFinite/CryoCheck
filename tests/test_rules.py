@@ -11,7 +11,7 @@ import pytest
 from app.services.rules import IMPLEMENTATION_STATUS, RULES, RuleDefinition
 
 
-EXPECTED_RULE_IDS = tuple(f"CC-RULE-{number:03d}" for number in range(1, 12))
+EXPECTED_RULE_IDS = tuple(f"CC-RULE-{number:03d}" for number in range(1, 14))
 EXPECTED_EXCEPTION_MESSAGES = (
     "Application entry proceeds event.",
     "Late entry.",
@@ -24,6 +24,8 @@ EXPECTED_EXCEPTION_MESSAGES = (
     "Excessive Type IV.",
     "Excessive event time.",
     "Incorrect Type IV concentration.",
+    "Incorrect tail number.",
+    "Pass overlap.",
 )
 
 
@@ -32,7 +34,7 @@ def test_rules_page_returns_200_with_documented_count(client):
 
     assert response.status_code == 200
     assert b"CryoCheck Rules" in response.data
-    assert b"11 documented rules" in response.data
+    assert b"13 documented rules" in response.data
 
 
 def test_rule_ids_are_unique_and_in_permanent_numeric_order():
@@ -107,6 +109,14 @@ def test_import_and_rules_navigation_active_states(client):
         r'href="/"[^>]*aria-current="page"',
         rules_page,
     )
+
+
+def test_rules_page_has_no_enable_or_disable_controls(client):
+    page = client.get("/rules").get_data(as_text=True)
+
+    assert 'type="checkbox"' not in page
+    assert ">Enable<" not in page
+    assert ">Disable<" not in page
 
 
 def test_rules_documentation_stays_synchronized_with_registry():
