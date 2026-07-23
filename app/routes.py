@@ -9,6 +9,7 @@ from app.services.csv_import import (
     PREVIEW_DISPLAY_COLUMNS,
     parse_csv_upload,
 )
+from app.services.rules import RULES
 
 
 main = Blueprint("main", __name__)
@@ -19,6 +20,7 @@ def index() -> str:
     """Render the initial CryoCheck landing page."""
     return render_template(
         "index.html",
+        active_page="import",
         max_upload_mb=current_app.config["MAX_UPLOAD_MB"],
     )
 
@@ -32,12 +34,30 @@ def import_csv():
             raise CSVImportError("Import one CSV file at a time.")
         result = parse_csv_upload(uploads[0] if uploads else None)
     except CSVImportError as error:
-        return render_template("import_error.html", error=error), 400
+        return (
+            render_template(
+                "import_error.html",
+                active_page="import",
+                error=error,
+            ),
+            400,
+        )
 
     return render_template(
         "import_summary.html",
+        active_page="import",
         result=result,
         preview_columns=PREVIEW_DISPLAY_COLUMNS,
+    )
+
+
+@main.get("/rules")
+def rules() -> str:
+    """Render the approved, documentation-only audit rule catalog."""
+    return render_template(
+        "rules.html",
+        active_page="rules",
+        rules=RULES,
     )
 
 

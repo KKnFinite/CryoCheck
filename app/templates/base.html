@@ -17,6 +17,22 @@
           <span class="brand__mark" aria-hidden="true">&#10052;</span>
           <span class="brand__name">CryoCheck</span>
         </a>
+        <nav class="site-nav" aria-label="Primary navigation">
+          <a
+            class="site-nav__link{% if active_page == 'import' %} site-nav__link--active{% endif %}"
+            href="{{ url_for('main.index') }}"
+            {% if active_page == "import" %}aria-current="page"{% endif %}
+          >
+            Import
+          </a>
+          <a
+            class="site-nav__link{% if active_page == 'rules' %} site-nav__link--active{% endif %}"
+            href="{{ url_for('main.rules') }}"
+            {% if active_page == "rules" %}aria-current="page"{% endif %}
+          >
+            Rules
+          </a>
+        </nav>
       </header>
 
       <main id="main-content" class="site-main">

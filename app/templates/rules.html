@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}CryoCheck Rules | Audit Specification{% endblock %}
+
+{% block content %}
+  <section class="rules-page" aria-labelledby="page-title">
+    <header class="rules-page__heading">
+      <div>
+        <p class="eyebrow">Audit specification</p>
+        <h1 id="page-title">CryoCheck Rules</h1>
+        <p class="hero__intro">
+          This page documents CryoCheck’s mandatory audit checks and their
+          current configurable behavior. These rules are specifications only
+          and are not executed during CSV import.
+        </p>
+      </div>
+      <p class="rule-count" aria-label="{{ rules | length }} documented rules">
+        <strong>{{ rules | length }}</strong>
+        <span>Documented rules</span>
+      </p>
+    </header>
+
+    <ol class="rules-list">
+      {% for rule in rules %}
+        <li>
+          <article class="rule-card" aria-labelledby="rule-{{ loop.index }}-title">
+            <header class="rule-card__header">
+              <div class="rule-card__identity">
+                <p class="rule-card__id">{{ rule.rule_id }}</p>
+                <h2 id="rule-{{ loop.index }}-title">{{ rule.name }}</h2>
+                <p class="rule-card__description">{{ rule.description }}</p>
+              </div>
+              <p class="rule-card__status">
+                <span aria-hidden="true"></span>
+                {{ rule.implementation_status }}
+              </p>
+            </header>
+
+            <div class="rule-card__body">
+              <section class="rule-detail rule-detail--logic">
+                <h3>Logic summary</h3>
+                <ul>
+                  {% for item in rule.logic_summary %}
+                    <li>{{ item }}</li>
+                  {% endfor %}
+                </ul>
+              </section>
+
+              <section class="rule-detail">
+                <h3>Settings / defaults</h3>
+                <ul>
+                  {% for item in rule.settings_defaults %}
+                    <li>{{ item }}</li>
+                  {% endfor %}
+                </ul>
+              </section>
+
+              <section class="rule-detail">
+                <h3>Exception message</h3>
+                <p class="rule-exception">{{ rule.exception_message }}</p>
+              </section>
+
+              <section class="rule-detail rule-detail--output">
+                <h3>Output details</h3>
+                <ul>
+                  {% for item in rule.output_details %}
+                    <li>{{ item }}</li>
+                  {% endfor %}
+                </ul>
+              </section>
+            </div>
+          </article>
+        </li>
+      {% endfor %}
+    </ol>
+  </section>
+{% endblock %}

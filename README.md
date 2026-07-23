@@ -1,10 +1,10 @@
 # CryoCheck
 
-CryoCheck is a standalone deice log audit application. This repository currently contains the production-ready Flask application shell, Neon PostgreSQL integration foundation, and in-memory CSV inspection workflow; validation rules, settings, results, and Excel export will be added in later development phases.
+CryoCheck is a standalone deice log audit application. This repository currently contains the production-ready Flask application shell, Neon PostgreSQL integration foundation, in-memory CSV inspection workflow, and a read-only catalog of approved audit rule specifications. Rule execution, settings, results, and Excel export will be added in later development phases.
 
 ## Purpose
 
-The application provides a focused starting workflow for importing and safely inspecting deice log data. Future phases will validate that data and support reviewing or exporting exceptions.
+The application provides a focused starting workflow for importing and safely inspecting deice log data. Its public Rules page documents the checks planned for future validation. Future phases will execute those checks and support reviewing or exporting exceptions.
 
 ## Windows setup
 
@@ -60,6 +60,10 @@ The landing page accepts one `.csv` file through file browsing or drag and drop.
 Importing only inspects the CSV structure and display values. It does not normalize values or run audit rules.
 
 The upload limit is configured with `MAX_UPLOAD_MB` and defaults to 10 MB. Oversized requests receive a branded HTTP 413 response.
+
+## Rules catalog
+
+The read-only Rules page at `/rules` documents all approved audit checks in permanent rule-ID order. The application registry in `app/services/rules.py` and [the detailed rules specification](docs/rules.md) must remain synchronized. The documented rules are not executed during CSV import.
 
 ### Required baseline columns
 
