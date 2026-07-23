@@ -12,11 +12,38 @@
 
     <div class="glass-panel">
       <div class="launch-control" aria-labelledby="launch-title">
-        <p id="launch-title" class="launch-control__label">Coming Soon</p>
-        <button class="button button--primary" type="button" disabled>
-          <span aria-hidden="true">&#8593;</span>
-          Import CSV
-        </button>
+        <p id="launch-title" class="launch-control__label">Import deicing log</p>
+        <form
+          class="upload-form"
+          action="{{ url_for('main.import_csv') }}"
+          method="post"
+          enctype="multipart/form-data"
+          data-upload-form
+        >
+          <label class="upload-dropzone" for="csv-file" data-drop-zone>
+            <input
+              class="visually-hidden"
+              id="csv-file"
+              name="csv_file"
+              type="file"
+              accept=".csv,text/csv"
+              required
+              data-file-input
+            >
+            <span class="upload-dropzone__icon" aria-hidden="true">&#8679;</span>
+            <span class="upload-dropzone__title">Drop your CSV here</span>
+            <span class="upload-dropzone__prompt">or click to browse</span>
+            <span class="upload-dropzone__meta">
+              One .csv file, up to {{ max_upload_mb }} MB
+            </span>
+          </label>
+          <p class="file-selection" aria-live="polite" data-file-status>
+            No file selected
+          </p>
+          <button class="button button--primary" type="submit">
+            Import and Inspect
+          </button>
+        </form>
       </div>
 
       <ol class="workflow" aria-label="CryoCheck workflow">
@@ -37,4 +64,8 @@
       </ol>
     </div>
   </section>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', filename='js/upload.js') }}" defer></script>
 {% endblock %}

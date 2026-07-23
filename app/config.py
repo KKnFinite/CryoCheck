@@ -10,6 +10,18 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+def _positive_integer_setting(name: str, default: int) -> int:
+    raw_value = os.getenv(name, str(default))
+    try:
+        value = int(raw_value)
+    except ValueError:
+        raise ValueError(f"{name} must be a positive integer.") from None
+
+    if value <= 0:
+        raise ValueError(f"{name} must be a positive integer.")
+    return value
+
+
 def prepare_database_url(database_url: str | None) -> str | None:
     """Normalize PostgreSQL URLs and select the installed psycopg 3 driver."""
     if not database_url:
@@ -33,6 +45,8 @@ class Config:
     SECRET_KEY = os.getenv("SECRET_KEY")
     DEBUG = False
     TESTING = False
+    MAX_UPLOAD_MB = _positive_integer_setting("MAX_UPLOAD_MB", 10)
+    MAX_CONTENT_LENGTH = MAX_UPLOAD_MB * 1024 * 1024
     SQLALCHEMY_DATABASE_URI = prepare_database_url(os.getenv("DATABASE_URL"))
     SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True}
     SQLALCHEMY_TRACK_MODIFICATIONS = False

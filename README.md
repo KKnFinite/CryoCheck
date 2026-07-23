@@ -1,10 +1,10 @@
 # CryoCheck
 
-CryoCheck is a standalone deice log audit application. This repository currently contains the production-ready Flask application shell, landing experience, and Neon PostgreSQL integration foundation; CSV importing, validation rules, settings, results, and Excel export will be added in later development phases.
+CryoCheck is a standalone deice log audit application. This repository currently contains the production-ready Flask application shell, Neon PostgreSQL integration foundation, and in-memory CSV inspection workflow; validation rules, settings, results, and Excel export will be added in later development phases.
 
 ## Purpose
 
-The application will provide a focused workflow for importing deice log data, validating it, and reviewing or exporting exceptions. The initial foundation includes an application factory, environment-specific configuration, health monitoring, custom error pages, and a tested landing page.
+The application provides a focused starting workflow for importing and safely inspecting deice log data. Future phases will validate that data and support reviewing or exporting exceptions.
 
 ## Windows setup
 
@@ -52,6 +52,78 @@ flask db-check
 ```
 
 The command runs `SELECT 1` and prints a success message. Connection failures return a nonzero exit code with a sanitized diagnostic that does not expose the database URL or credentials. Automated tests use an isolated in-memory SQLite database and never connect to Neon.
+
+## CSV import workflow
+
+The landing page accepts one `.csv` file through file browsing or drag and drop. CryoCheck parses the file in memory with pandas, validates its header, and shows an import summary plus the first 10 data rows. Uploaded content is not written to the repository, retained on the server, stored in Neon, or added to an upload history.
+
+Importing only inspects the CSV structure and display values. It does not normalize values or run audit rules.
+
+The upload limit is configured with `MAX_UPLOAD_MB` and defaults to 10 MB. Oversized requests receive a branded HTTP 413 response.
+
+### Required baseline columns
+
+All baseline columns must be present, but their order may vary. Additional columns are allowed and reported in the summary.
+
+```text
+RecordID
+ApplicationNumber
+GatewayUID
+GatewayCode
+RRDD
+ApplicationDate
+StartTime
+EndTime
+ElapsedTime
+ModifiedBy
+ModifiedByName
+LastModified
+CreatedBy
+CreatedByName
+DateCreated
+AircraftType
+TailNumber
+Reason
+Precipitation
+AmbientTemp
+DewPoint
+OtherConditions
+EquipmentOwnedBy
+ConductedBy
+TruckNumber
+Operator
+Driver
+Posted
+VendorName
+AuthorizedBy
+DialToTemperatureTruck
+DateCreatedUTC
+LastModifiedUTC
+LiquidUOM
+TempUOM
+Type1Used
+Type1SKU
+Type1Concentration
+FreezingPoint1
+StartTime1
+EndTime1
+ProcessTime1
+FromInventory1
+ForcedAir1
+LowFlow1
+Type4Used
+Type4SKU
+Type4AConcentration
+FreezingPoint4
+StartTime4
+EndTime4
+ProcessTime4
+FromInventory4
+ForcedAir4
+LowFlow4
+Type4ABrix
+Notes
+```
 
 ### Run the application
 
@@ -103,5 +175,6 @@ Configure these Render environment variables:
 - `DATABASE_URL`: the Neon production connection string, including its SSL parameters
 - `SECRET_KEY`: a secure production secret
 - `FLASK_CONFIG=production`
+- `MAX_UPLOAD_MB`: optional CSV upload limit in megabytes; defaults to `10`
 
 Do not add `flask db upgrade` to the build command yet because there are no migrations or domain models. The `/health` endpoint intentionally remains database-independent so Render can verify the web process during a temporary database outage. Use `flask db-check` separately when database connectivity must be confirmed.

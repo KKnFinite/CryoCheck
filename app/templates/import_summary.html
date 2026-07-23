@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block title %}Import Summary | CryoCheck{% endblock %}
+
+{% block content %}
+  <section class="import-page" aria-labelledby="page-title">
+    <div class="import-page__heading">
+      <p class="eyebrow">Import complete</p>
+      <h1 id="page-title">CSV Import Summary</h1>
+      <p class="hero__intro">
+        CSV parsed successfully. Audit rules have not been run.
+      </p>
+    </div>
+
+    <div class="summary-panel">
+      <div class="summary-file">
+        <span class="summary-file__icon" aria-hidden="true">&#10003;</span>
+        <div>
+          <p class="summary-file__label">Imported filename</p>
+          <p class="summary-file__name">{{ result.filename }}</p>
+        </div>
+      </div>
+
+      <dl class="summary-metrics">
+        <div class="summary-metric">
+          <dt>Total data rows</dt>
+          <dd>{{ result.row_count }}</dd>
+        </div>
+        <div class="summary-metric">
+          <dt>Total columns</dt>
+          <dd>{{ result.column_count }}</dd>
+        </div>
+        <div class="summary-metric">
+          <dt>Expected columns found</dt>
+          <dd>{{ result.expected_columns_found | length }}</dd>
+        </div>
+      </dl>
+
+      <div class="summary-details">
+        <section class="summary-detail" aria-labelledby="gateway-heading">
+          <h2 id="gateway-heading">Gateway codes found</h2>
+          {% if result.gateway_codes %}
+            <ul class="tag-list">
+              {% for gateway_code in result.gateway_codes %}
+                <li>{{ gateway_code }}</li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p>None reported</p>
+          {% endif %}
+        </section>
+
+        <section class="summary-detail" aria-labelledby="date-heading">
+          <h2 id="date-heading">Application date range</h2>
+          {% if result.earliest_application_date and result.latest_application_date %}
+            <p>
+              {{ result.earliest_application_date }}
+              <span aria-hidden="true">&#8594;</span>
+              {{ result.latest_application_date }}
+            </p>
+          {% else %}
+            <p>Could not be determined safely</p>
+          {% endif %}
+        </section>
+
+        <section class="summary-detail summary-detail--wide" aria-labelledby="unexpected-heading">
+          <h2 id="unexpected-heading">Unexpected columns</h2>
+          {% if result.unexpected_columns %}
+            <ul class="tag-list tag-list--warning">
+              {% for column in result.unexpected_columns %}
+                <li>{{ column }}</li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p>None</p>
+          {% endif %}
+        </section>
+      </div>
+
+      <div class="summary-actions">
+        <button class="button button--primary button--with-tag" type="button" disabled>
+          Continue to Audit
+          <span class="button__tag">Coming Soon</span>
+        </button>
+        <a class="button button--secondary" href="{{ url_for('main.index') }}">
+          Import Another CSV
+        </a>
+      </div>
+    </div>
+
+    <section class="preview-panel" aria-labelledby="preview-heading">
+      <div class="preview-panel__heading">
+        <div>
+          <p class="eyebrow">Preview only</p>
+          <h2 id="preview-heading">First {{ result.preview_records | length }} data rows</h2>
+        </div>
+        <p>Values are shown as imported. No corrections or audit rules have been applied.</p>
+      </div>
+
+      <div class="table-scroll" tabindex="0" aria-label="Imported CSV preview table">
+        <table class="preview-table">
+          <thead>
+            <tr>
+              {% for column in preview_columns %}
+                <th scope="col">{{ column }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for record in result.preview_records %}
+              <tr>
+                {% for column in preview_columns %}
+                  <td{% if column == "CSV Row" %} class="preview-table__row"{% endif %}>
+                    {{ record[column] }}
+                  </td>
+                {% endfor %}
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </section>
+{% endblock %}

@@ -10,6 +10,9 @@ def test_landing_page_returns_200(client):
 
     assert response.status_code == 200
     assert b"Deice Data Validation" in response.data
+    assert b"Import and Inspect" in response.data
+    assert b'name="csv_file"' in response.data
+    assert b"disabled CSV" not in response.data
 
 
 def test_health_returns_healthy_status_without_database_query(app, client):
@@ -47,3 +50,16 @@ def test_not_found_page_uses_custom_template(client):
 
     assert response.status_code == 404
     assert b"Page not found" in response.data
+
+
+def test_internal_server_error_uses_custom_template(app, client):
+    @app.get("/test-only-server-error")
+    def trigger_server_error():
+        raise RuntimeError("synthetic test error")
+
+    app.config["PROPAGATE_EXCEPTIONS"] = False
+    response = client.get("/test-only-server-error")
+
+    assert response.status_code == 500
+    assert b"Something went wrong" in response.data
+    assert b"synthetic test error" not in response.data

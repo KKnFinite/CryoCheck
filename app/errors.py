@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from flask import Flask, render_template
+from flask import Flask, current_app, render_template
+from werkzeug.exceptions import RequestEntityTooLarge
 
 
 def register_error_handlers(app: Flask) -> None:
@@ -17,3 +18,14 @@ def register_error_handlers(app: Flask) -> None:
     def internal_server_error(error):
         del error
         return render_template("errors/500.html"), 500
+
+    @app.errorhandler(RequestEntityTooLarge)
+    def upload_too_large(error):
+        del error
+        return (
+            render_template(
+                "errors/413.html",
+                max_upload_mb=current_app.config["MAX_UPLOAD_MB"],
+            ),
+            413,
+        )

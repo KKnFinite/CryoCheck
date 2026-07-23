@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}CSV Import Rejected | CryoCheck{% endblock %}
+
+{% block content %}
+  <section class="error-panel import-error" aria-labelledby="error-title">
+    <p class="error-panel__code">Import rejected</p>
+    <h1 id="error-title">We couldn’t inspect this CSV</h1>
+    <p>{{ error.message }}</p>
+
+    {% if error.filename %}
+      <p class="import-error__filename">
+        <span>Selected file</span>
+        <strong>{{ error.filename }}</strong>
+      </p>
+    {% endif %}
+
+    {% if error.missing_columns %}
+      <div class="missing-columns">
+        <h2>Missing required columns</h2>
+        <ul>
+          {% for column in error.missing_columns %}
+            <li>{{ column }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+
+    <a class="button button--secondary" href="{{ url_for('main.index') }}">
+      Import Another CSV
+    </a>
+  </section>
+{% endblock %}
