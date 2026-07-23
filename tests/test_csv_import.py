@@ -504,7 +504,7 @@ def test_rule_006_default_five_minute_gap_passes_on_results_screen(client):
     assert b"CC-RULE-006" not in response.data
     assert b"No exceptions found" in response.data
     assert b"Rules executed</dt>" in response.data
-    assert b"<dd>6</dd>" in response.data
+    assert b"<dd>7</dd>" in response.data
 
 
 def test_rule_006_default_six_minute_gap_renders_required_details(client):
@@ -658,6 +658,136 @@ def test_personal_allowed_gap_affects_next_upload_and_reset(app, client):
     assert reset_response.status_code == 302
     assert b"CC-RULE-006" in reset_audit_response.data
     assert b"Allowed gap: 5 minutes" in reset_audit_response.data
+
+
+@pytest.mark.parametrize(
+    ("precipitation", "type4_used", "displayed_type4"),
+    (
+        ("Snow", "", b"Blank"),
+        ("Freezing Rain", "0", b"0"),
+    ),
+)
+def test_rule_007_exception_is_rendered_on_results_screen(
+    client,
+    precipitation,
+    type4_used,
+    displayed_type4,
+):
+    response = _upload(
+        client,
+        _synthetic_csv(
+            overrides={
+                0: {
+                    "Precipitation": precipitation,
+                    "Type4Used": type4_used,
+                }
+            }
+        ),
+    )
+
+    assert response.status_code == 200
+    assert b"CC-RULE-007" in response.data
+    assert b"No Type IV during active precipitation." in response.data
+    assert precipitation.encode() in response.data
+    assert b"Type IV amount recorded" in response.data
+    assert displayed_type4 in response.data
+    assert (
+        b"No Type IV fluid was recorded during active precipitation."
+        in response.data
+    )
+
+
+@pytest.mark.parametrize(
+    ("precipitation", "type4_used", "type4_brix"),
+    (
+        ("Snow", "1", "35"),
+        ("None", "0", ""),
+        ("", "", ""),
+    ),
+)
+def test_rule_007_pass_cases_render_no_exception(
+    client,
+    precipitation,
+    type4_used,
+    type4_brix,
+):
+    response = _upload(
+        client,
+        _synthetic_csv(
+            overrides={
+                0: {
+                    "Precipitation": precipitation,
+                    "Type4Used": type4_used,
+                    "Type4ABrix": type4_brix,
+                }
+            }
+        ),
+    )
+
+    assert response.status_code == 200
+    assert b"CC-RULE-007" not in response.data
+    assert b"No exceptions found" in response.data
+
+
+def test_rule_007_malformed_type4_renders_non_exception_warning(client):
+    response = _upload(
+        client,
+        _synthetic_csv(
+            overrides={
+                0: {
+                    "Precipitation": "Snow",
+                    "Type4Used": "malformed",
+                }
+            }
+        ),
+    )
+
+    assert response.status_code == 200
+    assert b"Some rule evaluations could not run" in response.data
+    assert b"CC-RULE-007" in response.data
+    assert b"malformed, non-finite, or negative" in response.data
+    assert b"No Type IV during active precipitation." not in response.data
+    assert b"No exceptions found" in response.data
+
+
+def test_rule_007_is_identical_for_anonymous_and_signed_in_audits(app, client):
+    payload = _synthetic_csv(
+        overrides={
+            0: {
+                "Precipitation": "Snow",
+                "Type4Used": "0",
+            }
+        }
+    )
+    anonymous_response = _upload(client, payload)
+
+    with app.app_context():
+        user = User(
+            username="PrecipAuditUser",
+            username_normalized="precipaudituser",
+        )
+        user.set_password(VALID_PASSWORD)
+        settings = create_default_user_settings(user)
+        settings.allowed_gap_minutes = 99
+        db.session.add(user)
+        db.session.commit()
+
+    login_response = client.post(
+        "/login",
+        data={
+            "username": "PrecipAuditUser",
+            "password": VALID_PASSWORD,
+        },
+    )
+    personal_response = _upload(client, payload)
+
+    assert anonymous_response.status_code == 200
+    assert login_response.status_code == 302
+    assert personal_response.status_code == 200
+    assert anonymous_response.data.count(b"CC-RULE-007") == 1
+    assert personal_response.data.count(b"CC-RULE-007") == 1
+    assert b"Default" in anonymous_response.data
+    assert b"Personal \xe2\x80\x94 PrecipAuditUser" in personal_response.data
 
 
 def test_invalid_timestamp_warning_is_separate_from_exceptions(client):

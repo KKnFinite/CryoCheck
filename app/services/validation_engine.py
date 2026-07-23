@@ -8,6 +8,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Final
 
 from app.services.csv_import import CSVImportResult, CSVSourceRow
+from app.services.precipitation import has_active_precipitation
 from app.services.rules import IMPLEMENTED_STATUS, RULES, RuleDefinition
 from app.services.settings import SettingsDefinition
 from app.services.time_of_day import (
@@ -31,6 +32,7 @@ _RULE_003 = _EXECUTED_RULES_BY_ID["CC-RULE-003"]
 _RULE_004 = _EXECUTED_RULES_BY_ID["CC-RULE-004"]
 _RULE_005 = _EXECUTED_RULES_BY_ID["CC-RULE-005"]
 _RULE_006 = _EXECUTED_RULES_BY_ID["CC-RULE-006"]
+_RULE_007 = _EXECUTED_RULES_BY_ID["CC-RULE-007"]
 _TIMESTAMP_RULES: Final = (_RULE_001, _RULE_002)
 _TYPE1_RULES: Final = (_RULE_003, _RULE_004)
 _REQUIRED_TYPE1_BUFFER: Final = Decimal("18.0")
@@ -195,6 +197,12 @@ def run_audit(
         )
         exceptions.extend(gap_exceptions)
         warnings.extend(gap_warnings)
+
+        precipitation_exceptions, precipitation_warnings = (
+            _evaluate_precipitation_rule(source_row)
+        )
+        exceptions.extend(precipitation_exceptions)
+        warnings.extend(precipitation_warnings)
 
     return AuditResult(
         filename=imported_csv.filename,
@@ -712,6 +720,38 @@ def _valid_allowed_gap_minutes(
     return allowed_gap
 
 
+def _evaluate_precipitation_rule(
+    source_row: CSVSourceRow,
+) -> tuple[list[AuditException], list[UnableToEvaluate]]:
+    """Evaluate active precipitation independently of settings and profiles."""
+    precipitation_text = source_row.get("Precipitation")
+    if not has_active_precipitation(precipitation_text):
+        return [], []
+
+    type4_used_text = source_row.get("Type4Used")
+    if not type4_used_text.strip():
+        return [_rule_007_exception(source_row)], []
+
+    type4_used = _parse_decimal(type4_used_text)
+    if type4_used is None or type4_used < 0:
+        return [], [
+            _unable_to_evaluate(
+                source_row,
+                _RULE_007,
+                ("Type4Used",),
+                message=(
+                    "Type4Used is malformed, non-finite, or negative, so "
+                    "recorded Type IV use during active precipitation could "
+                    "not be determined."
+                ),
+            )
+        ]
+    if type4_used == 0:
+        return [_rule_007_exception(source_row)], []
+
+    return [], []
+
+
 def _rule_001_exception(
     source_row: CSVSourceRow,
     created_before_event: timedelta,
@@ -902,6 +942,29 @@ def _rule_006_exception(
                     f"{type4_start_text}. Actual gap: {actual_gap_text}. "
                     f"Allowed gap: {allowed_gap_text}. Exceeded by "
                     f"{amount_over_text}."
+                ),
+            ),
+        ),
+    )
+
+
+def _rule_007_exception(source_row: CSVSourceRow) -> AuditException:
+    type4_used_text = source_row.get("Type4Used")
+    type4_display = type4_used_text if type4_used_text.strip() else "Blank"
+    return _build_exception(
+        source_row,
+        _RULE_007,
+        details=(
+            RuleDetail(
+                "Recorded precipitation",
+                source_row.get("Precipitation"),
+            ),
+            RuleDetail("Type IV amount recorded", type4_display),
+            RuleDetail(
+                "Finding",
+                (
+                    "No Type IV fluid was recorded during active "
+                    "precipitation."
                 ),
             ),
         ),

@@ -1,6 +1,6 @@
 # CryoCheck
 
-CryoCheck is a standalone deice log audit application. This repository contains the production-ready Flask application, Neon PostgreSQL integration, an in-memory CSV audit workflow, optional local accounts with private Personal Settings, and the approved audit-rule registry. The first six rules now execute and produce reviewable Results; the remaining rules and Excel export will be added in later development phases.
+CryoCheck is a standalone deice log audit application. This repository contains the production-ready Flask application, Neon PostgreSQL integration, an in-memory CSV audit workflow, optional local accounts with private Personal Settings, and the approved audit-rule registry. The first seven rules now execute and produce reviewable Results; the remaining rules and Excel export will be added in later development phases.
 
 ## Purpose
 
@@ -67,6 +67,7 @@ The current pipeline executes:
 - `CC-RULE-004` — 18 Degree Buffer Not Met
 - `CC-RULE-005` — BRIX Out of Range
 - `CC-RULE-006` — Excessive Gap Between Steps
+- `CC-RULE-007` — No Type IV During Active Precipitation
 
 The first two rules compare the local `ApplicationDate + StartTime` event timestamp with local `DateCreated`; UTC columns are not used. Blank or malformed required timestamps produce clearly separated unable-to-evaluate warnings, not rule exceptions. `CC-RULE-002` uses the active profile’s 24- or 48-hour late-entry threshold and fails at exact equality.
 
@@ -77,6 +78,8 @@ Cryotech Polar Plus LT manufacturer data is stored as a version-controlled, read
 Type IV BRIX limits are also version-controlled, read-only reference data. The reusable registry in `app/services/type4_fluids.py` validates fluid names and finite Decimal ranges without database or network access. `CC-RULE-005` runs only for positive `Type4Used`, compares `Type4ABrix` without rounding, and treats the Cryotech Polar Guard Xtend range of 34.6–36.6 as inclusive. Missing or invalid required values and unknown fluid profiles produce unable-to-evaluate warnings.
 
 `CC-RULE-006` runs only when both `Type1Used` and `Type4Used` are positive. It compares `EndTime1` with `StartTime4` using exact whole-minute HH:MM arithmetic and fails only when the calculated gap exceeds the active profile’s Allowed Gap; equality passes and Default is 5 minutes. Overall `StartTime` and `EndTime` distinguish a positive overnight gap from a same-day overlap. Same-day overlaps remain assigned to pending `CC-RULE-013`, while missing or malformed values needed for evaluation produce non-exception warnings.
+
+`CC-RULE-007` treats blank, whitespace-only, and case-insensitive `None` precipitation as inactive; every other nonblank source value is active without requiring a fixed condition list. During active precipitation, blank or Decimal-equivalent zero `Type4Used` produces an exception, positive usage passes, and malformed, non-finite, or negative usage produces an unable-to-evaluate warning. Original source text is preserved for Results. The rule has no setting, so anonymous and signed-in audits behave identically.
 
 The upload limit is configured with `MAX_UPLOAD_MB` and defaults to 10 MB. Oversized requests receive a branded HTTP 413 response.
 
@@ -102,7 +105,7 @@ Registering creates exactly one private `UserSettings` record copied from the cu
 
 ## Rules catalog
 
-The read-only Rules page at `/rules` documents all 13 approved audit checks in permanent rule-ID order and shows each implementation status. The application registry in `app/services/rules.py` and [the detailed rules specification](docs/rules.md) must remain synchronized. `CC-RULE-001` through `CC-RULE-006` are implemented; `CC-RULE-007` through `CC-RULE-013` remain implementation pending.
+The read-only Rules page at `/rules` documents all 13 approved audit checks in permanent rule-ID order and shows each implementation status. The application registry in `app/services/rules.py` and [the detailed rules specification](docs/rules.md) must remain synchronized. `CC-RULE-001` through `CC-RULE-007` are implemented; `CC-RULE-008` through `CC-RULE-013` remain implementation pending.
 
 ### Required baseline columns
 

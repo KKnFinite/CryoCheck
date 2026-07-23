@@ -284,16 +284,34 @@ RULES: Final[tuple[RuleDefinition, ...]] = (
             "amount was recorded."
         ),
         logic_summary=(
-            "Treat blank Precipitation as no active precipitation.",
-            "Treat any capitalization of None as no active precipitation.",
-            "Treat Type4Used as no Type IV when blank or numerically 0.",
             (
-                "Generate an exception when Precipitation contains an actual "
-                "condition and Type4Used is blank or 0."
+                "Treat blank or whitespace-only Precipitation as no active "
+                "precipitation."
+            ),
+            (
+                "After trimming whitespace, treat any capitalization of None "
+                "as no active precipitation."
+            ),
+            "Treat every other nonblank precipitation value as active.",
+            (
+                "Treat blank or numerically zero Type4Used as no recorded "
+                "Type IV."
+            ),
+            (
+                "Generate an exception when precipitation is active and "
+                "Type4Used is blank or numerically zero."
+            ),
+            (
+                "Positive Type4Used passes; malformed, non-finite, or negative "
+                "Type4Used is unable to evaluate when precipitation is active."
+            ),
+            (
+                "When precipitation is not active, skip without evaluating "
+                "Type4Used."
             ),
         ),
         settings_defaults=(
-            "None",
+            "No configurable setting.",
             "Mandatory",
         ),
         exception_message="No Type IV during active precipitation.",
@@ -305,6 +323,7 @@ RULES: Final[tuple[RuleDefinition, ...]] = (
                 "precipitation"
             ),
         ),
+        implementation_status=IMPLEMENTED_STATUS,
     ),
     RuleDefinition(
         rule_id="CC-RULE-008",

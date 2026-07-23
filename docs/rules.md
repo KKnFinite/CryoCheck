@@ -1,8 +1,8 @@
 # CryoCheck Rules
 
 This document is the approved specification for CryoCheck’s audit rules.
-CC-RULE-001 through CC-RULE-006 are implemented and execute automatically
-after a structurally valid CSV upload. CC-RULE-007 through CC-RULE-013 remain
+CC-RULE-001 through CC-RULE-007 are implemented and execute automatically
+after a structurally valid CSV upload. CC-RULE-008 through CC-RULE-013 remain
 implementation pending.
 
 The in-application registry and this documentation must remain synchronized.
@@ -228,19 +228,24 @@ Settings. Uploaded rows, audit results, and exceptions are not persisted.
 
 ## CC-RULE-007 — No Type IV During Active Precipitation
 
-**Implementation status:** Documented — implementation pending
+**Implementation status:** Implemented
 
 ### Logic
 
-- Treat blank Precipitation as no active precipitation.
-- Treat any capitalization of None as no active precipitation.
-- Treat Type4Used as no Type IV when blank or numerically 0.
-- Generate an exception when Precipitation contains an actual condition and
-  Type4Used is blank or 0.
+- Treat blank or whitespace-only Precipitation as no active precipitation.
+- After trimming whitespace, treat any capitalization of None as no active
+  precipitation.
+- Treat every other nonblank precipitation value as active.
+- Treat blank or numerically zero Type4Used as no recorded Type IV.
+- Generate an exception when precipitation is active and Type4Used is blank or
+  numerically zero.
+- Positive Type4Used passes; malformed, non-finite, or negative Type4Used is
+  unable to evaluate when precipitation is active.
+- When precipitation is not active, skip without evaluating Type4Used.
 
 ### Settings
 
-- None
+- No configurable setting.
 - Mandatory
 
 ### Exception message

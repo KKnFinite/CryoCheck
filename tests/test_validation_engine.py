@@ -24,6 +24,7 @@ def _source_row(
     date_created_utc: str = "",
     last_modified_utc: str = "",
     record_id: str = "record-001",
+    precipitation: str = "",
     type1_used: str = "",
     type1_concentration: str = "",
     freezing_point1: str = "",
@@ -48,6 +49,7 @@ def _source_row(
         "Driver": "Test Driver",
         "DateCreatedUTC": date_created_utc,
         "LastModifiedUTC": last_modified_utc,
+        "Precipitation": precipitation,
         "Type1Used": type1_used,
         "Type1Concentration": type1_concentration,
         "FreezingPoint1": freezing_point1,
@@ -148,10 +150,10 @@ def test_utc_fields_do_not_influence_rule_001_or_rule_002():
     assert result.unable_to_evaluate_count == 0
 
 
-def test_audit_reports_six_rules_executed():
+def test_audit_reports_seven_rules_executed():
     result = _audit_one()
 
-    assert result.rules_executed == 6
+    assert result.rules_executed == 7
 
 
 def test_rule_002_23_hours_59_minutes_passes_at_24_hours():
@@ -1029,6 +1031,167 @@ def test_rule_005_and_rule_006_exceptions_are_ordered_on_same_row():
     assert tuple(
         exception.rule_id for exception in result.exceptions
     ) == ("CC-RULE-005", "CC-RULE-006")
+
+
+@pytest.mark.parametrize(
+    ("precipitation", "type4_used"),
+    (
+        ("", ""),
+        ("   ", "0"),
+        ("None", "0"),
+        ("NONE", ""),
+        ("none", "0"),
+        (" NoNe ", "0.00"),
+    ),
+)
+def test_rule_007_no_active_precipitation_passes(
+    precipitation,
+    type4_used,
+):
+    result = _audit_one(
+        precipitation=precipitation,
+        type4_used=type4_used,
+    )
+
+    assert all(
+        exception.rule_id != "CC-RULE-007"
+        for exception in result.exceptions
+    )
+    assert all(
+        warning.rule_id != "CC-RULE-007"
+        for warning in result.unable_to_evaluate
+    )
+
+
+@pytest.mark.parametrize(
+    ("precipitation", "type4_used"),
+    (
+        ("Snow", ""),
+        ("Snow", "   "),
+        ("Snow", "0"),
+        ("Snow", "0.0"),
+        ("Freezing Rain", "0.00"),
+        ("Rain", ""),
+        ("Unfamiliar Condition", "0"),
+    ),
+)
+def test_rule_007_active_precipitation_without_type4_fails(
+    precipitation,
+    type4_used,
+):
+    result = _audit_one(
+        precipitation=precipitation,
+        type4_used=type4_used,
+    )
+
+    assert result.exception_count == 1
+    assert result.exceptions[0].rule_id == "CC-RULE-007"
+    assert result.exceptions[0].exception_message == (
+        "No Type IV during active precipitation."
+    )
+    assert result.unable_to_evaluate_count == 0
+
+
+@pytest.mark.parametrize(
+    ("precipitation", "type4_used"),
+    (
+        ("Snow", "1"),
+        ("Snow", "0.1"),
+        ("Freezing Rain", "25"),
+    ),
+)
+def test_rule_007_positive_type4_passes(precipitation, type4_used):
+    result = _audit_one(
+        precipitation=precipitation,
+        type4_used=type4_used,
+        type4_brix="35",
+    )
+
+    assert result.exception_count == 0
+    assert result.unable_to_evaluate_count == 0
+
+
+def test_rule_007_exception_preserves_original_values_and_details():
+    result = _audit_one(
+        precipitation=" MiXeD Precipitation ",
+        type4_used="0.00",
+    )
+
+    exception = result.exceptions[0]
+    assert exception.rule_id == "CC-RULE-007"
+    assert exception.rule_name == "No Type IV During Active Precipitation"
+    assert tuple(
+        (detail.label, detail.value) for detail in exception.details
+    ) == (
+        ("Recorded precipitation", " MiXeD Precipitation "),
+        ("Type IV amount recorded", "0.00"),
+        (
+            "Finding",
+            "No Type IV fluid was recorded during active precipitation.",
+        ),
+    )
+
+
+def test_rule_007_blank_type4_displays_blank_without_mutating_source():
+    source_row = _source_row(
+        precipitation="Snow",
+        type4_used="   ",
+    )
+    result = run_audit(_import_result(source_row), DEFAULT_SETTINGS)
+
+    assert source_row.get("Type4Used") == "   "
+    assert result.exceptions[0].details[1].value == "Blank"
+
+
+@pytest.mark.parametrize(
+    "type4_used",
+    ("malformed", "NaN", "Infinity", "-1"),
+)
+def test_rule_007_invalid_type4_during_active_precipitation_is_warning(
+    type4_used,
+):
+    result = _audit_one(
+        precipitation="Snow",
+        type4_used=type4_used,
+    )
+
+    rule_warnings = tuple(
+        warning
+        for warning in result.unable_to_evaluate
+        if warning.rule_id == "CC-RULE-007"
+    )
+    assert result.exception_count == 0
+    assert len(rule_warnings) == 1
+    assert rule_warnings[0].invalid_fields == ("Type4Used",)
+    assert "malformed, non-finite, or negative" in rule_warnings[0].message
+
+
+def test_rule_007_inactive_precipitation_skips_malformed_type4():
+    result = _audit_one(
+        precipitation="None",
+        type4_used="malformed",
+    )
+
+    assert all(
+        exception.rule_id != "CC-RULE-007"
+        for exception in result.exceptions
+    )
+    assert all(
+        warning.rule_id != "CC-RULE-007"
+        for warning in result.unable_to_evaluate
+    )
+
+
+def test_rule_007_exception_orders_after_earlier_rule_on_same_row():
+    result = _audit_one(
+        date_created="2026-01-15 07:59",
+        precipitation="Snow",
+        type4_used="0",
+    )
+
+    assert tuple(
+        exception.rule_id for exception in result.exceptions
+    ) == ("CC-RULE-001", "CC-RULE-007")
 
 
 def test_audit_result_and_exception_structures_are_immutable():
