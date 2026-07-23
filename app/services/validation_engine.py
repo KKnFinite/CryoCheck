@@ -12,6 +12,7 @@ from app.services.csv_import import CSVImportResult, CSVSourceRow
 from app.services.rules import IMPLEMENTED_STATUS, RULES, RuleDefinition
 from app.services.settings import SettingsDefinition
 from app.services.type1_fluids import get_type1_fluid_profile
+from app.services.type4_fluids import get_type4_fluid_profile
 
 
 EXECUTED_RULES: Final[tuple[RuleDefinition, ...]] = tuple(
@@ -24,6 +25,7 @@ _RULE_001 = _EXECUTED_RULES_BY_ID["CC-RULE-001"]
 _RULE_002 = _EXECUTED_RULES_BY_ID["CC-RULE-002"]
 _RULE_003 = _EXECUTED_RULES_BY_ID["CC-RULE-003"]
 _RULE_004 = _EXECUTED_RULES_BY_ID["CC-RULE-004"]
+_RULE_005 = _EXECUTED_RULES_BY_ID["CC-RULE-005"]
 _TIMESTAMP_RULES: Final = (_RULE_001, _RULE_002)
 _TYPE1_RULES: Final = (_RULE_003, _RULE_004)
 _REQUIRED_TYPE1_BUFFER: Final = Decimal("18.0")
@@ -177,6 +179,13 @@ def run_audit(
         )
         exceptions.extend(type1_exceptions)
         warnings.extend(type1_warnings)
+
+        type4_exceptions, type4_warnings = _evaluate_type4_rule(
+            source_row,
+            active_settings,
+        )
+        exceptions.extend(type4_exceptions)
+        warnings.extend(type4_warnings)
 
     return AuditResult(
         filename=imported_csv.filename,
@@ -444,6 +453,126 @@ def _parse_decimal(source_value: str) -> Decimal | None:
     return parsed if parsed.is_finite() else None
 
 
+def _evaluate_type4_rule(
+    source_row: CSVSourceRow,
+    active_settings: SettingsDefinition,
+) -> tuple[list[AuditException], list[UnableToEvaluate]]:
+    """Evaluate the Type IV BRIX range rule independently of other rules."""
+    exceptions: list[AuditException] = []
+    warnings: list[UnableToEvaluate] = []
+    type4_used_text = source_row.get("Type4Used")
+
+    if not type4_used_text.strip():
+        return exceptions, warnings
+
+    type4_used = _parse_decimal(type4_used_text)
+    if type4_used is None:
+        warnings.append(
+            _unable_to_evaluate(
+                source_row,
+                _RULE_005,
+                ("Type4Used",),
+                message=(
+                    "Type4Used is malformed, so Type IV rule applicability "
+                    "could not be determined."
+                ),
+            )
+        )
+        return exceptions, warnings
+    if type4_used <= 0:
+        return exceptions, warnings
+
+    profile = get_type4_fluid_profile(active_settings.type4_fluid)
+    if profile is None:
+        warnings.append(
+            _unable_to_evaluate(
+                source_row,
+                _RULE_005,
+                ("Type IV fluid setting",),
+                message=(
+                    "The selected Type IV fluid does not have an available "
+                    f"BRIX profile: {active_settings.type4_fluid}."
+                ),
+            )
+        )
+        return exceptions, warnings
+
+    brix_range = _valid_brix_range(profile)
+    if brix_range is None:
+        warnings.append(
+            _unable_to_evaluate(
+                source_row,
+                _RULE_005,
+                ("Type IV fluid setting",),
+                message=(
+                    "The selected Type IV fluid profile does not supply a "
+                    f"valid BRIX range: {active_settings.type4_fluid}."
+                ),
+            )
+        )
+        return exceptions, warnings
+
+    minimum_brix, maximum_brix = brix_range
+    entered_brix_text = source_row.get("Type4ABrix")
+    entered_brix = _parse_decimal(entered_brix_text)
+    if entered_brix is None:
+        warnings.append(
+            _unable_to_evaluate(
+                source_row,
+                _RULE_005,
+                ("Type4ABrix",),
+                message=(
+                    "Type4ABrix is blank, malformed, or non-finite, so it "
+                    "could not be compared with the acceptable range."
+                ),
+            )
+        )
+    elif entered_brix < minimum_brix:
+        exceptions.append(
+            _rule_005_exception(
+                source_row,
+                fluid_name=profile.name,
+                entered_brix_text=entered_brix_text,
+                minimum_brix=minimum_brix,
+                maximum_brix=maximum_brix,
+                direction="Below",
+                amount_outside=minimum_brix - entered_brix,
+            )
+        )
+    elif entered_brix > maximum_brix:
+        exceptions.append(
+            _rule_005_exception(
+                source_row,
+                fluid_name=profile.name,
+                entered_brix_text=entered_brix_text,
+                minimum_brix=minimum_brix,
+                maximum_brix=maximum_brix,
+                direction="Above",
+                amount_outside=entered_brix - maximum_brix,
+            )
+        )
+
+    return exceptions, warnings
+
+
+def _valid_brix_range(profile: object) -> tuple[Decimal, Decimal] | None:
+    try:
+        minimum_brix = profile.minimum_brix
+        maximum_brix = profile.maximum_brix
+    except AttributeError:
+        return None
+
+    if (
+        not isinstance(minimum_brix, Decimal)
+        or not isinstance(maximum_brix, Decimal)
+        or not minimum_brix.is_finite()
+        or not maximum_brix.is_finite()
+        or minimum_brix > maximum_brix
+    ):
+        return None
+    return minimum_brix, maximum_brix
+
+
 def _rule_001_exception(
     source_row: CSVSourceRow,
     created_before_event: timedelta,
@@ -566,6 +695,46 @@ def _rule_004_exception(
     )
 
 
+def _rule_005_exception(
+    source_row: CSVSourceRow,
+    *,
+    fluid_name: str,
+    entered_brix_text: str,
+    minimum_brix: Decimal,
+    maximum_brix: Decimal,
+    direction: str,
+    amount_outside: Decimal,
+) -> AuditException:
+    acceptable_range = (
+        f"{_format_decimal(minimum_brix)}–"
+        f"{_format_decimal(maximum_brix)}"
+    )
+    direction_text = f"{direction} range"
+    amount_text = _format_decimal(amount_outside)
+    return _build_exception(
+        source_row,
+        _RULE_005,
+        details=(
+            RuleDetail("Selected Type IV fluid", fluid_name),
+            RuleDetail("Entered BRIX", entered_brix_text),
+            RuleDetail("Acceptable inclusive range", acceptable_range),
+            RuleDetail("Range comparison", direction_text),
+            RuleDetail(
+                f"Amount {direction.lower()} nearest boundary",
+                amount_text,
+            ),
+            RuleDetail(
+                "Comparison",
+                (
+                    f"Entered BRIX: {entered_brix_text}. Acceptable range for "
+                    f"{fluid_name}: {acceptable_range}. {direction_text} by "
+                    f"{amount_text}."
+                ),
+            ),
+        ),
+    )
+
+
 def _build_exception(
     source_row: CSVSourceRow,
     rule: RuleDefinition,
@@ -619,7 +788,11 @@ def _format_duration(duration: timedelta) -> str:
 
 
 def _format_temperature(value: Decimal) -> str:
-    return f"{format(value, 'f')}°F"
+    return f"{_format_decimal(value)}°F"
+
+
+def _format_decimal(value: Decimal) -> str:
+    return format(value, "f")
 
 
 __all__ = [

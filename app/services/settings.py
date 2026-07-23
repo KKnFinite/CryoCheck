@@ -11,10 +11,11 @@ from flask_login import current_user
 
 from app.models import User, UserSettings
 from app.services.type1_fluids import TYPE1_FLUID_PROFILES
+from app.services.type4_fluids import TYPE4_FLUID_PROFILES
 
 
 TYPE1_FLUID_OPTIONS: Final[tuple[str, ...]] = tuple(TYPE1_FLUID_PROFILES)
-TYPE4_FLUID_OPTIONS: Final[tuple[str, ...]] = ("Cryotech Polar Guard Xtend",)
+TYPE4_FLUID_OPTIONS: Final[tuple[str, ...]] = tuple(TYPE4_FLUID_PROFILES)
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,7 +39,7 @@ DEFAULT_SETTINGS: Final = SettingsDefinition(
     is_default=True,
     late_entry_threshold_hours=24,
     type1_fluid=TYPE1_FLUID_OPTIONS[0],
-    type4_fluid="Cryotech Polar Guard Xtend",
+    type4_fluid=TYPE4_FLUID_OPTIONS[0],
     allowed_gap_minutes=5,
     max_type1_rate_gpm=Decimal("60"),
     max_type4_rate_gpm=Decimal("30"),

@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import FrozenInstanceError, replace
+from decimal import Decimal
 
 import pytest
 
+from app.services import validation_engine
 from app.services.csv_import import CSVImportResult, CSVSourceRow
 from app.services.settings import DEFAULT_SETTINGS
+from app.services.type4_fluids import TypeIVFluidProfile
 from app.services.validation_engine import run_audit
 
 
@@ -24,6 +27,8 @@ def _source_row(
     type1_concentration: str = "",
     freezing_point1: str = "",
     ambient_temp: str = "",
+    type4_used: str = "",
+    type4_brix: str = "",
 ) -> CSVSourceRow:
     values = {
         "RecordID": record_id,
@@ -43,6 +48,8 @@ def _source_row(
         "Type1Concentration": type1_concentration,
         "FreezingPoint1": freezing_point1,
         "AmbientTemp": ambient_temp,
+        "Type4Used": type4_used,
+        "Type4ABrix": type4_brix,
     }
     return CSVSourceRow(
         source_row_number=source_row_number,
@@ -113,10 +120,10 @@ def test_utc_fields_do_not_influence_rule_001_or_rule_002():
     assert result.unable_to_evaluate_count == 0
 
 
-def test_audit_reports_four_rules_executed():
+def test_audit_reports_five_rules_executed():
     result = _audit_one()
 
-    assert result.rules_executed == 4
+    assert result.rules_executed == 5
 
 
 def test_rule_002_23_hours_59_minutes_passes_at_24_hours():
@@ -512,6 +519,194 @@ def test_rule_004_uses_chart_value_not_incorrect_entered_value():
         exception.rule_id for exception in result.exceptions
     ) == ("CC-RULE-003", "CC-RULE-004")
     assert result.exceptions[1].details[3].value == "-50.0°F"
+
+
+@pytest.mark.parametrize(
+    "type4_brix",
+    ("34.6", "36.6", "34.60", "36.600", "35", "35.0"),
+)
+def test_rule_005_inclusive_range_and_numeric_equivalence_pass(type4_brix):
+    result = _audit_one(
+        type4_used="1",
+        type4_brix=type4_brix,
+    )
+
+    assert result.exception_count == 0
+    assert result.unable_to_evaluate_count == 0
+
+
+@pytest.mark.parametrize("type4_used", ("", "0", "0.0", "-1"))
+def test_rule_005_nonpositive_or_blank_type4_used_skips(type4_used):
+    result = _audit_one(
+        type4_used=type4_used,
+        type4_brix="malformed",
+    )
+
+    assert result.exception_count == 0
+    assert result.unable_to_evaluate_count == 0
+
+
+@pytest.mark.parametrize(
+    ("entered_brix", "amount_below"),
+    (("34.59", "0.01"), ("33.9", "0.7")),
+)
+def test_rule_005_below_range_fails_with_exact_amount(
+    entered_brix,
+    amount_below,
+):
+    result = _audit_one(
+        type4_used="1",
+        type4_brix=entered_brix,
+    )
+
+    assert result.exception_count == 1
+    exception = result.exceptions[0]
+    assert exception.rule_id == "CC-RULE-005"
+    assert exception.rule_name == "BRIX Out of Range"
+    assert exception.exception_message == "BRIX out of range."
+    assert tuple(
+        (detail.label, detail.value) for detail in exception.details
+    ) == (
+        ("Selected Type IV fluid", "Cryotech Polar Guard Xtend"),
+        ("Entered BRIX", entered_brix),
+        ("Acceptable inclusive range", "34.6–36.6"),
+        ("Range comparison", "Below range"),
+        ("Amount below nearest boundary", amount_below),
+        (
+            "Comparison",
+            (
+                f"Entered BRIX: {entered_brix}. Acceptable range for "
+                "Cryotech Polar Guard Xtend: 34.6–36.6. "
+                f"Below range by {amount_below}."
+            ),
+        ),
+    )
+
+
+@pytest.mark.parametrize(
+    ("entered_brix", "amount_above"),
+    (("36.61", "0.01"), ("37.1", "0.5")),
+)
+def test_rule_005_above_range_fails_with_exact_amount(
+    entered_brix,
+    amount_above,
+):
+    result = _audit_one(
+        type4_used="1",
+        type4_brix=entered_brix,
+    )
+
+    assert result.exception_count == 1
+    exception = result.exceptions[0]
+    assert exception.rule_id == "CC-RULE-005"
+    assert tuple(
+        (detail.label, detail.value) for detail in exception.details
+    ) == (
+        ("Selected Type IV fluid", "Cryotech Polar Guard Xtend"),
+        ("Entered BRIX", entered_brix),
+        ("Acceptable inclusive range", "34.6–36.6"),
+        ("Range comparison", "Above range"),
+        ("Amount above nearest boundary", amount_above),
+        (
+            "Comparison",
+            (
+                f"Entered BRIX: {entered_brix}. Acceptable range for "
+                "Cryotech Polar Guard Xtend: 34.6–36.6. "
+                f"Above range by {amount_above}."
+            ),
+        ),
+    )
+
+
+@pytest.mark.parametrize("type4_brix", ("", "malformed", "NaN", "Infinity"))
+def test_rule_005_invalid_brix_is_unable_to_evaluate(type4_brix):
+    result = _audit_one(
+        type4_used="1",
+        type4_brix=type4_brix,
+    )
+
+    assert result.exception_count == 0
+    assert tuple(
+        warning.rule_id for warning in result.unable_to_evaluate
+    ) == ("CC-RULE-005",)
+    assert result.unable_to_evaluate[0].invalid_fields == ("Type4ABrix",)
+
+
+def test_rule_005_malformed_type4_used_is_unable_to_evaluate():
+    result = _audit_one(
+        type4_used="malformed",
+        type4_brix="35",
+    )
+
+    assert result.exception_count == 0
+    assert tuple(
+        warning.rule_id for warning in result.unable_to_evaluate
+    ) == ("CC-RULE-005",)
+    assert result.unable_to_evaluate[0].invalid_fields == ("Type4Used",)
+
+
+def test_rule_005_unknown_selected_type4_fluid_is_unable_to_evaluate():
+    settings = replace(
+        DEFAULT_SETTINGS,
+        type4_fluid="Unknown Type IV fluid",
+    )
+
+    result = run_audit(
+        _import_result(
+            _source_row(
+                type4_used="1",
+                type4_brix="35",
+            )
+        ),
+        settings,
+    )
+
+    assert result.exception_count == 0
+    assert tuple(
+        warning.rule_id for warning in result.unable_to_evaluate
+    ) == ("CC-RULE-005",)
+    assert result.unable_to_evaluate[0].invalid_fields == (
+        "Type IV fluid setting",
+    )
+
+
+def test_rule_005_invalid_profile_range_is_unable_to_evaluate(monkeypatch):
+    invalid_profile = TypeIVFluidProfile(
+        name="Invalid Type IV fluid",
+        minimum_brix=Decimal("36.6"),
+        maximum_brix=Decimal("34.6"),
+    )
+    monkeypatch.setattr(
+        validation_engine,
+        "get_type4_fluid_profile",
+        lambda _name: invalid_profile,
+    )
+
+    result = _audit_one(
+        type4_used="1",
+        type4_brix="35",
+    )
+
+    assert result.exception_count == 0
+    assert tuple(
+        warning.rule_id for warning in result.unable_to_evaluate
+    ) == ("CC-RULE-005",)
+    assert "valid BRIX range" in result.unable_to_evaluate[0].message
+
+
+def test_type1_and_type4_exceptions_are_ordered_by_rule_id_on_same_row():
+    result = _audit_one(
+        type1_used="1",
+        type1_concentration="65",
+        freezing_point1="-20",
+        ambient_temp="-32",
+        type4_used="1",
+        type4_brix="33.9",
+    )
+
+    assert tuple(
+        exception.rule_id for exception in result.exceptions
+    ) == ("CC-RULE-003", "CC-RULE-005")
 
 
 def test_audit_result_and_exception_structures_are_immutable():

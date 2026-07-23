@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import io
 
+import pytest
 from sqlalchemy import event
 from werkzeug.datastructures import FileStorage
 
@@ -406,6 +407,81 @@ def test_exact_18_degree_buffer_does_not_render_rule_004(client):
     assert b"No exceptions found" in response.data
 
 
+@pytest.mark.parametrize("type4_brix", ("34.6", "36.6"))
+def test_rule_005_inclusive_boundaries_pass_on_results_screen(
+    client,
+    type4_brix,
+):
+    response = _upload(
+        client,
+        _synthetic_csv(
+            overrides={
+                0: {
+                    "Type4Used": "1",
+                    "Type4ABrix": type4_brix,
+                }
+            }
+        ),
+    )
+
+    assert response.status_code == 200
+    assert b"CC-RULE-005" not in response.data
+    assert b"No exceptions found" in response.data
+
+
+@pytest.mark.parametrize(
+    ("type4_brix", "direction", "amount"),
+    (
+        ("33.9", b"Below range", b"0.7"),
+        ("37.1", b"Above range", b"0.5"),
+    ),
+)
+def test_rule_005_exception_is_rendered_on_results_screen(
+    client,
+    type4_brix,
+    direction,
+    amount,
+):
+    response = _upload(
+        client,
+        _synthetic_csv(
+            overrides={
+                0: {
+                    "Type4Used": "1",
+                    "Type4ABrix": type4_brix,
+                }
+            }
+        ),
+    )
+
+    assert response.status_code == 200
+    assert b"CC-RULE-005" in response.data
+    assert b"BRIX out of range." in response.data
+    assert b"Cryotech Polar Guard Xtend" in response.data
+    assert b"34.6\xe2\x80\x9336.6" in response.data
+    assert direction in response.data
+    assert amount in response.data
+
+
+def test_rule_005_no_type4_use_skips_without_warning(client):
+    response = _upload(
+        client,
+        _synthetic_csv(
+            overrides={
+                0: {
+                    "Type4Used": "0",
+                    "Type4ABrix": "malformed",
+                }
+            }
+        ),
+    )
+
+    assert response.status_code == 200
+    assert b"CC-RULE-005" not in response.data
+    assert b"Some rule evaluations could not run" not in response.data
+    assert b"No exceptions found" in response.data
+
+
 def test_invalid_timestamp_warning_is_separate_from_exceptions(client):
     response = _upload(
         client,
@@ -456,6 +532,48 @@ def test_personal_48_hour_threshold_overrides_anonymous_default(app, client):
     assert b"Personal \xe2\x80\x94 AuditUser" in personal_response.data
     assert b"No exceptions found" in personal_response.data
     assert b"Late entry." not in personal_response.data
+
+
+def test_signed_in_audit_uses_personal_type4_fluid_selection(app, client):
+    payload = _synthetic_csv(
+        overrides={
+            0: {
+                "Type4Used": "1",
+                "Type4ABrix": "33.9",
+            }
+        }
+    )
+
+    anonymous_response = _upload(client, payload)
+
+    assert anonymous_response.status_code == 200
+    assert b"Default" in anonymous_response.data
+    assert b"CC-RULE-005" in anonymous_response.data
+
+    with app.app_context():
+        user = User(
+            username="Type4AuditUser",
+            username_normalized="type4audituser",
+        )
+        user.set_password(VALID_PASSWORD)
+        create_default_user_settings(user)
+        db.session.add(user)
+        db.session.commit()
+
+    login_response = client.post(
+        "/login",
+        data={
+            "username": "Type4AuditUser",
+            "password": VALID_PASSWORD,
+        },
+    )
+    personal_response = _upload(client, payload)
+
+    assert login_response.status_code == 302
+    assert personal_response.status_code == 200
+    assert b"Personal \xe2\x80\x94 Type4AuditUser" in personal_response.data
+    assert b"CC-RULE-005" in personal_response.data
+    assert b"Cryotech Polar Guard Xtend" in personal_response.data
 
 
 def test_successful_import_performs_no_database_operations(app, client):

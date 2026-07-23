@@ -1,8 +1,8 @@
 # CryoCheck Rules
 
 This document is the approved specification for CryoCheck’s audit rules.
-CC-RULE-001 through CC-RULE-004 are implemented and execute automatically
-after a structurally valid CSV upload. CC-RULE-005 through CC-RULE-013 remain
+CC-RULE-001 through CC-RULE-005 are implemented and execute automatically
+after a structurally valid CSV upload. CC-RULE-006 through CC-RULE-013 remain
 implementation pending.
 
 The in-application registry and this documentation must remain synchronized.
@@ -152,19 +152,23 @@ Settings. Uploaded rows, audit results, and exceptions are not persisted.
 
 ## CC-RULE-005 — BRIX Out of Range
 
-**Implementation status:** Documented — implementation pending
+**Implementation status:** Implemented
 
 ### Logic
 
-- Applies to Type IV BRIX.
-- Validate Type4ABrix against the acceptable range for the Type IV fluid
-  selected for the gateway.
-- For Cryotech Polar Guard Xtend, 34.6 through 36.6 inclusive passes.
-- Below 34.6 or above 36.6 fails.
+- Runs only when Type4Used is numerically greater than 0.
+- Use the Type IV fluid selected in active audit settings.
+- Parse Type4ABrix using Decimal without rounding.
+- For Cryotech Polar Guard Xtend, the acceptable range is 34.6–36.6
+  inclusive.
+- Values below 34.6 or above 36.6 fail.
+- The exact lower and upper boundaries pass.
+- Malformed applicability, missing or invalid BRIX, and unknown fluid profiles
+  are unable to evaluate.
 
 ### Settings/defaults
 
-- Type IV fluid is gateway-selectable
+- Type IV fluid is selected in active audit settings
 - Default Type IV fluid: Cryotech Polar Guard Xtend
 - Default range: 34.6–36.6 inclusive
 - Mandatory
@@ -177,8 +181,10 @@ Settings. Uploaded rows, audit results, and exceptions are not persisted.
 
 - Selected Type IV fluid
 - Entered BRIX
-- Acceptable range
-- Amount below or above the range
+- Acceptable inclusive range
+- Whether the value is below or above the range
+- Exact amount below or above the nearest boundary
+- Concise comparison
 
 ## CC-RULE-006 — Excessive Gap Between Steps
 

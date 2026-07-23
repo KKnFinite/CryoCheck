@@ -196,19 +196,22 @@ RULES: Final[tuple[RuleDefinition, ...]] = (
             "selected fluid."
         ),
         logic_summary=(
-            "Applies to Type IV BRIX.",
+            "Runs only when Type4Used is numerically greater than 0.",
+            "Use the Type IV fluid selected in active audit settings.",
+            "Parse Type4ABrix using Decimal without rounding.",
             (
-                "Validate Type4ABrix against the acceptable range for the Type "
-                "IV fluid selected for the gateway."
+                "For Cryotech Polar Guard Xtend, the acceptable range is "
+                "34.6–36.6 inclusive."
             ),
+            "Values below 34.6 or above 36.6 fail.",
+            "The exact lower and upper boundaries pass.",
             (
-                "For Cryotech Polar Guard Xtend, 34.6 through 36.6 inclusive "
-                "passes."
+                "Malformed applicability, missing or invalid BRIX, and unknown "
+                "fluid profiles are unable to evaluate."
             ),
-            "Below 34.6 or above 36.6 fails.",
         ),
         settings_defaults=(
-            "Type IV fluid is gateway-selectable",
+            "Type IV fluid is selected in active audit settings",
             "Default Type IV fluid: Cryotech Polar Guard Xtend",
             "Default range: 34.6–36.6 inclusive",
             "Mandatory",
@@ -217,9 +220,12 @@ RULES: Final[tuple[RuleDefinition, ...]] = (
         output_details=(
             "Selected Type IV fluid",
             "Entered BRIX",
-            "Acceptable range",
-            "Amount below or above the range",
+            "Acceptable inclusive range",
+            "Whether the value is below or above the range",
+            "Exact amount below or above the nearest boundary",
+            "Concise comparison",
         ),
+        implementation_status=IMPLEMENTED_STATUS,
     ),
     RuleDefinition(
         rule_id="CC-RULE-006",
