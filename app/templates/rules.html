@@ -20,7 +20,7 @@
       </p>
     </header>
 
-    <ol class="rules-list">
+    <ol class="rules-list rules-list--desktop">
       {% for rule in rules %}
         <li>
           <article class="rule-card" aria-labelledby="rule-{{ loop.index }}-title">
@@ -73,5 +73,7 @@
         </li>
       {% endfor %}
     </ol>
+
+    <ol class="mobile-rules-list" data-mobile-rules-list></ol>
   </section>
 {% endblock %}

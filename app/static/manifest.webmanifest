@@ -1,0 +1,56 @@
+{
+  "id": "/",
+  "name": "CryoCheck",
+  "short_name": "CryoCheck",
+  "description": "Audit deicing log CSV files against fourteen CryoCheck validation rules.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#e9f9fc",
+  "theme_color": "#071b33",
+  "categories": [
+    "business",
+    "utilities"
+  ],
+  "icons": [
+    {
+      "src": "/static/img/icon-180.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/img/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/img/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/img/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "share_target": {
+    "action": "/share/csv",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "files": [
+        {
+          "name": "csv_file",
+          "accept": [
+            ".csv",
+            "text/csv",
+            "text/comma-separated-values"
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import secrets
 from urllib.parse import urlsplit
 
@@ -10,6 +11,7 @@ from flask import (
     current_app,
     flash,
     jsonify,
+    make_response,
     redirect,
     render_template,
     request,
@@ -25,7 +27,7 @@ from flask_login import (
 )
 from sqlalchemy.exc import IntegrityError
 
-from app.extensions import db, limiter
+from app.extensions import csrf, db, limiter
 from app.forms import LoginForm, RegisterForm, ResetSettingsForm, SettingsForm
 from app.models import User, normalize_username, utc_now
 
@@ -54,6 +56,39 @@ from app.services.validation_engine import run_audit
 main = Blueprint("main", __name__)
 
 
+@main.after_app_request
+def prevent_sensitive_response_caching(response):
+    """Keep uploads, account pages, and authenticated responses out of caches."""
+    public_asset_endpoints = {
+        "static",
+        "main.favicon",
+        "main.service_worker",
+    }
+    account_endpoints = {
+        "main.login",
+        "main.logout",
+        "main.register",
+        "main.reset_settings",
+        "main.settings",
+    }
+    endpoint = request.endpoint or ""
+    should_disable_cache = (
+        request.method != "GET"
+        or endpoint in account_endpoints
+        or (
+            bool(session.get("_user_id"))
+            and endpoint not in public_asset_endpoints
+        )
+    )
+    if should_disable_cache:
+        existing = response.headers.get("Cache-Control", "")
+        if "no-store" not in existing.lower():
+            response.headers["Cache-Control"] = "private, no-store"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
+
 @main.get("/")
 def index() -> str:
     """Render the initial CryoCheck landing page."""
@@ -66,9 +101,8 @@ def index() -> str:
     )
 
 
-@main.post("/import")
-def import_csv():
-    """Parse and audit one deicing CSV entirely in memory."""
+def _audit_uploaded_csv():
+    """Parse, audit, and render one uploaded CSV entirely in memory."""
     try:
         uploads = request.files.getlist("csv_file")
         if len(uploads) > 1:
@@ -118,6 +152,19 @@ def import_csv():
             else ()
         ),
     )
+
+
+@main.post("/import")
+def import_csv():
+    """Audit one CSV selected in the browser."""
+    return _audit_uploaded_csv()
+
+
+@main.post("/share/csv")
+@csrf.exempt
+def share_csv():
+    """Accept one Android PWA share-target CSV without persisting it."""
+    return _audit_uploaded_csv()
 
 
 @main.post("/export")
@@ -386,13 +433,29 @@ def reset_settings():
 @main.get("/health")
 def health():
     """Return a database-independent service health response."""
-    return jsonify(
+    response = jsonify(
         status="healthy",
         application=current_app.config["APPLICATION_NAME"],
     )
+    render_revision = os.getenv("RENDER_GIT_COMMIT", "").strip()
+    if render_revision:
+        response.headers["X-CryoCheck-Revision"] = render_revision
+    return response
 
 
 @main.get("/favicon.ico")
 def favicon():
     """Serve the CryoCheck SVG favicon at the conventional browser path."""
     return current_app.send_static_file("img/favicon.svg")
+
+
+@main.get("/service-worker.js")
+def service_worker():
+    """Serve the static-only service worker from the application scope."""
+    response = make_response(
+        current_app.send_static_file("js/service-worker.js")
+    )
+    response.headers["Content-Type"] = "application/javascript; charset=utf-8"
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Service-Worker-Allowed"] = "/"
+    return response

@@ -65,7 +65,7 @@
     </section>
 
     {% if audit.unable_to_evaluate_count %}
-      <section class="audit-warning-summary" aria-labelledby="warning-heading">
+      <section class="audit-warning-summary desktop-results-only" aria-labelledby="warning-heading">
         <div>
           <p class="eyebrow">Non-exception warning</p>
           <h2 id="warning-heading">Some rule evaluations could not run</h2>
@@ -98,6 +98,23 @@
           {% endfor %}
         </ul>
       </section>
+
+      <details class="mobile-warning-summary mobile-results-only">
+        <summary>
+          <span>
+            <strong>Unable to evaluate</strong>
+            {{ audit.unable_to_evaluate_count }} warning{% if audit.unable_to_evaluate_count != 1 %}s{% endif %}
+          </span>
+          <span aria-hidden="true">+</span>
+        </summary>
+        <div class="mobile-warning-summary__body">
+          <p>
+            These warnings are separate from exceptions and are not included
+            in the exception count.
+          </p>
+          <ul data-mobile-warning-list></ul>
+        </div>
+      </details>
     {% endif %}
 
     <section class="exceptions-section" aria-labelledby="exceptions-heading">
@@ -182,34 +199,36 @@
                     </span>
                   </label>
 
-                  <div class="exception-card__field">
-                    <span>Record ID</span>
-                    <strong>{{ exception.record_id or "Not reported" }}</strong>
-                    <small>
-                      CSV row <strong>{{ exception.source_row_number }}</strong>
-                    </small>
-                  </div>
+                  <div class="exception-card__desktop-summary">
+                    <div class="exception-card__field">
+                      <span>Record ID</span>
+                      <strong>{{ exception.record_id or "Not reported" }}</strong>
+                      <small>
+                        CSV row <strong>{{ exception.source_row_number }}</strong>
+                      </small>
+                    </div>
 
-                  <div class="exception-card__field">
-                    <span>Entry Date</span>
-                    <strong>{{ exception.date_created or "Not reported" }}</strong>
-                  </div>
+                    <div class="exception-card__field">
+                      <span>Entry Date</span>
+                      <strong>{{ exception.date_created or "Not reported" }}</strong>
+                    </div>
 
-                  <div class="exception-card__field">
-                    <span>Truck Number</span>
-                    <strong>{{ exception.truck_number or "Not reported" }}</strong>
-                  </div>
+                    <div class="exception-card__field">
+                      <span>Truck Number</span>
+                      <strong>{{ exception.truck_number or "Not reported" }}</strong>
+                    </div>
 
-                  <div class="exception-card__field exception-card__field--rule">
-                    <span>Rule ID</span>
-                    <strong>{{ exception.rule_id }}</strong>
-                  </div>
+                    <div class="exception-card__field exception-card__field--rule">
+                      <span>Rule ID</span>
+                      <strong>{{ exception.rule_id }}</strong>
+                    </div>
 
-                  <div class="exception-card__message">
-                    <span>Exception</span>
-                    <h3 id="exception-{{ loop.index }}-title">
-                      {{ exception.exception_message }}
-                    </h3>
+                    <div class="exception-card__message">
+                      <span>Exception</span>
+                      <h3 id="exception-{{ loop.index }}-title">
+                        {{ exception.exception_message }}
+                      </h3>
+                    </div>
                   </div>
 
                   <dl class="exception-details" aria-label="Rule-relevant details">
@@ -220,10 +239,42 @@
                       </div>
                     {% endfor %}
                   </dl>
+
+                  <div
+                    class="mobile-exception-card__content mobile-results-only"
+                    data-mobile-exception-content
+                  ></div>
                 </article>
               </li>
             {% endfor %}
           </ol>
+
+          <div class="mobile-export-bar mobile-results-only" data-mobile-export-bar>
+            <span
+              class="mobile-export-bar__count"
+              aria-live="polite"
+              data-selection-status
+            >0 of {{ audit.exception_count }} selected</span>
+            <div class="mobile-export-bar__selection">
+              <button type="button" data-select-all>Select All</button>
+              <button type="button" data-clear-all>Clear</button>
+            </div>
+            <div class="mobile-export-bar__actions">
+              <button
+                type="submit"
+                name="scope"
+                value="selected"
+                disabled
+                data-export-selected
+              >Export Selected</button>
+              <button
+                type="submit"
+                name="scope"
+                value="all"
+                data-export-all
+              >Export All</button>
+            </div>
+          </div>
         </form>
       {% else %}
         <div class="audit-empty-state">
@@ -237,7 +288,7 @@
       {% endif %}
     </section>
 
-    <section class="preview-panel" aria-labelledby="preview-heading">
+    <section class="preview-panel desktop-results-only" aria-labelledby="preview-heading">
       <div class="preview-panel__heading">
         <div>
           <p class="eyebrow">Source preview</p>
@@ -275,6 +326,23 @@
       </div>
     </section>
 
+    <details class="mobile-preview mobile-results-only">
+      <summary>
+        <span>
+          <strong>Source preview</strong>
+          First {{ import_result.preview_records | length }} data rows
+        </span>
+        <span aria-hidden="true">+</span>
+      </summary>
+      <div class="mobile-preview__body">
+        <p>
+          Values are shown exactly as imported. The complete dataset was
+          audited in memory.
+        </p>
+        <ol data-mobile-preview-list></ol>
+      </div>
+    </details>
+
     <div class="results-actions">
       <a class="button button--primary" href="{{ url_for('main.index') }}">
         Import Another CSV
@@ -284,5 +352,8 @@
 {% endblock %}
 
 {% block scripts %}
-  <script src="{{ url_for('static', filename='js/exception-export.js') }}" defer></script>
+  <script
+    src="{{ url_for('static', filename='js/exception-export.js', v='mobile-pwa-1') }}"
+    defer
+  ></script>
 {% endblock %}
