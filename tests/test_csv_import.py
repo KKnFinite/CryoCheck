@@ -38,7 +38,7 @@ def _synthetic_csv(
             "StartTime": "08:00",
             "EndTime": "08:30",
             "DateCreated": f"2026-01-{index + 1:02d} 08:00",
-            "AircraftType": "A320",
+            "AircraftType": "2",
             "TailNumber": f"N{index:05d}",
             "TruckNumber": "TRUCK-TEST",
             "Operator": "Synthetic Operator",
@@ -507,7 +507,7 @@ def test_rule_006_default_five_minute_gap_passes_on_results_screen(client):
     assert b"CC-RULE-006" not in response.data
     assert b"No exceptions found" in response.data
     assert b"Rules executed</dt>" in response.data
-    assert b"<dd>11</dd>" in response.data
+    assert b"<dd>12</dd>" in response.data
 
 
 def test_rule_006_default_six_minute_gap_renders_required_details(client):
@@ -1457,6 +1457,110 @@ def test_rules_005_009_and_011_render_together_on_results_screen(client):
     assert b"BRIX out of range." in response.data
     assert b"Excessive Type IV." in response.data
     assert b"Incorrect Type IV concentration." in response.data
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    (
+        {
+            "AircraftType": "0",
+            "TailNumber": "",
+            "Notes": "Equipment treatment",
+        },
+        {
+            "AircraftType": "1",
+            "TailNumber": "N121UP",
+        },
+        {
+            "AircraftType": "2",
+            "TailNumber": "AB-123",
+        },
+    ),
+)
+def test_rule_012_valid_tail_paths_pass_on_results_screen(client, overrides):
+    response = _upload(
+        client,
+        _synthetic_csv(overrides={0: overrides}),
+    )
+
+    assert response.status_code == 200
+    assert b"CC-RULE-012" not in response.data
+    assert b"No exceptions found" in response.data
+
+
+@pytest.mark.parametrize(
+    ("overrides", "expected_reason"),
+    (
+        (
+            {
+                "AircraftType": "0",
+                "TailNumber": "",
+                "Notes": "",
+            },
+            b"Notes are required for AircraftType 0",
+        ),
+        (
+            {
+                "AircraftType": "0",
+                "TailNumber": "N121UP",
+                "Notes": "Equipment treatment",
+            },
+            b"TailNumber must be blank for AircraftType 0",
+        ),
+        (
+            {
+                "AircraftType": "1",
+                "TailNumber": "AB-123",
+            },
+            b"Does not match UPS NxxxUP format",
+        ),
+        (
+            {
+                "AircraftType": "2",
+                "TailNumber": "N121UP",
+            },
+            b"AircraftType 2 must not use UPS format",
+        ),
+    ),
+)
+def test_rule_012_invalid_tail_paths_render_specific_reason(
+    client,
+    overrides,
+    expected_reason,
+):
+    response = _upload(
+        client,
+        _synthetic_csv(overrides={0: overrides}),
+    )
+
+    assert response.status_code == 200
+    assert response.data.count(b"CC-RULE-012") == 1
+    assert b"Incorrect tail number." in response.data
+    assert expected_reason in response.data
+    assert b"Original AircraftType" in response.data
+    assert b"Original TailNumber" in response.data
+    assert b"Required format" in response.data
+
+
+def test_rule_012_invalid_aircraft_type_renders_warning(client):
+    response = _upload(
+        client,
+        _synthetic_csv(
+            overrides={
+                0: {
+                    "AircraftType": "A320",
+                    "TailNumber": "N121UP",
+                }
+            }
+        ),
+    )
+
+    assert response.status_code == 200
+    assert b"Some rule evaluations could not run" in response.data
+    assert response.data.count(b"CC-RULE-012") == 1
+    assert b"AircraftType" in response.data
+    assert b"Incorrect tail number." not in response.data
+    assert b"No exceptions found" in response.data
 
 
 def test_invalid_timestamp_warning_is_separate_from_exceptions(client):

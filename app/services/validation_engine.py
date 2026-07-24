@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation, localcontext
@@ -37,9 +38,13 @@ _RULE_008 = _EXECUTED_RULES_BY_ID["CC-RULE-008"]
 _RULE_009 = _EXECUTED_RULES_BY_ID["CC-RULE-009"]
 _RULE_010 = _EXECUTED_RULES_BY_ID["CC-RULE-010"]
 _RULE_011 = _EXECUTED_RULES_BY_ID["CC-RULE-011"]
+_RULE_012 = _EXECUTED_RULES_BY_ID["CC-RULE-012"]
 _TIMESTAMP_RULES: Final = (_RULE_001, _RULE_002)
 _TYPE1_RULES: Final = (_RULE_003, _RULE_004)
 _REQUIRED_TYPE1_BUFFER: Final = Decimal("18.0")
+_UPS_TAIL_PATTERN: Final = re.compile(r"^N[0-9]{3}UP$", re.IGNORECASE)
+_TYPE2_TAIL_CHARACTERS_PATTERN: Final = re.compile(r"^[A-Z0-9-]+$")
+_TYPE2_TAIL_ALPHANUMERIC_PATTERN: Final = re.compile(r"[A-Z0-9]")
 
 _APPLICATION_DATE_FORMATS: Final[tuple[str, ...]] = (
     "%Y-%m-%d",
@@ -270,6 +275,10 @@ def run_audit(
         )
         exceptions.extend(concentration_exceptions)
         warnings.extend(concentration_warnings)
+
+        tail_exceptions, tail_warnings = _evaluate_tail_number_rule(source_row)
+        exceptions.extend(tail_exceptions)
+        warnings.extend(tail_warnings)
 
     return AuditResult(
         filename=imported_csv.filename,
@@ -1156,6 +1165,77 @@ def _valid_required_concentration(profile: object) -> Decimal | None:
     return required_concentration
 
 
+def _evaluate_tail_number_rule(
+    source_row: CSVSourceRow,
+) -> tuple[list[AuditException], list[UnableToEvaluate]]:
+    """Validate a trimmed tail deterministically for AircraftType 0, 1, or 2."""
+    aircraft_type_text = source_row.get("AircraftType")
+    aircraft_type = _parse_decimal(aircraft_type_text)
+    if (
+        aircraft_type is None
+        or aircraft_type != aircraft_type.to_integral_value()
+        or aircraft_type not in (Decimal(0), Decimal(1), Decimal(2))
+    ):
+        return [], [
+            _unable_to_evaluate(
+                source_row,
+                _RULE_012,
+                ("AircraftType",),
+                message=(
+                    "AircraftType must be a finite, numerically whole value "
+                    "of 0, 1, or 2 for tail-number validation."
+                ),
+            )
+        ]
+
+    aircraft_type_number = int(aircraft_type)
+    tail_text = source_row.get("TailNumber")
+    normalized_tail = tail_text.strip().upper()
+    notes_text = source_row.get("Notes")
+    failure_reasons: list[str] = []
+
+    if aircraft_type_number == 0:
+        if normalized_tail:
+            failure_reasons.append(
+                "TailNumber must be blank for AircraftType 0"
+            )
+        if not notes_text.strip():
+            failure_reasons.append("Notes are required for AircraftType 0")
+    elif aircraft_type_number == 1:
+        if _UPS_TAIL_PATTERN.fullmatch(normalized_tail) is None:
+            failure_reasons.append("Does not match UPS NxxxUP format")
+    else:
+        if not normalized_tail:
+            failure_reasons.append(
+                "TailNumber must not be blank for AircraftType 2"
+            )
+        elif _UPS_TAIL_PATTERN.fullmatch(normalized_tail) is not None:
+            failure_reasons.append(
+                "AircraftType 2 must not use UPS format"
+            )
+        elif (
+            _TYPE2_TAIL_CHARACTERS_PATTERN.fullmatch(normalized_tail) is None
+        ):
+            failure_reasons.append("Contains unsupported characters")
+        elif (
+            _TYPE2_TAIL_ALPHANUMERIC_PATTERN.search(normalized_tail) is None
+        ):
+            failure_reasons.append(
+                "Does not contain a letter or number"
+            )
+
+    if not failure_reasons:
+        return [], []
+
+    return [
+        _rule_012_exception(
+            source_row,
+            aircraft_type_number=aircraft_type_number,
+            failure_reasons=tuple(failure_reasons),
+        )
+    ], []
+
+
 def _evaluate_step_gap_rule(
     source_row: CSVSourceRow,
     active_settings: SettingsDefinition,
@@ -1798,6 +1878,44 @@ def _rule_011_exception(
                 ),
             ),
         ),
+    )
+
+
+def _rule_012_exception(
+    source_row: CSVSourceRow,
+    *,
+    aircraft_type_number: int,
+    failure_reasons: tuple[str, ...],
+) -> AuditException:
+    required_format = {
+        0: (
+            "AircraftType 0 requires a blank TailNumber and nonblank Notes."
+        ),
+        1: (
+            "UPS format ^N[0-9]{3}UP$ after trimming, compared "
+            "case-insensitively."
+        ),
+        2: (
+            "A nonblank, non-UPS tail containing only letters, numbers, and "
+            "hyphens, with at least one letter or number."
+        ),
+    }[aircraft_type_number]
+    details: list[RuleDetail] = [
+        RuleDetail("Original AircraftType", source_row.get("AircraftType")),
+        RuleDetail("Original TailNumber", source_row.get("TailNumber")),
+    ]
+    if aircraft_type_number == 0:
+        details.append(RuleDetail("Original Notes", source_row.get("Notes")))
+    details.extend(
+        (
+            RuleDetail("Required format", required_format),
+            RuleDetail("Failure reason", "; ".join(failure_reasons)),
+        )
+    )
+    return _build_exception(
+        source_row,
+        _RULE_012,
+        details=tuple(details),
     )
 
 

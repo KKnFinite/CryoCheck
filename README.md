@@ -1,6 +1,6 @@
 # CryoCheck
 
-CryoCheck is a standalone deice log audit application. This repository contains the production-ready Flask application, Neon PostgreSQL integration, an in-memory CSV audit workflow, optional local accounts with private Personal Settings, and the approved audit-rule registry. The first eleven rules now execute and produce reviewable Results; the remaining rules and Excel export will be added in later development phases.
+CryoCheck is a standalone deice log audit application. This repository contains the production-ready Flask application, Neon PostgreSQL integration, an in-memory CSV audit workflow, optional local accounts with private Personal Settings, and the approved audit-rule registry. The first twelve rules now execute and produce reviewable Results; the remaining rules and Excel export will be added in later development phases.
 
 ## Purpose
 
@@ -86,6 +86,8 @@ Type IV fluid profiles are also version-controlled, read-only reference data. Th
 
 `CC-RULE-010` sums the original whole-minute process time for every positively used fluid step and compares the result with the active profile’s maximum event time. Default is 30 minutes. Type I-only and Type IV-only rows are both evaluated. For combined events, the Include Gap setting optionally adds the whole-minute Type I-to-Type IV gap, including a recognized overnight gap; same-day overlaps contribute zero and remain assigned to pending `CC-RULE-013`. Equality passes, and invalid required inputs produce unable-to-evaluate warnings.
 
+`CC-RULE-012` validates trimmed, case-insensitive tail-number requirements for numeric AircraftType 0, 1, and 2 without external registry, web, API, or ownership checks. Type 0 requires a blank tail and nonblank Notes, Type 1 requires UPS format `NxxxUP`, and Type 2 requires a nonblank non-UPS value containing only letters, numbers, and hyphens with at least one letter or number. Original CSV values remain unchanged for Results display.
+
 The upload limit is configured with `MAX_UPLOAD_MB` and defaults to 10 MB. Oversized requests receive a branded HTTP 413 response.
 
 ## Optional accounts
@@ -110,7 +112,7 @@ Registering creates exactly one private `UserSettings` record copied from the cu
 
 ## Rules catalog
 
-The read-only Rules page at `/rules` documents all 14 approved audit checks in permanent rule-ID order and shows each implementation status. The application registry in `app/services/rules.py` and [the detailed rules specification](docs/rules.md) must remain synchronized. `CC-RULE-001` through `CC-RULE-011` are implemented; `CC-RULE-012` through `CC-RULE-014` remain implementation pending.
+The read-only Rules page at `/rules` documents all 14 approved audit checks in permanent rule-ID order and shows each implementation status. The application registry in `app/services/rules.py` and [the detailed rules specification](docs/rules.md) must remain synchronized. `CC-RULE-001` through `CC-RULE-012` are implemented; `CC-RULE-013` and `CC-RULE-014` remain implementation pending.
 
 ### Required baseline columns
 

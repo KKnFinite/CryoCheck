@@ -1,8 +1,8 @@
 # CryoCheck Rules
 
 This document is the approved specification for CryoCheck’s audit rules.
-CC-RULE-001 through CC-RULE-011 are implemented and execute automatically
-after a structurally valid CSV upload. CC-RULE-012 through CC-RULE-014 remain
+CC-RULE-001 through CC-RULE-012 are implemented and execute automatically
+after a structurally valid CSV upload. CC-RULE-013 through CC-RULE-014 remain
 implementation pending.
 
 The in-application registry and this documentation must remain synchronized.
@@ -471,22 +471,42 @@ independent so one rule's invalid input does not block the others.
 
 ## CC-RULE-012 — Incorrect Tail Number
 
-**Implementation status:** Documented — implementation pending
+**Implementation status:** Implemented
 
 ### Logic
 
 - Trim surrounding whitespace and compare letters case-insensitively.
+- AircraftType must resolve numerically to whole-number 0, 1, or 2; equivalent
+  Decimal forms such as 0.0, 1.0, and 2.00 are accepted.
+- Blank, malformed, non-finite, non-whole, or unsupported AircraftType is
+  unable to evaluate.
+- When AircraftType = 0, TailNumber must be blank and Notes must contain
+  nonblank text.
+- Type I and Type IV usage do not affect AircraftType 0 validation.
 - When AircraftType = 1, TailNumber must match the UPS format NxxxUP, where
   each x is a digit.
 - Normalized UPS pattern: ^N[0-9]{3}UP$
 - When AircraftType = 2:
   - TailNumber must not be blank.
   - TailNumber must not match the UPS NxxxUP pattern.
-  - Apply only a loose syntax check allowing letters, numbers, and hyphens.
-  - Do not perform FAA, ICAO, registry, country-specific, carrier-list, or
-    ownership validation.
+  - TailNumber may contain only letters, numbers, and hyphens and must contain
+    at least one letter or number.
+  - Leading, trailing, and repeated hyphens are allowed for AircraftType 2.
+  - Do not perform FAA, ICAO, registry, country-specific, carrier-list,
+    ownership, web, or API validation.
 - Generate an exception when the tail does not meet the requirement for its
   aircraft type.
+
+AircraftType 0 represents a non-aircraft spray. A blank TailNumber with
+nonblank Notes passes, while a populated TailNumber, blank Notes, or both
+produce one exception with the applicable failure reasons. Fluid usage does
+not affect this path.
+
+AircraftType 1 uses the exact case-insensitive UPS expression
+`^N[0-9]{3}UP$` after trimming. AircraftType 2 accepts values such as
+`AB-123`, `12345`, `-A123-`, and `A--123`, but rejects blank values, UPS-format
+tails, hyphen-only values, spaces, underscores, slashes, and other unsupported
+characters. CryoCheck does not query external registries or infer ownership.
 
 ### Settings
 
@@ -499,9 +519,11 @@ independent so one rule's invalid input does not block the others.
 
 ### Output details
 
-- AircraftType
-- Entered TailNumber
-- Required format or reason for failure
+- Original AircraftType
+- Original TailNumber
+- Original Notes for AircraftType 0
+- Required format
+- Specific failure reason
 
 ## CC-RULE-013 — Pass Overlap
 

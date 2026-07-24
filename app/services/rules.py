@@ -593,6 +593,23 @@ RULES: Final[tuple[RuleDefinition, ...]] = (
                 "case-insensitively."
             ),
             (
+                "AircraftType must resolve numerically to whole-number 0, 1, "
+                "or 2; equivalent Decimal forms such as 0.0, 1.0, and 2.00 "
+                "are accepted."
+            ),
+            (
+                "Blank, malformed, non-finite, non-whole, or unsupported "
+                "AircraftType is unable to evaluate."
+            ),
+            (
+                "When AircraftType = 0, TailNumber must be blank and Notes "
+                "must contain nonblank text."
+            ),
+            (
+                "Type I and Type IV usage do not affect AircraftType 0 "
+                "validation."
+            ),
+            (
                 "When AircraftType = 1, TailNumber must match the UPS format "
                 "NxxxUP, where each x is a digit."
             ),
@@ -601,12 +618,16 @@ RULES: Final[tuple[RuleDefinition, ...]] = (
             "TailNumber must not be blank.",
             "TailNumber must not match the UPS NxxxUP pattern.",
             (
-                "Apply only a loose syntax check allowing letters, numbers, "
-                "and hyphens."
+                "TailNumber may contain only letters, numbers, and hyphens and "
+                "must contain at least one letter or number."
+            ),
+            (
+                "Leading, trailing, and repeated hyphens are allowed for "
+                "AircraftType 2."
             ),
             (
                 "Do not perform FAA, ICAO, registry, country-specific, "
-                "carrier-list, or ownership validation."
+                "carrier-list, ownership, web, or API validation."
             ),
             (
                 "Generate an exception when the tail does not meet the "
@@ -619,10 +640,13 @@ RULES: Final[tuple[RuleDefinition, ...]] = (
         ),
         exception_message="Incorrect tail number.",
         output_details=(
-            "AircraftType",
-            "Entered TailNumber",
-            "Required format or reason for failure",
+            "Original AircraftType",
+            "Original TailNumber",
+            "Original Notes for AircraftType 0",
+            "Required format",
+            "Specific failure reason",
         ),
+        implementation_status=IMPLEMENTED_STATUS,
     ),
     RuleDefinition(
         rule_id="CC-RULE-013",

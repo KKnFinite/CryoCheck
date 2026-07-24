@@ -18,6 +18,9 @@ from app.services.validation_engine import run_audit
 def _source_row(
     *,
     source_row_number: int = 2,
+    aircraft_type: str = "2",
+    tail_number: str = "N12345",
+    notes: str = "",
     application_date: str = "2026-01-15",
     start_time: str = "08:00",
     end_time: str = "08:30",
@@ -42,8 +45,9 @@ def _source_row(
         "RecordID": record_id,
         "ApplicationNumber": "application-001",
         "GatewayCode": "GATEWAY-A",
-        "AircraftType": "A320",
-        "TailNumber": "N12345",
+        "AircraftType": aircraft_type,
+        "TailNumber": tail_number,
+        "Notes": notes,
         "ApplicationDate": application_date,
         "StartTime": start_time,
         "EndTime": end_time,
@@ -173,6 +177,13 @@ def _audit_type4_concentration(
     )
 
 
+def _audit_tail_number(**row_values):
+    return run_audit(
+        _import_result(_source_row(**row_values)),
+        DEFAULT_SETTINGS,
+    )
+
+
 def _audit_event_time(
     *,
     settings=DEFAULT_SETTINGS,
@@ -243,10 +254,10 @@ def test_utc_fields_do_not_influence_rule_001_or_rule_002():
     assert result.unable_to_evaluate_count == 0
 
 
-def test_audit_reports_eleven_rules_executed():
+def test_audit_reports_twelve_rules_executed():
     result = _audit_one()
 
-    assert result.rules_executed == 11
+    assert result.rules_executed == 12
 
 
 def test_rule_002_23_hours_59_minutes_passes_at_24_hours():
@@ -1124,6 +1135,307 @@ def test_malformed_concentration_does_not_block_rules_005_or_009():
     assert tuple(
         warning.rule_id for warning in result.unable_to_evaluate
     ) == ("CC-RULE-011",)
+
+
+@pytest.mark.parametrize(
+    ("aircraft_type", "tail_number", "notes"),
+    (
+        ("0.0", "", "Equipment treatment"),
+        ("1.0", "N121UP", ""),
+        ("2.00", "AB-123", ""),
+    ),
+)
+def test_rule_012_accepts_equivalent_whole_aircraft_types(
+    aircraft_type,
+    tail_number,
+    notes,
+):
+    result = _audit_tail_number(
+        aircraft_type=aircraft_type,
+        tail_number=tail_number,
+        notes=notes,
+    )
+
+    assert all(
+        exception.rule_id != "CC-RULE-012"
+        for exception in result.exceptions
+    )
+    assert all(
+        warning.rule_id != "CC-RULE-012"
+        for warning in result.unable_to_evaluate
+    )
+
+
+@pytest.mark.parametrize(
+    "aircraft_type",
+    ("", "malformed", "NaN", "Infinity", "1.5", "-1", "3"),
+)
+def test_rule_012_invalid_aircraft_type_warns(aircraft_type):
+    result = _audit_tail_number(aircraft_type=aircraft_type)
+    rule_warnings = tuple(
+        warning
+        for warning in result.unable_to_evaluate
+        if warning.rule_id == "CC-RULE-012"
+    )
+
+    assert len(rule_warnings) == 1
+    assert rule_warnings[0].invalid_fields == ("AircraftType",)
+    assert all(
+        exception.rule_id != "CC-RULE-012"
+        for exception in result.exceptions
+    )
+
+
+@pytest.mark.parametrize(
+    ("tail_number", "notes"),
+    (("", "Equipment treatment"), ("   ", "  Ground equipment  ")),
+)
+def test_rule_012_aircraft_type_0_valid_non_aircraft_spray_passes(
+    tail_number,
+    notes,
+):
+    result = _audit_tail_number(
+        aircraft_type="0",
+        tail_number=tail_number,
+        notes=notes,
+    )
+
+    assert all(
+        finding.rule_id != "CC-RULE-012"
+        for finding in result.exceptions
+    )
+
+
+@pytest.mark.parametrize(
+    ("tail_number", "notes", "expected_reasons"),
+    (
+        ("", "", ("Notes are required for AircraftType 0",)),
+        (
+            "N121UP",
+            "Equipment treatment",
+            ("TailNumber must be blank for AircraftType 0",),
+        ),
+        (
+            " N121UP ",
+            "   ",
+            (
+                "TailNumber must be blank for AircraftType 0",
+                "Notes are required for AircraftType 0",
+            ),
+        ),
+    ),
+)
+def test_rule_012_aircraft_type_0_failures_are_specific(
+    tail_number,
+    notes,
+    expected_reasons,
+):
+    result = _audit_tail_number(
+        aircraft_type="0",
+        tail_number=tail_number,
+        notes=notes,
+    )
+    exception = tuple(
+        exception
+        for exception in result.exceptions
+        if exception.rule_id == "CC-RULE-012"
+    )[0]
+
+    assert exception.details[-1].label == "Failure reason"
+    assert exception.details[-1].value == "; ".join(expected_reasons)
+
+
+def test_rule_012_aircraft_type_0_ignores_fluid_usage():
+    result = _audit_tail_number(
+        aircraft_type="0",
+        tail_number="",
+        notes="Equipment treatment",
+        type1_used="malformed",
+        type4_used="Infinity",
+    )
+
+    assert all(
+        exception.rule_id != "CC-RULE-012"
+        for exception in result.exceptions
+    )
+    assert all(
+        warning.rule_id != "CC-RULE-012"
+        for warning in result.unable_to_evaluate
+    )
+
+
+@pytest.mark.parametrize(
+    "tail_number",
+    ("N121UP", "n121up", "  N121UP  "),
+)
+def test_rule_012_aircraft_type_1_valid_ups_tails_pass(tail_number):
+    result = _audit_tail_number(
+        aircraft_type="1",
+        tail_number=tail_number,
+    )
+
+    assert all(
+        exception.rule_id != "CC-RULE-012"
+        for exception in result.exceptions
+    )
+
+
+@pytest.mark.parametrize(
+    "tail_number",
+    ("", "N12UP", "N121XX", "N0123UP", "AB-123", "N12AUP"),
+)
+def test_rule_012_aircraft_type_1_invalid_tails_fail(tail_number):
+    result = _audit_tail_number(
+        aircraft_type="1",
+        tail_number=tail_number,
+    )
+    exception = tuple(
+        exception
+        for exception in result.exceptions
+        if exception.rule_id == "CC-RULE-012"
+    )[0]
+
+    assert exception.details[-1].value == (
+        "Does not match UPS NxxxUP format"
+    )
+
+
+@pytest.mark.parametrize(
+    "tail_number",
+    ("AB-123", "12345", "-A123-", "A--123", "abc-123"),
+)
+def test_rule_012_aircraft_type_2_valid_non_ups_tails_pass(tail_number):
+    result = _audit_tail_number(
+        aircraft_type="2",
+        tail_number=tail_number,
+    )
+
+    assert all(
+        exception.rule_id != "CC-RULE-012"
+        for exception in result.exceptions
+    )
+
+
+@pytest.mark.parametrize(
+    ("tail_number", "expected_reason"),
+    (
+        ("", "TailNumber must not be blank for AircraftType 2"),
+        ("N121UP", "AircraftType 2 must not use UPS format"),
+        ("n121up", "AircraftType 2 must not use UPS format"),
+        ("---", "Does not contain a letter or number"),
+        ("AB 123", "Contains unsupported characters"),
+        ("AB_123", "Contains unsupported characters"),
+        ("AB/123", "Contains unsupported characters"),
+    ),
+)
+def test_rule_012_aircraft_type_2_invalid_tails_fail(
+    tail_number,
+    expected_reason,
+):
+    result = _audit_tail_number(
+        aircraft_type="2",
+        tail_number=tail_number,
+    )
+    exception = tuple(
+        exception
+        for exception in result.exceptions
+        if exception.rule_id == "CC-RULE-012"
+    )[0]
+
+    assert exception.details[-1].value == expected_reason
+
+
+def test_rule_012_type_0_details_preserve_original_csv_values():
+    result = _audit_tail_number(
+        aircraft_type=" 0.0 ",
+        tail_number=" N121UP ",
+        notes="   ",
+    )
+    exception = tuple(
+        exception
+        for exception in result.exceptions
+        if exception.rule_id == "CC-RULE-012"
+    )[0]
+
+    assert exception.rule_name == "Incorrect Tail Number"
+    assert exception.exception_message == "Incorrect tail number."
+    assert tuple(
+        (detail.label, detail.value)
+        for detail in exception.details
+    ) == (
+        ("Original AircraftType", " 0.0 "),
+        ("Original TailNumber", " N121UP "),
+        ("Original Notes", "   "),
+        (
+            "Required format",
+            (
+                "AircraftType 0 requires a blank TailNumber and nonblank "
+                "Notes."
+            ),
+        ),
+        (
+            "Failure reason",
+            (
+                "TailNumber must be blank for AircraftType 0; "
+                "Notes are required for AircraftType 0"
+            ),
+        ),
+    )
+
+
+def test_rule_012_type_1_details_show_required_format():
+    result = _audit_tail_number(
+        aircraft_type="1",
+        tail_number="AB-123",
+    )
+    exception = tuple(
+        exception
+        for exception in result.exceptions
+        if exception.rule_id == "CC-RULE-012"
+    )[0]
+
+    assert exception.details[2].value == (
+        "UPS format ^N[0-9]{3}UP$ after trimming, compared "
+        "case-insensitively."
+    )
+
+
+def test_rule_012_orders_by_csv_row_then_rule_id():
+    result = run_audit(
+        _import_result(
+            _source_row(
+                source_row_number=3,
+                aircraft_type="1",
+                tail_number="invalid",
+            ),
+            _source_row(
+                source_row_number=2,
+                aircraft_type="2",
+                tail_number="N121UP",
+            ),
+        ),
+        DEFAULT_SETTINGS,
+    )
+
+    assert tuple(
+        (exception.source_row_number, exception.rule_id)
+        for exception in result.exceptions
+    ) == ((2, "CC-RULE-012"), (3, "CC-RULE-012"))
+
+
+def test_rule_012_does_not_execute_pending_rules_013_or_014():
+    result = _audit_tail_number(
+        aircraft_type="2",
+        tail_number="N121UP",
+    )
+
+    assert tuple(
+        exception.rule_id for exception in result.exceptions
+    ) == ("CC-RULE-012",)
+    assert all(
+        warning.rule_id not in ("CC-RULE-013", "CC-RULE-014")
+        for warning in result.unable_to_evaluate
+    )
 
 
 def test_type1_and_type4_exceptions_are_ordered_by_rule_id_on_same_row():
