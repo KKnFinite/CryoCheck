@@ -1,8 +1,8 @@
 # CryoCheck Rules
 
 This document is the approved specification for CryoCheck’s audit rules.
-CC-RULE-001 through CC-RULE-010 are implemented and execute automatically
-after a structurally valid CSV upload. CC-RULE-011 through CC-RULE-014 remain
+CC-RULE-001 through CC-RULE-011 are implemented and execute automatically
+after a structurally valid CSV upload. CC-RULE-012 through CC-RULE-014 remain
 implementation pending.
 
 The in-application registry and this documentation must remain synchronized.
@@ -418,19 +418,42 @@ produce a warning.
 
 ## CC-RULE-011 — Incorrect Type IV Concentration
 
-**Implementation status:** Documented — implementation pending
+**Implementation status:** Implemented
 
 ### Logic
 
-- Run only when Type4Used is greater than 0.
-- Use the Type IV fluid selected for the gateway.
-- Cryotech Polar Guard Xtend requires 100% concentration.
-- Accept 100, 100.0, and 100%.
-- Any other value fails.
+- Run only when Type4Used is numerically greater than 0; blank, zero, or
+  negative usage skips.
+- Malformed or non-finite Type4Used is unable to evaluate without blocking
+  other Type IV rules.
+- Use the required concentration from the Type IV fluid selected in the active
+  audit settings.
+- Cryotech Polar Guard Xtend requires exactly 100% concentration.
+- Accept a finite numeric concentration with or without one optional trailing
+  percent sign, including surrounding whitespace.
+- Compare with Decimal-safe exact equality; do not interpret fractions as
+  percentages and do not round into compliance.
+- Blank, malformed, non-finite, unsupported, or ambiguously formatted
+  concentration is unable to evaluate.
+- An unavailable or invalid selected fluid requirement is unable to evaluate.
+- Evaluate independently from CC-RULE-005 BRIX and CC-RULE-009 adjusted-rate
+  validation.
+- Generate an exception only when the exact concentrations differ.
+
+Accepted representations of the required current concentration include `100`,
+`100.0`, `100.00`, `100%`, `100.0%`, and whitespace-padded forms such as
+` 100 % `. Values such as `1`, `99.999`, and `100.001` are compared exactly
+as entered; they are not converted or rounded to 100%.
+
+When positive Type IV usage is present, blank or invalid
+`Type4AConcentration` produces an unable-to-evaluate warning. The original CSV
+text is retained for Results details when a numeric value differs from the
+profile requirement. BRIX, concentration, and adjusted-rate evaluation remain
+independent so one rule's invalid input does not block the others.
 
 ### Settings/defaults
 
-- Type IV fluid is gateway-selectable
+- Type IV fluid is selected by the active settings profile
 - Default Type IV fluid: Cryotech Polar Guard Xtend
 - Required concentration for the default fluid: 100%
 - Mandatory
@@ -443,7 +466,8 @@ produce a warning.
 
 - Selected Type IV fluid
 - Entered Type IV concentration
-- Required concentration
+- Required Type IV concentration
+- Comparison statement
 
 ## CC-RULE-012 — Incorrect Tail Number
 

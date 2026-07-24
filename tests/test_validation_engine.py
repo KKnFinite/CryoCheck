@@ -34,6 +34,7 @@ def _source_row(
     process_time1: str = "1",
     type4_used: str = "",
     type4_brix: str = "",
+    type4_concentration: str = "100",
     start_time4: str = "08:15",
     process_time4: str = "1",
 ) -> CSVSourceRow:
@@ -61,6 +62,7 @@ def _source_row(
         "ProcessTime1": process_time1,
         "Type4Used": type4_used,
         "Type4ABrix": type4_brix,
+        "Type4AConcentration": type4_concentration,
         "StartTime4": start_time4,
         "ProcessTime4": process_time4,
     }
@@ -153,6 +155,24 @@ def _audit_type4_rate(
     )
 
 
+def _audit_type4_concentration(
+    *,
+    settings=DEFAULT_SETTINGS,
+    **row_values,
+):
+    values = {
+        "type4_used": "1",
+        "type4_brix": "35",
+        "type4_concentration": "100",
+        "process_time4": "1",
+    }
+    values.update(row_values)
+    return run_audit(
+        _import_result(_source_row(**values)),
+        settings,
+    )
+
+
 def _audit_event_time(
     *,
     settings=DEFAULT_SETTINGS,
@@ -223,10 +243,10 @@ def test_utc_fields_do_not_influence_rule_001_or_rule_002():
     assert result.unable_to_evaluate_count == 0
 
 
-def test_audit_reports_ten_rules_executed():
+def test_audit_reports_eleven_rules_executed():
     result = _audit_one()
 
-    assert result.rules_executed == 10
+    assert result.rules_executed == 11
 
 
 def test_rule_002_23_hours_59_minutes_passes_at_24_hours():
@@ -770,8 +790,11 @@ def test_rule_005_unknown_selected_type4_fluid_is_unable_to_evaluate():
     assert result.exception_count == 0
     assert tuple(
         warning.rule_id for warning in result.unable_to_evaluate
-    ) == ("CC-RULE-005",)
+    ) == ("CC-RULE-005", "CC-RULE-011")
     assert result.unable_to_evaluate[0].invalid_fields == (
+        "Type IV fluid setting",
+    )
+    assert result.unable_to_evaluate[1].invalid_fields == (
         "Type IV fluid setting",
     )
 
@@ -781,6 +804,7 @@ def test_rule_005_invalid_profile_range_is_unable_to_evaluate(monkeypatch):
         name="Invalid Type IV fluid",
         minimum_brix=Decimal("36.6"),
         maximum_brix=Decimal("34.6"),
+        required_concentration=Decimal("100"),
     )
     monkeypatch.setattr(
         validation_engine,
@@ -798,6 +822,308 @@ def test_rule_005_invalid_profile_range_is_unable_to_evaluate(monkeypatch):
         warning.rule_id for warning in result.unable_to_evaluate
     ) == ("CC-RULE-005",)
     assert "valid BRIX range" in result.unable_to_evaluate[0].message
+
+
+@pytest.mark.parametrize("type4_used", ("", "0", "0.0", "-1"))
+def test_rule_011_blank_or_nonpositive_usage_skips(type4_used):
+    result = _audit_type4_concentration(
+        type4_used=type4_used,
+        type4_concentration="malformed",
+    )
+
+    assert all(
+        exception.rule_id != "CC-RULE-011"
+        for exception in result.exceptions
+    )
+    assert all(
+        warning.rule_id != "CC-RULE-011"
+        for warning in result.unable_to_evaluate
+    )
+
+
+@pytest.mark.parametrize("type4_used", ("malformed", "NaN", "Infinity"))
+def test_rule_011_malformed_or_nonfinite_usage_warns(type4_used):
+    result = _audit_type4_concentration(type4_used=type4_used)
+    rule_warnings = tuple(
+        warning
+        for warning in result.unable_to_evaluate
+        if warning.rule_id == "CC-RULE-011"
+    )
+
+    assert len(rule_warnings) == 1
+    assert rule_warnings[0].invalid_fields == ("Type4Used",)
+    assert all(
+        exception.rule_id != "CC-RULE-011"
+        for exception in result.exceptions
+    )
+
+
+@pytest.mark.parametrize(
+    "type4_concentration",
+    ("100", "100.0", "100.00", "100%", "100.0%", " 100 % "),
+)
+def test_rule_011_exact_required_concentration_formats_pass(
+    type4_concentration,
+):
+    result = _audit_type4_concentration(
+        type4_concentration=type4_concentration
+    )
+
+    assert all(
+        exception.rule_id != "CC-RULE-011"
+        for exception in result.exceptions
+    )
+    assert all(
+        warning.rule_id != "CC-RULE-011"
+        for warning in result.unable_to_evaluate
+    )
+
+
+@pytest.mark.parametrize(
+    "type4_concentration",
+    ("99.9", "99.999", "50", "1", "1.0", "0", "100.001", "101"),
+)
+def test_rule_011_exact_concentration_mismatch_fails(type4_concentration):
+    result = _audit_type4_concentration(
+        type4_concentration=type4_concentration
+    )
+    rule_exceptions = tuple(
+        exception
+        for exception in result.exceptions
+        if exception.rule_id == "CC-RULE-011"
+    )
+
+    assert len(rule_exceptions) == 1
+    assert rule_exceptions[0].exception_message == (
+        "Incorrect Type IV concentration."
+    )
+    assert all(
+        warning.rule_id != "CC-RULE-011"
+        for warning in result.unable_to_evaluate
+    )
+
+
+@pytest.mark.parametrize(
+    "type4_concentration",
+    ("", "malformed", "NaN", "Infinity", "100%%", "100 percent"),
+)
+def test_rule_011_invalid_concentration_warns(type4_concentration):
+    result = _audit_type4_concentration(
+        type4_concentration=type4_concentration
+    )
+    rule_warnings = tuple(
+        warning
+        for warning in result.unable_to_evaluate
+        if warning.rule_id == "CC-RULE-011"
+    )
+
+    assert len(rule_warnings) == 1
+    assert rule_warnings[0].invalid_fields == ("Type4AConcentration",)
+    assert all(
+        exception.rule_id != "CC-RULE-011"
+        for exception in result.exceptions
+    )
+
+
+def test_rule_011_unknown_selected_fluid_warns():
+    result = _audit_type4_concentration(
+        settings=replace(
+            DEFAULT_SETTINGS,
+            type4_fluid="Unknown Type IV fluid",
+        )
+    )
+    rule_warnings = tuple(
+        warning
+        for warning in result.unable_to_evaluate
+        if warning.rule_id == "CC-RULE-011"
+    )
+
+    assert len(rule_warnings) == 1
+    assert rule_warnings[0].invalid_fields == ("Type IV fluid setting",)
+
+
+@pytest.mark.parametrize(
+    "invalid_requirement",
+    (None, "100", Decimal("NaN"), Decimal("-0.1"), Decimal("100.1")),
+)
+def test_rule_011_invalid_runtime_profile_requirement_warns(
+    monkeypatch,
+    invalid_requirement,
+):
+    invalid_profile = SimpleNamespace(
+        name="Invalid Type IV fluid",
+        minimum_brix=Decimal("34.6"),
+        maximum_brix=Decimal("36.6"),
+        required_concentration=invalid_requirement,
+    )
+    monkeypatch.setattr(
+        validation_engine,
+        "get_type4_fluid_profile",
+        lambda _name: invalid_profile,
+    )
+
+    result = _audit_type4_concentration()
+    rule_warnings = tuple(
+        warning
+        for warning in result.unable_to_evaluate
+        if warning.rule_id == "CC-RULE-011"
+    )
+
+    assert len(rule_warnings) == 1
+    assert rule_warnings[0].invalid_fields == ("Type IV fluid setting",)
+
+
+def test_rule_011_exception_details_preserve_original_concentration():
+    result = _audit_type4_concentration(
+        type4_concentration=" 99.5 % "
+    )
+    exception = tuple(
+        exception
+        for exception in result.exceptions
+        if exception.rule_id == "CC-RULE-011"
+    )[0]
+
+    assert exception.rule_name == "Incorrect Type IV Concentration"
+    assert exception.exception_message == "Incorrect Type IV concentration."
+    assert tuple(
+        (detail.label, detail.value)
+        for detail in exception.details
+    ) == (
+        ("Selected Type IV fluid", "Cryotech Polar Guard Xtend"),
+        ("Entered Type IV concentration", " 99.5 % "),
+        ("Required Type IV concentration", "100%"),
+        (
+            "Comparison",
+            (
+                "Entered concentration 99.5 % does not match the required "
+                "100%."
+            ),
+        ),
+    )
+
+
+def test_rule_011_uses_active_type4_fluid_profile(monkeypatch):
+    personal_profile = TypeIVFluidProfile(
+        name="Personal Type IV fluid",
+        minimum_brix=Decimal("34"),
+        maximum_brix=Decimal("36"),
+        required_concentration=Decimal("75"),
+    )
+    monkeypatch.setattr(
+        validation_engine,
+        "get_type4_fluid_profile",
+        lambda name: personal_profile
+        if name == personal_profile.name
+        else None,
+    )
+    settings = replace(
+        DEFAULT_SETTINGS,
+        name="Personal — ConcentrationUser",
+        is_default=False,
+        type4_fluid=personal_profile.name,
+    )
+
+    passing = _audit_type4_concentration(
+        settings=settings,
+        type4_brix="35",
+        type4_concentration="75%",
+    )
+    failing = _audit_type4_concentration(
+        settings=settings,
+        type4_brix="35",
+        type4_concentration="100",
+    )
+    exception = tuple(
+        exception
+        for exception in failing.exceptions
+        if exception.rule_id == "CC-RULE-011"
+    )[0]
+
+    assert all(
+        exception.rule_id != "CC-RULE-011"
+        for exception in passing.exceptions
+    )
+    assert exception.details[0].value == personal_profile.name
+    assert exception.details[2].value == "75%"
+
+
+@pytest.mark.parametrize(
+    ("type4_brix", "type4_concentration", "type4_used", "process_time4",
+     "expected_rule_ids"),
+    (
+        ("33.9", "100", "10", "1", ("CC-RULE-005",)),
+        ("35", "99.9", "10", "1", ("CC-RULE-011",)),
+        ("35", "100", "61", "1", ("CC-RULE-009",)),
+        (
+            "33.9",
+            "99.9",
+            "61",
+            "1",
+            ("CC-RULE-005", "CC-RULE-009", "CC-RULE-011"),
+        ),
+    ),
+)
+def test_type4_brix_rate_and_concentration_rules_are_independent(
+    type4_brix,
+    type4_concentration,
+    type4_used,
+    process_time4,
+    expected_rule_ids,
+):
+    result = _audit_type4_concentration(
+        type4_brix=type4_brix,
+        type4_concentration=type4_concentration,
+        type4_used=type4_used,
+        process_time4=process_time4,
+    )
+
+    assert tuple(
+        exception.rule_id for exception in result.exceptions
+    ) == expected_rule_ids
+
+
+def test_malformed_brix_does_not_block_rule_011():
+    result = _audit_type4_concentration(
+        type4_brix="malformed",
+        type4_concentration="99.9",
+    )
+
+    assert tuple(
+        exception.rule_id for exception in result.exceptions
+    ) == ("CC-RULE-011",)
+    assert tuple(
+        warning.rule_id for warning in result.unable_to_evaluate
+    ) == ("CC-RULE-005",)
+
+
+def test_malformed_process_time_does_not_block_rule_011():
+    result = _audit_type4_concentration(
+        type4_concentration="99.9",
+        process_time4="malformed",
+    )
+
+    assert tuple(
+        exception.rule_id for exception in result.exceptions
+    ) == ("CC-RULE-011",)
+    assert tuple(
+        warning.rule_id for warning in result.unable_to_evaluate
+    ) == ("CC-RULE-009", "CC-RULE-010")
+
+
+def test_malformed_concentration_does_not_block_rules_005_or_009():
+    result = _audit_type4_concentration(
+        type4_brix="33.9",
+        type4_concentration="malformed",
+        type4_used="61",
+        process_time4="1",
+    )
+
+    assert tuple(
+        exception.rule_id for exception in result.exceptions
+    ) == ("CC-RULE-005", "CC-RULE-009")
+    assert tuple(
+        warning.rule_id for warning in result.unable_to_evaluate
+    ) == ("CC-RULE-011",)
 
 
 def test_type1_and_type4_exceptions_are_ordered_by_rule_id_on_same_row():

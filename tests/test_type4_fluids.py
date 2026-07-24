@@ -1,4 +1,4 @@
-"""Coverage for version-controlled Type IV BRIX reference data."""
+"""Coverage for version-controlled Type IV fluid reference data."""
 
 from __future__ import annotations
 
@@ -21,6 +21,7 @@ def test_cryotech_polar_guard_xtend_profile_is_exact():
     assert profile is not None
     assert profile.minimum_brix == Decimal("34.6")
     assert profile.maximum_brix == Decimal("36.6")
+    assert profile.required_concentration == Decimal("100")
 
 
 def test_type4_settings_options_derive_from_profile_registry():
@@ -43,8 +44,8 @@ def test_type4_reference_loading_requires_no_app_context_or_network(
 ):
     reference_path = tmp_path / "type4.csv"
     reference_path.write_text(
-        "Fluid,Minimum BRIX,Maximum BRIX\n"
-        "Offline Test Fluid,1.2,3.4\n",
+        "Fluid,Minimum BRIX,Maximum BRIX,Required Concentration\n"
+        "Offline Test Fluid,1.2,3.4,75\n",
         encoding="utf-8",
     )
 
@@ -58,49 +59,77 @@ def test_type4_reference_loading_requires_no_app_context_or_network(
 
     assert profiles["Offline Test Fluid"].minimum_brix == Decimal("1.2")
     assert profiles["Offline Test Fluid"].maximum_brix == Decimal("3.4")
+    assert profiles["Offline Test Fluid"].required_concentration == Decimal(
+        "75"
+    )
 
 
 @pytest.mark.parametrize(
     ("contents", "message_fragment"),
     (
         (
-            "Fluid,Minimum BRIX,Maximum BRIX\n"
-            "Duplicate,1.0,2.0\n"
-            "Duplicate,1.0,2.0\n",
+            "Fluid,Minimum BRIX,Maximum BRIX,Required Concentration\n"
+            "Duplicate,1.0,2.0,100\n"
+            "Duplicate,1.0,2.0,100\n",
             "Duplicate Type IV",
         ),
         (
-            "Fluid,Minimum BRIX,Maximum BRIX\n"
-            "Missing Minimum,,2.0\n",
+            "Fluid,Minimum BRIX,Maximum BRIX,Required Concentration\n"
+            "Missing Minimum,,2.0,100\n",
             "Missing Type IV",
         ),
         (
-            "Fluid,Minimum BRIX,Maximum BRIX\n"
-            "Missing Maximum,1.0,\n",
+            "Fluid,Minimum BRIX,Maximum BRIX,Required Concentration\n"
+            "Missing Maximum,1.0,,100\n",
             "Missing Type IV",
         ),
         (
-            "Fluid,Minimum BRIX,Maximum BRIX\n"
-            "Malformed,not-a-number,2.0\n",
+            "Fluid,Minimum BRIX,Maximum BRIX,Required Concentration\n"
+            "Missing Concentration,1.0,2.0,\n",
+            "Missing Type IV",
+        ),
+        (
+            "Fluid,Minimum BRIX,Maximum BRIX,Required Concentration\n"
+            "Malformed,not-a-number,2.0,100\n",
             "Malformed Type IV",
         ),
         (
-            "Fluid,Minimum BRIX,Maximum BRIX\n"
-            "Non-finite,NaN,2.0\n",
+            "Fluid,Minimum BRIX,Maximum BRIX,Required Concentration\n"
+            "Malformed Concentration,1.0,2.0,not-a-number\n",
+            "Malformed Type IV",
+        ),
+        (
+            "Fluid,Minimum BRIX,Maximum BRIX,Required Concentration\n"
+            "Non-finite,NaN,2.0,100\n",
             "Non-finite Type IV",
         ),
         (
-            "Fluid,Minimum BRIX,Maximum BRIX\n"
-            "Reversed,2.1,2.0\n",
+            "Fluid,Minimum BRIX,Maximum BRIX,Required Concentration\n"
+            "Non-finite Concentration,1.0,2.0,Infinity\n",
+            "Non-finite Type IV",
+        ),
+        (
+            "Fluid,Minimum BRIX,Maximum BRIX,Required Concentration\n"
+            "Reversed,2.1,2.0,100\n",
             "minimum exceeds maximum",
         ),
         (
-            "Name,Minimum BRIX,Maximum BRIX\n"
-            "Wrong Header,1.0,2.0\n",
+            "Fluid,Minimum BRIX,Maximum BRIX,Required Concentration\n"
+            "Below Range,1.0,2.0,-0.1\n",
+            "between 0 and 100",
+        ),
+        (
+            "Fluid,Minimum BRIX,Maximum BRIX,Required Concentration\n"
+            "Above Range,1.0,2.0,100.1\n",
+            "between 0 and 100",
+        ),
+        (
+            "Name,Minimum BRIX,Maximum BRIX,Required Concentration\n"
+            "Wrong Header,1.0,2.0,100\n",
             "headers",
         ),
         (
-            "Fluid,Minimum BRIX,Maximum BRIX\n",
+            "Fluid,Minimum BRIX,Maximum BRIX,Required Concentration\n",
             "contains no profiles",
         ),
     ),

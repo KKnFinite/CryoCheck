@@ -36,6 +36,7 @@ _RULE_007 = _EXECUTED_RULES_BY_ID["CC-RULE-007"]
 _RULE_008 = _EXECUTED_RULES_BY_ID["CC-RULE-008"]
 _RULE_009 = _EXECUTED_RULES_BY_ID["CC-RULE-009"]
 _RULE_010 = _EXECUTED_RULES_BY_ID["CC-RULE-010"]
+_RULE_011 = _EXECUTED_RULES_BY_ID["CC-RULE-011"]
 _TIMESTAMP_RULES: Final = (_RULE_001, _RULE_002)
 _TYPE1_RULES: Final = (_RULE_003, _RULE_004)
 _REQUIRED_TYPE1_BUFFER: Final = Decimal("18.0")
@@ -263,6 +264,12 @@ def run_audit(
         )
         exceptions.extend(event_time_exceptions)
         warnings.extend(event_time_warnings)
+
+        concentration_exceptions, concentration_warnings = (
+            _evaluate_type4_concentration_rule(source_row, active_settings)
+        )
+        exceptions.extend(concentration_exceptions)
+        warnings.extend(concentration_warnings)
 
     return AuditResult(
         filename=imported_csv.filename,
@@ -521,6 +528,23 @@ def _parse_decimal(source_value: str) -> Decimal | None:
     except InvalidOperation:
         return None
     return parsed if parsed.is_finite() else None
+
+
+def _parse_concentration(source_value: str) -> Decimal | None:
+    """Parse a finite Decimal with one optional trailing percent sign."""
+    value = source_value.strip()
+    if not value:
+        return None
+
+    percent_count = value.count("%")
+    if percent_count:
+        if percent_count != 1 or not value.endswith("%"):
+            return None
+        value = value[:-1].strip()
+        if not value:
+            return None
+
+    return _parse_decimal(value)
 
 
 def _evaluate_type1_rate_rule(
@@ -1029,6 +1053,107 @@ def _valid_brix_range(profile: object) -> tuple[Decimal, Decimal] | None:
     ):
         return None
     return minimum_brix, maximum_brix
+
+
+def _evaluate_type4_concentration_rule(
+    source_row: CSVSourceRow,
+    active_settings: SettingsDefinition,
+) -> tuple[list[AuditException], list[UnableToEvaluate]]:
+    """Compare entered Type IV concentration with the active fluid profile."""
+    type4_used_text = source_row.get("Type4Used")
+    if not type4_used_text.strip():
+        return [], []
+
+    type4_used = _parse_decimal(type4_used_text)
+    if type4_used is None:
+        return [], [
+            _unable_to_evaluate(
+                source_row,
+                _RULE_011,
+                ("Type4Used",),
+                message=(
+                    "Type4Used is malformed or non-finite, so CC-RULE-011 "
+                    "applicability could not be determined."
+                ),
+            )
+        ]
+    if type4_used <= 0:
+        return [], []
+
+    selected_fluid = getattr(active_settings, "type4_fluid", None)
+    profile = (
+        get_type4_fluid_profile(selected_fluid)
+        if isinstance(selected_fluid, str)
+        else None
+    )
+    if profile is None:
+        return [], [
+            _unable_to_evaluate(
+                source_row,
+                _RULE_011,
+                ("Type IV fluid setting",),
+                message=(
+                    "The selected Type IV fluid does not have an available "
+                    "concentration profile."
+                ),
+            )
+        ]
+
+    required_concentration = _valid_required_concentration(profile)
+    if required_concentration is None:
+        return [], [
+            _unable_to_evaluate(
+                source_row,
+                _RULE_011,
+                ("Type IV fluid setting",),
+                message=(
+                    "The selected Type IV fluid profile does not supply a "
+                    "valid required concentration."
+                ),
+            )
+        ]
+
+    entered_text = source_row.get("Type4AConcentration")
+    entered_concentration = _parse_concentration(entered_text)
+    if entered_concentration is None:
+        return [], [
+            _unable_to_evaluate(
+                source_row,
+                _RULE_011,
+                ("Type4AConcentration",),
+                message=(
+                    "Type4AConcentration must be a finite numeric value with "
+                    "at most one optional trailing percent sign."
+                ),
+            )
+        ]
+
+    if entered_concentration == required_concentration:
+        return [], []
+
+    return [
+        _rule_011_exception(
+            source_row,
+            fluid_name=profile.name,
+            entered_concentration_text=entered_text,
+            required_concentration=required_concentration,
+        )
+    ], []
+
+
+def _valid_required_concentration(profile: object) -> Decimal | None:
+    try:
+        required_concentration = profile.required_concentration
+    except AttributeError:
+        return None
+
+    if (
+        not isinstance(required_concentration, Decimal)
+        or not required_concentration.is_finite()
+        or not Decimal(0) <= required_concentration <= Decimal(100)
+    ):
+        return None
+    return required_concentration
 
 
 def _evaluate_step_gap_rule(
@@ -1640,6 +1765,39 @@ def _rule_010_exception(
         source_row,
         _RULE_010,
         details=tuple(details),
+    )
+
+
+def _rule_011_exception(
+    source_row: CSVSourceRow,
+    *,
+    fluid_name: str,
+    entered_concentration_text: str,
+    required_concentration: Decimal,
+) -> AuditException:
+    required_display = f"{_format_compact_decimal(required_concentration)}%"
+    entered_comparison = entered_concentration_text.strip()
+    return _build_exception(
+        source_row,
+        _RULE_011,
+        details=(
+            RuleDetail("Selected Type IV fluid", fluid_name),
+            RuleDetail(
+                "Entered Type IV concentration",
+                entered_concentration_text,
+            ),
+            RuleDetail(
+                "Required Type IV concentration",
+                required_display,
+            ),
+            RuleDetail(
+                "Comparison",
+                (
+                    f"Entered concentration {entered_comparison} does "
+                    f"not match the required {required_display}."
+                ),
+            ),
+        ),
     )
 
 

@@ -526,14 +526,47 @@ RULES: Final[tuple[RuleDefinition, ...]] = (
             "for the selected fluid."
         ),
         logic_summary=(
-            "Run only when Type4Used is greater than 0.",
-            "Use the Type IV fluid selected for the gateway.",
-            "Cryotech Polar Guard Xtend requires 100% concentration.",
-            "Accept 100, 100.0, and 100%.",
-            "Any other value fails.",
+            (
+                "Run only when Type4Used is numerically greater than 0; blank, "
+                "zero, or negative usage skips."
+            ),
+            (
+                "Malformed or non-finite Type4Used is unable to evaluate "
+                "without blocking other Type IV rules."
+            ),
+            (
+                "Use the required concentration from the Type IV fluid "
+                "selected in the active audit settings."
+            ),
+            (
+                "Cryotech Polar Guard Xtend requires exactly 100% "
+                "concentration."
+            ),
+            (
+                "Accept a finite numeric concentration with or without one "
+                "optional trailing percent sign, including surrounding "
+                "whitespace."
+            ),
+            (
+                "Compare with Decimal-safe exact equality; do not interpret "
+                "fractions as percentages and do not round into compliance."
+            ),
+            (
+                "Blank, malformed, non-finite, unsupported, or ambiguously "
+                "formatted concentration is unable to evaluate."
+            ),
+            (
+                "An unavailable or invalid selected fluid requirement is "
+                "unable to evaluate."
+            ),
+            (
+                "Evaluate independently from CC-RULE-005 BRIX and CC-RULE-009 "
+                "adjusted-rate validation."
+            ),
+            "Generate an exception only when the exact concentrations differ.",
         ),
         settings_defaults=(
-            "Type IV fluid is gateway-selectable",
+            "Type IV fluid is selected by the active settings profile",
             "Default Type IV fluid: Cryotech Polar Guard Xtend",
             "Required concentration for the default fluid: 100%",
             "Mandatory",
@@ -542,8 +575,10 @@ RULES: Final[tuple[RuleDefinition, ...]] = (
         output_details=(
             "Selected Type IV fluid",
             "Entered Type IV concentration",
-            "Required concentration",
+            "Required Type IV concentration",
+            "Comparison statement",
         ),
+        implementation_status=IMPLEMENTED_STATUS,
     ),
     RuleDefinition(
         rule_id="CC-RULE-012",

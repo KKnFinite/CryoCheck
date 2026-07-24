@@ -50,6 +50,7 @@ def _synthetic_csv(
             "EndTime1": "08:10",
             "ProcessTime1": "1",
             "Type4Used": "0",
+            "Type4AConcentration": "100",
             "StartTime4": "08:15",
             "ProcessTime4": "1",
             "Type4ABrix": "",
@@ -506,7 +507,7 @@ def test_rule_006_default_five_minute_gap_passes_on_results_screen(client):
     assert b"CC-RULE-006" not in response.data
     assert b"No exceptions found" in response.data
     assert b"Rules executed</dt>" in response.data
-    assert b"<dd>10</dd>" in response.data
+    assert b"<dd>11</dd>" in response.data
 
 
 def test_rule_006_default_six_minute_gap_renders_required_details(client):
@@ -1359,6 +1360,103 @@ def test_personal_event_time_settings_affect_next_upload_and_reset(app, client):
     assert reset_audit_response.status_code == 200
     assert b"CC-RULE-010" not in reset_audit_response.data
     assert b"No exceptions found" in reset_audit_response.data
+
+
+@pytest.mark.parametrize("type4_concentration", ("100", "100%"))
+def test_rule_011_required_concentration_formats_pass_on_results_screen(
+    client,
+    type4_concentration,
+):
+    response = _upload(
+        client,
+        _synthetic_csv(
+            overrides={
+                0: {
+                    "Type4Used": "1",
+                    "Type4ABrix": "35",
+                    "Type4AConcentration": type4_concentration,
+                    "ProcessTime4": "1",
+                }
+            }
+        ),
+    )
+
+    assert response.status_code == 200
+    assert b"CC-RULE-011" not in response.data
+    assert b"No exceptions found" in response.data
+
+
+def test_rule_011_exception_renders_required_results_details(client):
+    response = _upload(
+        client,
+        _synthetic_csv(
+            overrides={
+                0: {
+                    "Type4Used": "1",
+                    "Type4ABrix": "35",
+                    "Type4AConcentration": "99.9",
+                    "ProcessTime4": "1",
+                }
+            }
+        ),
+    )
+
+    assert response.status_code == 200
+    assert response.data.count(b"CC-RULE-011") == 1
+    assert b"Incorrect Type IV concentration." in response.data
+    assert b"Cryotech Polar Guard Xtend" in response.data
+    assert b"Entered Type IV concentration" in response.data
+    assert b">99.9</dd>" in response.data
+    assert b"Required Type IV concentration" in response.data
+    assert b">100%</dd>" in response.data
+    assert b"does not match the required 100%" in response.data
+
+
+def test_rule_011_malformed_concentration_renders_warning(client):
+    response = _upload(
+        client,
+        _synthetic_csv(
+            overrides={
+                0: {
+                    "Type4Used": "1",
+                    "Type4ABrix": "35",
+                    "Type4AConcentration": "malformed",
+                    "ProcessTime4": "1",
+                }
+            }
+        ),
+    )
+
+    assert response.status_code == 200
+    assert b"Some rule evaluations could not run" in response.data
+    assert response.data.count(b"CC-RULE-011") == 1
+    assert b"Type4AConcentration" in response.data
+    assert b"Incorrect Type IV concentration." not in response.data
+    assert b"No exceptions found" in response.data
+
+
+def test_rules_005_009_and_011_render_together_on_results_screen(client):
+    response = _upload(
+        client,
+        _synthetic_csv(
+            overrides={
+                0: {
+                    "Type4Used": "61",
+                    "Type4ABrix": "33.9",
+                    "Type4AConcentration": "99.9",
+                    "ProcessTime4": "1",
+                }
+            }
+        ),
+    )
+
+    assert response.status_code == 200
+    assert response.data.count(b"CC-RULE-005") == 1
+    assert response.data.count(b"CC-RULE-009") == 1
+    assert response.data.count(b"CC-RULE-011") == 1
+    assert b"BRIX out of range." in response.data
+    assert b"Excessive Type IV." in response.data
+    assert b"Incorrect Type IV concentration." in response.data
 
 
 def test_invalid_timestamp_warning_is_separate_from_exceptions(client):

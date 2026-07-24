@@ -1,4 +1,4 @@
-"""Validated, read-only Type IV fluid BRIX reference profiles."""
+"""Validated, read-only Type IV fluid reference profiles."""
 
 from __future__ import annotations
 
@@ -13,18 +13,24 @@ from typing import Final, Mapping
 _REFERENCE_DATA_PATH: Final = (
     Path(__file__).resolve().parent.parent
     / "reference_data"
-    / "type4_fluid_brix_ranges.csv"
+    / "type4_fluid_profiles.csv"
 )
-_REFERENCE_HEADERS: Final = ("Fluid", "Minimum BRIX", "Maximum BRIX")
+_REFERENCE_HEADERS: Final = (
+    "Fluid",
+    "Minimum BRIX",
+    "Maximum BRIX",
+    "Required Concentration",
+)
 
 
 @dataclass(frozen=True, slots=True)
 class TypeIVFluidProfile:
-    """One immutable Type IV fluid and its inclusive acceptable BRIX range."""
+    """One immutable Type IV fluid and its numeric audit requirements."""
 
     name: str
     minimum_brix: Decimal
     maximum_brix: Decimal
+    required_concentration: Decimal
 
 
 def load_type4_fluid_profiles(
@@ -61,7 +67,13 @@ def load_type4_fluid_profiles(
             fluid_name = row["Fluid"].strip()
             minimum_text = row["Minimum BRIX"].strip()
             maximum_text = row["Maximum BRIX"].strip()
-            if not fluid_name or not minimum_text or not maximum_text:
+            concentration_text = row["Required Concentration"].strip()
+            if (
+                not fluid_name
+                or not minimum_text
+                or not maximum_text
+                or not concentration_text
+            ):
                 raise RuntimeError(
                     "Missing Type IV reference-data value on row "
                     f"{row_number}: {reference_path.name}."
@@ -75,15 +87,20 @@ def load_type4_fluid_profiles(
             try:
                 minimum_brix = Decimal(minimum_text)
                 maximum_brix = Decimal(maximum_text)
+                required_concentration = Decimal(concentration_text)
             except InvalidOperation as error:
                 raise RuntimeError(
-                    "Malformed Type IV reference-data BRIX value on row "
+                    "Malformed Type IV reference-data numeric value on row "
                     f"{row_number}: {reference_path.name}."
                 ) from error
 
-            if not minimum_brix.is_finite() or not maximum_brix.is_finite():
+            if (
+                not minimum_brix.is_finite()
+                or not maximum_brix.is_finite()
+                or not required_concentration.is_finite()
+            ):
                 raise RuntimeError(
-                    "Non-finite Type IV reference-data BRIX value on row "
+                    "Non-finite Type IV reference-data numeric value on row "
                     f"{row_number}: {reference_path.name}."
                 )
             if minimum_brix > maximum_brix:
@@ -91,11 +108,18 @@ def load_type4_fluid_profiles(
                     "Type IV reference-data minimum exceeds maximum on row "
                     f"{row_number}: {reference_path.name}."
                 )
+            if not Decimal(0) <= required_concentration <= Decimal(100):
+                raise RuntimeError(
+                    "Type IV reference-data required concentration must be "
+                    "between 0 and 100 on row "
+                    f"{row_number}: {reference_path.name}."
+                )
 
             profiles[fluid_name] = TypeIVFluidProfile(
                 name=fluid_name,
                 minimum_brix=minimum_brix,
                 maximum_brix=maximum_brix,
+                required_concentration=required_concentration,
             )
 
     if not profiles:
