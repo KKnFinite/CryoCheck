@@ -103,6 +103,7 @@ def import_csv():
         audit=audit_result,
         import_result=result,
         preview_columns=PREVIEW_DISPLAY_COLUMNS,
+        export_available=prepared_export is not None,
         export_token=(
             prepared_export.token if prepared_export is not None else None
         ),

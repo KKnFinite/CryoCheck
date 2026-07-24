@@ -104,6 +104,7 @@
 
       {% if audit.exceptions %}
         <form
+          id="exception-export-form"
           class="exception-export"
           action="{{ url_for('main.export_exceptions') }}"
           method="post"
@@ -139,7 +140,7 @@
             </div>
             <div class="exception-export__actions">
               <button
-                class="button button--secondary"
+                class="button button--primary"
                 type="submit"
                 name="scope"
                 value="selected"
@@ -147,14 +148,6 @@
                 data-export-selected
               >
                 Export Selected
-              </button>
-              <button
-                class="button button--primary"
-                type="submit"
-                name="scope"
-                value="all"
-              >
-                Export All
               </button>
             </div>
           </div>

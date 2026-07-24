@@ -194,7 +194,12 @@ def test_results_show_one_checkbox_per_exception_and_export_controls(client):
     assert b"Select All" in response.data
     assert b"Clear All" in response.data
     assert b"Export Selected" in response.data
-    assert b"Export All" in response.data
+    assert b"Export Exceptions" in response.data
+    assert re.search(
+        rb'<button[^>]+form="exception-export-form"[^>]+'
+        rb'value="all"[^>]+data-export-all',
+        response.data,
+    )
     assert re.search(
         rb'value="selected"\s+disabled\s+data-export-selected',
         response.data,
@@ -202,6 +207,15 @@ def test_results_show_one_checkbox_per_exception_and_export_controls(client):
     token, identifiers = _export_form(response)
     assert token
     assert identifiers == ("exception-1", "exception-2")
+
+
+def test_export_navigation_is_hidden_when_audit_has_no_exceptions(client):
+    response = _upload_for_export(client, {})
+
+    assert response.status_code == 200
+    assert b"No exceptions found" in response.data
+    assert b"Export Exceptions" not in response.data
+    assert b"data-export-all" not in response.data
 
 
 def test_export_all_downloads_every_exception_in_audit_order(client):

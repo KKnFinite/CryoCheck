@@ -94,7 +94,7 @@ Type IV fluid profiles are also version-controlled, read-only reference data. Th
 
 ## Excel exception export
 
-Results with exceptions provide a checkbox for every finding, Select All and Clear All controls, and Export Selected and Export All actions. Exports include exceptions only; unable-to-evaluate warnings are never included.
+Results with exceptions provide a checkbox for every finding, Select All and Clear All controls, an Export Selected action, and a Results-only Export Exceptions action in the primary navigation for exporting all findings. Exports include exceptions only; unable-to-evaluate warnings are never included.
 
 CryoCheck validates every selected identifier against the signed snapshot for that Results page, preserves CSV-row then Rule-ID ordering, and rejects expired, malformed, duplicate, or unrelated selections. Snapshots expire after `EXPORT_TOKEN_MAX_AGE_SECONDS`, which defaults to 1800 seconds.
 

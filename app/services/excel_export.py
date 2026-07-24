@@ -205,7 +205,9 @@ def select_export_rows(
             row for row in snapshot.rows if row.identifier in selected_set
         )
     else:
-        raise ExportRequestError("Choose Export Selected or Export All.")
+        raise ExportRequestError(
+            "Choose Export Selected or Export Exceptions."
+        )
 
     if not selected_rows:
         raise ExportRequestError("This audit result has no exceptions to export.")

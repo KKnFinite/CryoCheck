@@ -1,5 +1,7 @@
 """Route-level tests for the CryoCheck application shell."""
 
+import re
+
 from sqlalchemy import event
 
 from app.extensions import db
@@ -9,10 +11,48 @@ def test_landing_page_returns_200(client):
     response = client.get("/")
 
     assert response.status_code == 200
-    assert b"Deice Data Validation" in response.data
-    assert b"Import and Inspect" in response.data
+    assert b'class="landing-brand__lockup"' in response.data
+    assert b'class="landing-brand__mark"' in response.data
+    assert b'class="landing-brand__name">CryoCheck</h1>' in response.data
+    assert b"Run Validation" in response.data
+    assert b"Settings:" in response.data
     assert b'name="csv_file"' in response.data
-    assert b"disabled CSV" not in response.data
+    assert b"Deice operations assurance" not in response.data
+    assert b"Deice Data Validation" not in response.data
+    assert b"A clear, dependable workflow" not in response.data
+    assert b"Import and Inspect" not in response.data
+    assert b'class="workflow"' not in response.data
+    assert b"Review &amp; Export Exceptions" not in response.data
+    assert b"Export Exceptions" not in response.data
+
+
+def test_landing_navigation_has_primary_destinations(client):
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert re.search(rb'href="/"[^>]*>\s*Import\s*</a>', response.data)
+    assert re.search(rb'href="/rules"[^>]*>\s*Rules\s*</a>', response.data)
+    assert re.search(
+        rb'href="/settings"[^>]*>\s*Settings\s*</a>',
+        response.data,
+    )
+    assert response.data.count(b'aria-label="Primary navigation"') == 1
+
+
+def test_neofont_is_loaded_from_local_cryocheck_assets(client):
+    stylesheet = client.get("/static/css/app.css")
+    woff2 = client.get("/static/fonts/neofont/NeoFont.woff2")
+    truetype = client.get("/static/fonts/neofont/NeoFont.ttf")
+
+    assert stylesheet.status_code == 200
+    assert b'font-family: "NeoFont"' in stylesheet.data
+    assert b'url("../fonts/neofont/NeoFont.woff2")' in stylesheet.data
+    assert b'url("../fonts/neofont/NeoFont.ttf")' in stylesheet.data
+    assert b"NeoApps" not in stylesheet.data
+    assert woff2.status_code == 200
+    assert len(woff2.data) == 2944
+    assert truetype.status_code == 200
+    assert len(truetype.data) == 4872
 
 
 def test_health_returns_healthy_status_without_database_query(app, client):

@@ -45,6 +45,18 @@
             >
               Settings
             </a>
+            {% if export_available %}
+              <button
+                class="site-nav__link site-nav__link--export"
+                type="submit"
+                form="exception-export-form"
+                name="scope"
+                value="all"
+                data-export-all
+              >
+                Export Exceptions
+              </button>
+            {% endif %}
           </nav>
 
           <nav class="account-nav" aria-label="Account navigation">

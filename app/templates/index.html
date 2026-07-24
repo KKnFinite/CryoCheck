@@ -1,13 +1,20 @@
 {% extends "base.html" %}
 
-{% block title %}CryoCheck | Deice Data Validation{% endblock %}
+{% block title %}CryoCheck | Deice Log Validation{% endblock %}
 
 {% block content %}
-  <section class="hero" aria-labelledby="page-title">
-    <div class="hero__heading">
-      <p class="eyebrow">Deice operations assurance</p>
-      <h1 id="page-title">Deice Data Validation</h1>
-      <p class="hero__intro">A clear, dependable workflow for auditing deice log data.</p>
+  <section class="hero landing-hero" aria-labelledby="page-title">
+    <header class="landing-brand">
+      <div class="landing-brand__lockup">
+        <img
+          class="landing-brand__mark"
+          src="{{ url_for('static', filename='img/favicon.svg') }}"
+          alt=""
+          width="104"
+          height="104"
+        >
+        <h1 id="page-title" class="landing-brand__name">CryoCheck</h1>
+      </div>
       <a class="active-settings" href="{{ url_for('main.settings') }}">
         <span class="active-settings__dot" aria-hidden="true"></span>
         Settings:
@@ -17,9 +24,9 @@
           Personal &mdash; {{ current_user.username }}
         {% endif %}
       </a>
-    </div>
+    </header>
 
-    <div class="glass-panel">
+    <div class="glass-panel landing-panel">
       <div class="launch-control" aria-labelledby="launch-title">
         <p id="launch-title" class="launch-control__label">Import deicing log</p>
         <form
@@ -51,27 +58,10 @@
             No file selected
           </p>
           <button class="button button--primary" type="submit">
-            Import and Inspect
+            Run Validation
           </button>
         </form>
       </div>
-
-      <ol class="workflow" aria-label="CryoCheck workflow">
-        <li class="workflow__card">
-          <span class="workflow__number" aria-hidden="true">01</span>
-          <h2>Import CSV</h2>
-        </li>
-        <li class="workflow__arrow" aria-hidden="true">&#8595;</li>
-        <li class="workflow__card">
-          <span class="workflow__number" aria-hidden="true">02</span>
-          <h2>Run Validation</h2>
-        </li>
-        <li class="workflow__arrow" aria-hidden="true">&#8595;</li>
-        <li class="workflow__card">
-          <span class="workflow__number" aria-hidden="true">03</span>
-          <h2>Review &amp; Export Exceptions</h2>
-        </li>
-      </ol>
     </div>
   </section>
 {% endblock %}
