@@ -870,47 +870,79 @@ h1 {
 
 .audit-warning-summary {
   display: grid;
-  grid-template-columns: minmax(15rem, 0.85fr) minmax(0, 1.6fr);
-  gap: 2rem;
-  padding: clamp(1.5rem, 4vw, 2.25rem);
+  gap: 0.9rem;
+  padding: 1.15rem 1.25rem 1.25rem;
   border-color: rgb(173 108 25 / 25%);
   background: rgb(255 248 237 / 90%);
 }
 
 .audit-warning-summary h2 {
-  margin-bottom: 0.65rem;
+  margin-bottom: 0.35rem;
   color: #593709;
-  font-size: 1.35rem;
+  font-size: 1.15rem;
 }
 
 .audit-warning-summary p:not(.eyebrow) {
   margin: 0;
   color: #70440d;
-  line-height: 1.6;
+  font-size: 0.82rem;
+  line-height: 1.45;
 }
 
 .audit-warning-list {
   display: grid;
-  gap: 0.7rem;
+  gap: 0.45rem;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.audit-warning-list li {
+.audit-warning-card {
   display: grid;
-  gap: 0.2rem;
-  padding: 0.85rem 1rem;
+  grid-template-columns:
+    minmax(8rem, 0.8fr)
+    minmax(7rem, 0.55fr)
+    minmax(9rem, 0.9fr)
+    minmax(16rem, 2fr);
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.65rem 0.75rem;
   border: 1px solid rgb(173 108 25 / 18%);
-  border-radius: 0.75rem;
+  border-radius: 0.6rem;
   color: #70440d;
   background: rgb(255 255 255 / 72%);
-  font-size: 0.8rem;
-  line-height: 1.45;
 }
 
-.audit-warning-list strong {
+.audit-warning-card__field {
+  display: grid;
+  min-width: 0;
+  gap: 0.12rem;
+}
+
+.audit-warning-card__field > span {
+  color: #8b5a19;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.audit-warning-card__field strong {
   color: #593709;
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+
+.audit-warning-card__field small {
+  color: #8b5a19;
+  font-size: 0.68rem;
+}
+
+.audit-warning-card__message {
+  padding-left: 0.75rem;
+  border-left: 1px solid rgb(173 108 25 / 20%);
+  font-size: 0.78rem;
+  font-weight: 700;
 }
 
 .exceptions-section {
@@ -992,64 +1024,36 @@ h1 {
 
 .exception-list {
   display: grid;
-  gap: 1.25rem;
+  gap: 0.65rem;
   margin: 0;
-  padding: 1.5rem;
+  padding: 1rem;
   list-style: none;
 }
 
 .exception-card {
-  overflow: hidden;
+  display: grid;
+  grid-template-columns:
+    2rem
+    minmax(8rem, 0.9fr)
+    minmax(10rem, 1.1fr)
+    minmax(6.5rem, 0.65fr)
+    minmax(7rem, 0.7fr)
+    minmax(16rem, 2.2fr);
+  gap: 0.6rem 0.85rem;
+  align-items: center;
+  padding: 0.75rem 0.9rem 0.7rem;
   border: 1px solid rgb(25 118 168 / 17%);
-  border-radius: var(--radius-md);
-  background: var(--color-white);
-  box-shadow: 0 12px 28px rgb(6 40 70 / 8%);
-}
-
-.exception-card__header {
-  display: flex;
-  gap: 1.5rem;
-  align-items: start;
-  justify-content: space-between;
-  padding: 1.25rem 1.4rem;
-  border-bottom: 1px solid rgb(9 34 62 / 8%);
+  border-radius: 0.75rem;
   background:
-    radial-gradient(circle at 100% 0, rgb(157 221 239 / 28%), transparent 16rem),
-    linear-gradient(145deg, var(--color-white), rgb(233 249 252 / 58%));
-}
-
-.exception-card__rule {
-  margin-bottom: 0.35rem;
-  color: var(--color-blue-600);
-  font-size: 0.7rem;
-  font-weight: 850;
-  letter-spacing: 0.12em;
-}
-
-.exception-card__header h3 {
-  margin-bottom: 0.3rem;
-  color: var(--color-navy-950);
-  font-size: 1.25rem;
-}
-
-.exception-card__header > div > p:last-child {
-  margin: 0;
-  color: var(--color-muted);
-  font-size: 0.82rem;
+    linear-gradient(145deg, var(--color-white), rgb(242 251 253 / 70%));
+  box-shadow: 0 7px 18px rgb(6 40 70 / 6%);
 }
 
 .exception-card__selection {
-  display: inline-flex;
-  flex: 0 0 auto;
-  gap: 0.45rem;
-  align-items: center;
-  padding: 0.45rem 0.65rem;
-  border: 1px solid rgb(25 118 168 / 25%);
-  border-radius: 0.65rem;
-  color: var(--color-navy-800);
-  background: rgb(255 255 255 / 82%);
-  font-size: 0.76rem;
-  font-weight: 800;
+  display: grid;
+  align-self: stretch;
+  place-items: center;
+  border-right: 1px solid rgb(9 34 62 / 8%);
   cursor: pointer;
 }
 
@@ -1058,85 +1062,98 @@ h1 {
   height: 1rem;
   margin: 0;
   accent-color: var(--color-blue-600);
+  cursor: pointer;
 }
 
-.exception-card__row {
-  flex: 0 0 auto;
-  padding: 0.5rem 0.7rem;
-  border-radius: 999px;
-  margin: 0;
-  color: var(--color-navy-800);
-  background: var(--color-glacier-100);
-  font-size: 0.76rem;
-}
-
-.exception-record {
+.exception-card__field,
+.exception-card__message {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  margin: 0;
-}
-
-.exception-record > div {
   min-width: 0;
-  padding: 1rem 1.1rem;
-  border-right: 1px solid rgb(9 34 62 / 7%);
-  border-bottom: 1px solid rgb(9 34 62 / 7%);
+  gap: 0.15rem;
 }
 
-.exception-record > div:nth-child(4n) {
-  border-right: 0;
-}
-
-.exception-record .exception-record__wide {
-  grid-column: span 2;
-  border-bottom: 0;
-}
-
-.exception-record dt,
-.exception-details dt {
+.exception-card__field > span,
+.exception-card__message > span {
   color: var(--color-muted);
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.05em;
+  font-size: 0.61rem;
+  font-weight: 850;
+  letter-spacing: 0.055em;
   text-transform: uppercase;
 }
 
-.exception-record dd,
-.exception-details dd {
-  margin: 0.35rem 0 0;
-  color: var(--color-navy-900);
-  font-size: 0.86rem;
-  font-weight: 700;
-  line-height: 1.45;
+.exception-card__field > strong {
+  color: var(--color-navy-800);
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.25;
   overflow-wrap: anywhere;
 }
 
-.exception-details {
-  padding: 1.2rem 1.4rem 1.4rem;
-  background: rgb(233 249 252 / 48%);
+.exception-card__field small {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.64rem;
 }
 
-.exception-details h4 {
-  margin: 0 0 0.75rem;
-  color: var(--color-navy-900);
-  font-size: 0.78rem;
-  letter-spacing: 0.07em;
+.exception-card__field--rule > strong {
+  color: var(--color-blue-600);
+  letter-spacing: 0.035em;
+}
+
+.exception-card__message {
+  padding-left: 0.8rem;
+  border-left: 1px solid rgb(25 118 168 / 15%);
+}
+
+.exception-card__message h3 {
+  margin: 0;
+  color: var(--color-navy-950);
+  font-size: 0.98rem;
+  line-height: 1.25;
+}
+
+.exception-details {
+  display: grid;
+  grid-column: 2 / -1;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(10rem, 18rem);
+  gap: 0;
+  max-width: 100%;
+  margin: 0;
+  padding: 0.55rem 0 0;
+  border-top: 1px solid rgb(9 34 62 / 7%);
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+
+.exception-details > div {
+  display: grid;
+  min-width: 0;
+  gap: 0.12rem;
+  padding: 0 0.65rem;
+  border-left: 1px solid rgb(25 118 168 / 11%);
+}
+
+.exception-details > div:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+
+.exception-details dt {
+  color: var(--color-muted);
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.045em;
   text-transform: uppercase;
 }
 
-.exception-details dl {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.75rem;
+.exception-details dd {
   margin: 0;
-}
-
-.exception-details dl > div {
-  min-width: 0;
-  padding: 0.8rem;
-  border: 1px solid rgb(25 118 168 / 12%);
-  border-radius: 0.65rem;
-  background: rgb(255 255 255 / 78%);
+  color: var(--color-navy-900);
+  font-size: 0.74rem;
+  font-weight: 700;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
 .audit-empty-state {
@@ -1888,15 +1905,13 @@ h1 {
 
   .summary-metrics,
   .summary-details,
-  .audit-metrics,
-  .exception-record {
+  .audit-metrics {
     grid-template-columns: 1fr;
   }
 
   .results-heading,
   .exceptions-heading,
-  .exception-export__toolbar,
-  .exception-card__header {
+  .exception-export__toolbar {
     display: grid;
     gap: 1rem;
   }
@@ -1909,17 +1924,34 @@ h1 {
     grid-template-columns: 1fr;
   }
 
-  .exception-record > div,
-  .exception-record > div:nth-child(4n) {
-    border-right: 0;
+  .audit-warning-card {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .exception-record .exception-record__wide {
-    grid-column: auto;
+  .audit-warning-card__message {
+    grid-column: 1 / -1;
+    padding: 0.55rem 0 0;
+    border-top: 1px solid rgb(173 108 25 / 20%);
+    border-left: 0;
   }
 
-  .exception-details dl {
-    grid-template-columns: 1fr;
+  .exception-card {
+    grid-template-columns: 2rem repeat(2, minmax(0, 1fr));
+  }
+
+  .exception-card__selection {
+    grid-row: 1 / 4;
+  }
+
+  .exception-card__message,
+  .exception-details {
+    grid-column: 2 / -1;
+  }
+
+  .exception-card__message {
+    padding: 0.55rem 0 0;
+    border-top: 1px solid rgb(25 118 168 / 15%);
+    border-left: 0;
   }
 
   .summary-detail--wide {

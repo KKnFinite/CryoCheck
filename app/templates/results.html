@@ -79,12 +79,21 @@
         </div>
         <ul class="audit-warning-list">
           {% for warning in audit.unable_to_evaluate %}
-            <li>
-              <strong>CSV row {{ warning.source_row_number }} · {{ warning.rule_id }}</strong>
-              {% if warning.record_id %}
-                <span>RecordID {{ warning.record_id }}</span>
-              {% endif %}
-              <span>{{ warning.message }}</span>
+            <li class="audit-warning-card">
+              <div class="audit-warning-card__field">
+                <span>Record ID</span>
+                <strong>{{ warning.record_id or "Not reported" }}</strong>
+                <small>CSV row {{ warning.source_row_number }}</small>
+              </div>
+              <div class="audit-warning-card__field">
+                <span>Rule ID</span>
+                <strong>{{ warning.rule_id }}</strong>
+              </div>
+              <div class="audit-warning-card__field">
+                <span>Unable to evaluate</span>
+                <strong>{{ warning.invalid_fields | join(", ") }}</strong>
+              </div>
+              <p class="audit-warning-card__message">{{ warning.message }}</p>
             </li>
           {% endfor %}
         </ul>
@@ -155,81 +164,62 @@
           <ol class="exception-list">
             {% for identifier, exception in export_entries %}
               <li>
-                <article class="exception-card" aria-labelledby="exception-{{ loop.index }}-title">
-                  <header class="exception-card__header">
-                    <div>
-                      <p class="exception-card__rule">{{ exception.rule_id }}</p>
-                      <h3 id="exception-{{ loop.index }}-title">
-                        {{ exception.exception_message }}
-                      </h3>
-                      <p>{{ exception.rule_name }}</p>
-                    </div>
-                    <label class="exception-card__selection">
-                      <input
-                        type="checkbox"
-                        name="exception_id"
-                        value="{{ identifier }}"
-                        data-exception-checkbox
-                      >
-                      <span>Select</span>
-                    </label>
-                    <p class="exception-card__row">
+                <article
+                  class="exception-card"
+                  data-exception-card
+                  aria-labelledby="exception-{{ loop.index }}-title"
+                >
+                  <label class="exception-card__selection">
+                    <input
+                      type="checkbox"
+                      name="exception_id"
+                      value="{{ identifier }}"
+                      data-exception-checkbox
+                    >
+                    <span class="visually-hidden">
+                      Select exception for
+                      {{ exception.record_id or "unreported record" }}
+                    </span>
+                  </label>
+
+                  <div class="exception-card__field">
+                    <span>Record ID</span>
+                    <strong>{{ exception.record_id or "Not reported" }}</strong>
+                    <small>
                       CSV row <strong>{{ exception.source_row_number }}</strong>
-                    </p>
-                  </header>
+                    </small>
+                  </div>
 
-                  <dl class="exception-record">
-                    <div>
-                      <dt>RecordID</dt>
-                      <dd>{{ exception.record_id or "Not reported" }}</dd>
-                    </div>
-                    <div>
-                      <dt>ApplicationNumber</dt>
-                      <dd>{{ exception.application_number or "Not reported" }}</dd>
-                    </div>
-                    <div>
-                      <dt>Gateway</dt>
-                      <dd>{{ exception.gateway_code or "Not reported" }}</dd>
-                    </div>
-                    <div>
-                      <dt>Aircraft / tail</dt>
-                      <dd>
-                        {{ exception.aircraft_type or "Not reported" }}
-                        /
-                        {{ exception.tail_number or "Not reported" }}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>Application date/time</dt>
-                      <dd>{{ exception.application_date }} {{ exception.start_time }}</dd>
-                    </div>
-                    <div>
-                      <dt>Entry date/time</dt>
-                      <dd>{{ exception.date_created }}</dd>
-                    </div>
-                    <div class="exception-record__wide">
-                      <dt>Truck / operator / driver</dt>
-                      <dd>
-                        {{ exception.truck_number or "Not reported" }}
-                        /
-                        {{ exception.operator or "Not reported" }}
-                        /
-                        {{ exception.driver or "Not reported" }}
-                      </dd>
-                    </div>
+                  <div class="exception-card__field">
+                    <span>Entry Date</span>
+                    <strong>{{ exception.date_created or "Not reported" }}</strong>
+                  </div>
+
+                  <div class="exception-card__field">
+                    <span>Truck Number</span>
+                    <strong>{{ exception.truck_number or "Not reported" }}</strong>
+                  </div>
+
+                  <div class="exception-card__field exception-card__field--rule">
+                    <span>Rule ID</span>
+                    <strong>{{ exception.rule_id }}</strong>
+                  </div>
+
+                  <div class="exception-card__message">
+                    <span>Exception</span>
+                    <h3 id="exception-{{ loop.index }}-title">
+                      {{ exception.exception_message }}
+                    </h3>
+                  </div>
+
+                  <dl class="exception-details" aria-label="Rule-relevant details">
+                    {% for detail in exception.details %}
+                      <div>
+                        <dt>{{ detail.label }}</dt>
+                        <dd>{{ detail.value }}</dd>
+                      </div>
+                    {% endfor %}
                   </dl>
-
-                  <section class="exception-details" aria-label="Calculated rule details">
-                    <h4>Calculated rule details</h4>
-                    <dl>
-                      {% for detail in exception.details %}
-                        <div>
-                          <dt>{{ detail.label }}</dt>
-                          <dd>{{ detail.value }}</dd>
-                        </div>
-                      {% endfor %}
-                    </dl>
-                  </section>
                 </article>
               </li>
             {% endfor %}
