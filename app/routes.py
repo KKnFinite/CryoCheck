@@ -389,3 +389,9 @@ def health():
         status="healthy",
         application=current_app.config["APPLICATION_NAME"],
     )
+
+
+@main.get("/favicon.ico")
+def favicon():
+    """Serve the CryoCheck SVG favicon at the conventional browser path."""
+    return current_app.send_static_file("img/favicon.svg")

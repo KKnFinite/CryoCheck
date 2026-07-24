@@ -100,7 +100,7 @@ CryoCheck validates every selected identifier against the signed snapshot for th
 
 Each download is generated entirely in memory as `CryoCheck_Exceptions_YYYYMMDD_HHMMSS.xlsx`. Its `Exceptions` sheet contains the source-identification fields shown in Results, active settings profile, rule metadata, individual rule-detail columns, and combined details text. The header is frozen, filtered, styled, and wrapped with readable column widths. Text beginning with `=`, `+`, `-`, or `@` is escaped before being written to prevent Excel formula injection. Workbooks and export state are never saved to disk or Neon.
 
-The upload limit is configured with `MAX_UPLOAD_MB` and defaults to 10 MB. Oversized requests receive a branded HTTP 413 response.
+The upload limit is configured with `MAX_UPLOAD_MB` and defaults to 10 MB. The same request-size protection covers signed export submissions. Oversized uploads and exports receive branded HTTP 413 responses without echoing submitted data.
 
 ## Optional accounts
 
@@ -208,9 +208,11 @@ pytest -q
 
 - `development` enables Flask debugging for local work.
 - `testing` enables Flask testing behavior and is used by pytest.
-- `production` disables debugging and enables secure cookie transport.
+- `production` explicitly disables debugging, testing behavior, and exception propagation, and enables secure cookie transport.
 
 Select a profile with the `FLASK_CONFIG` environment variable.
+
+CryoCheck provides branded, detail-safe responses for HTTP 400, 403, 404, 413, 429, and 500 failures. The conventional `/favicon.ico` path serves the CryoCheck snowflake favicon.
 
 ## Database migrations
 

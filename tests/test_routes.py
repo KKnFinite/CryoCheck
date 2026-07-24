@@ -49,6 +49,8 @@ def test_not_found_page_uses_custom_template(client):
     response = client.get("/this-page-does-not-exist")
 
     assert response.status_code == 404
+    assert b'class="error-panel"' in response.data
+    assert b"CryoCheck" in response.data
     assert b"Page not found" in response.data
 
 

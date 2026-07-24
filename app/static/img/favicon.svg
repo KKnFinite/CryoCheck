@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="CryoCheck snowflake">
+  <defs>
+    <linearGradient id="ice" x1="8" y1="4" x2="56" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2b91c2"/>
+      <stop offset="1" stop-color="#071b33"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#ice)"/>
+  <g fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M32 12v40M14.7 22l34.6 20M14.7 42l34.6-20"/>
+    <path d="m25 17 7 6 7-6M25 47l7-6 7 6"/>
+    <path d="m18.6 29.5 9.1-1.6-3.1-8.7M45.4 44.8l-9.1-1.6 3.1-8.7"/>
+    <path d="m18.6 34.5 9.1 1.6-3.1 8.7M45.4 19.2l-9.1 1.6 3.1 8.7"/>
+  </g>
+</svg>

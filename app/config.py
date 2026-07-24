@@ -92,6 +92,9 @@ class TestingConfig(Config):
 class ProductionConfig(Config):
     """Production-safe defaults for Render."""
 
+    DEBUG = False
+    TESTING = False
+    PROPAGATE_EXCEPTIONS = False
     SESSION_COOKIE_SECURE = True
     REMEMBER_COOKIE_SECURE = True
 

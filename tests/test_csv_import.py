@@ -266,8 +266,10 @@ def test_oversized_upload_returns_branded_413(app, client):
 
     assert response.status_code == 413
     assert b"CryoCheck" in response.data
+    assert b'class="error-panel"' in response.data
     assert b"CSV file is too large" in response.data
     assert b"Import Another CSV" in response.data
+    assert b"oversized.csv" not in response.data
 
 
 def test_preview_is_limited_to_first_10_rows(client):

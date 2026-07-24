@@ -42,6 +42,9 @@ def test_login_and_registration_limits_are_configured(app):
 def test_production_cookie_security_configuration():
     app = create_app("production")
 
+    assert app.debug is False
+    assert app.testing is False
+    assert app.config["PROPAGATE_EXCEPTIONS"] is False
     assert app.config["SESSION_COOKIE_HTTPONLY"] is True
     assert app.config["SESSION_COOKIE_SAMESITE"] == "Lax"
     assert app.config["SESSION_COOKIE_SECURE"] is True
@@ -113,6 +116,7 @@ def test_missing_csrf_token_uses_branded_error_page():
     assert response.status_code == 400
     assert b"Security check failed" in response.data
     assert b"CryoCheck" in response.data
+    assert b'class="error-panel"' in response.data
 
 
 def test_registration_rate_limit_uses_branded_error_page():
@@ -144,3 +148,4 @@ def test_registration_rate_limit_uses_branded_error_page():
     assert responses[-1].status_code == 429
     assert b"Too many attempts" in responses[-1].data
     assert b"CryoCheck" in responses[-1].data
+    assert b'class="error-panel"' in responses[-1].data

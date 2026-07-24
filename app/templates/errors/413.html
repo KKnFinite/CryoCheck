@@ -1,17 +1,28 @@
 {% extends "base.html" %}
 
-{% block title %}Upload Too Large | CryoCheck{% endblock %}
+{% block title %}Request Too Large | CryoCheck{% endblock %}
 
 {% block content %}
   <section class="error-panel" aria-labelledby="error-title">
-    <p class="error-panel__code">Upload rejected</p>
-    <h1 id="error-title">CSV file is too large</h1>
-    <p>
-      CryoCheck accepts CSV uploads up to {{ max_upload_mb }} MB.
-      Choose a smaller deicing-log export and try again.
-    </p>
-    <a class="button button--secondary" href="{{ url_for('main.index') }}">
-      Import Another CSV
-    </a>
+    <p class="error-panel__code">413</p>
+    {% if is_export_request %}
+      <h1 id="error-title">Exception export request is too large</h1>
+      <p>
+        This Results page contains more export data than CryoCheck can safely
+        accept in one request. Import a smaller CSV and try again.
+      </p>
+      <a class="button button--secondary" href="{{ url_for('main.index') }}">
+        Return to Import
+      </a>
+    {% else %}
+      <h1 id="error-title">CSV file is too large</h1>
+      <p>
+        CryoCheck accepts CSV uploads up to {{ max_upload_mb }} MB.
+        Choose a smaller deicing-log export and try again.
+      </p>
+      <a class="button button--secondary" href="{{ url_for('main.index') }}">
+        Import Another CSV
+      </a>
+    {% endif %}
   </section>
 {% endblock %}
