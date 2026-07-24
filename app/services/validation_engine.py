@@ -34,6 +34,7 @@ _RULE_005 = _EXECUTED_RULES_BY_ID["CC-RULE-005"]
 _RULE_006 = _EXECUTED_RULES_BY_ID["CC-RULE-006"]
 _RULE_007 = _EXECUTED_RULES_BY_ID["CC-RULE-007"]
 _RULE_008 = _EXECUTED_RULES_BY_ID["CC-RULE-008"]
+_RULE_009 = _EXECUTED_RULES_BY_ID["CC-RULE-009"]
 _TIMESTAMP_RULES: Final = (_RULE_001, _RULE_002)
 _TYPE1_RULES: Final = (_RULE_003, _RULE_004)
 _REQUIRED_TYPE1_BUFFER: Final = Decimal("18.0")
@@ -224,6 +225,12 @@ def run_audit(
         )
         exceptions.extend(type1_rate_exceptions)
         warnings.extend(type1_rate_warnings)
+
+        type4_rate_exceptions, type4_rate_warnings = (
+            _evaluate_type4_rate_rule(source_row, active_settings)
+        )
+        exceptions.extend(type4_rate_exceptions)
+        warnings.extend(type4_rate_warnings)
 
     return AuditResult(
         filename=imported_csv.filename,
@@ -503,6 +510,27 @@ def _evaluate_type1_rate_rule(
     if calculation is None or not calculation.exceeds_maximum:
         return [], []
     return [_rule_008_exception(source_row, calculation)], []
+
+
+def _evaluate_type4_rate_rule(
+    source_row: CSVSourceRow,
+    active_settings: SettingsDefinition,
+) -> tuple[list[AuditException], list[UnableToEvaluate]]:
+    """Evaluate adjusted Type IV rate independently of other Type IV rules."""
+    calculation, warning = _evaluate_adjusted_rate(
+        source_row,
+        active_settings,
+        rule=_RULE_009,
+        usage_field="Type4Used",
+        process_time_field="ProcessTime4",
+        maximum_setting_name="max_type4_rate_gpm",
+        maximum_setting_label="Maximum Type IV rate setting",
+    )
+    if warning is not None:
+        return [], [warning]
+    if calculation is None or not calculation.exceeds_maximum:
+        return [], []
+    return [_rule_009_exception(source_row, calculation)], []
 
 
 def _evaluate_adjusted_rate(
@@ -1157,6 +1185,53 @@ def _rule_008_exception(
             ),
             RuleDetail(
                 "Configured maximum Type I rate",
+                f"{maximum_text} gallons per minute",
+            ),
+            RuleDetail(
+                "Comparison",
+                (
+                    f"Adjusted rate {rate_text} gallons per minute exceeds "
+                    f"the configured maximum of {maximum_text} gallons per "
+                    "minute."
+                ),
+            ),
+        ),
+    )
+
+
+def _rule_009_exception(
+    source_row: CSVSourceRow,
+    calculation: AdjustedRateCalculation,
+) -> AuditException:
+    usage_unit = "gallon" if calculation.usage == 1 else "gallons"
+    recorded_time = _format_decimal_minutes(
+        calculation.process_time_text,
+        calculation.recorded_minutes,
+    )
+    adjusted_time = _format_decimal_minutes(
+        _format_compact_decimal(calculation.adjusted_minutes),
+        calculation.adjusted_minutes,
+    )
+    rate_text = _format_compact_decimal(calculation.adjusted_rate)
+    maximum_text = _format_compact_decimal(
+        calculation.configured_maximum
+    )
+    return _build_exception(
+        source_row,
+        _RULE_009,
+        details=(
+            RuleDetail(
+                "Type IV gallons used",
+                f"{calculation.usage_text} {usage_unit}",
+            ),
+            RuleDetail("Recorded ProcessTime4", recorded_time),
+            RuleDetail("Adjusted calculation time", adjusted_time),
+            RuleDetail(
+                "Adjusted Type IV rate",
+                f"{rate_text} gallons per minute",
+            ),
+            RuleDetail(
+                "Configured maximum Type IV rate",
                 f"{maximum_text} gallons per minute",
             ),
             RuleDetail(

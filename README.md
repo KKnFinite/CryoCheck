@@ -1,6 +1,6 @@
 # CryoCheck
 
-CryoCheck is a standalone deice log audit application. This repository contains the production-ready Flask application, Neon PostgreSQL integration, an in-memory CSV audit workflow, optional local accounts with private Personal Settings, and the approved audit-rule registry. The first eight rules now execute and produce reviewable Results; the remaining rules and Excel export will be added in later development phases.
+CryoCheck is a standalone deice log audit application. This repository contains the production-ready Flask application, Neon PostgreSQL integration, an in-memory CSV audit workflow, optional local accounts with private Personal Settings, and the approved audit-rule registry. The first nine rules now execute and produce reviewable Results; the remaining rules and Excel export will be added in later development phases.
 
 ## Purpose
 
@@ -104,11 +104,11 @@ Login and registration are protected by CSRF validation and IP-based rate limits
 
 The `/settings` page is public. Anonymous users see the authoritative, immutable **Default** profile in read-only form. Default is the fallback for all anonymous use and is never stored as an editable database row.
 
-Registering creates exactly one private `UserSettings` record copied from the current Default values. A signed-in user can explicitly save changes to that record or reset it to the current Default. Personal changes affect only the owning account and never modify Default or another user’s settings. Anonymous audits use **Default**; signed-in audits use that account’s **Personal** profile. The Personal late-entry threshold affects `CC-RULE-002`, the active Type I fluid selection affects `CC-RULE-003` and `CC-RULE-004`, the active Type IV fluid selection affects `CC-RULE-005`, the Personal Allowed Gap affects `CC-RULE-006`, and the Personal maximum Type I rate affects `CC-RULE-008` immediately on the next upload; settings for pending rules are retained for later implementation.
+Registering creates exactly one private `UserSettings` record copied from the current Default values. A signed-in user can explicitly save changes to that record or reset it to the current Default. Personal changes affect only the owning account and never modify Default or another user’s settings. Anonymous audits use **Default**; signed-in audits use that account’s **Personal** profile. The Personal late-entry threshold affects `CC-RULE-002`, the active Type I fluid selection affects `CC-RULE-003` and `CC-RULE-004`, the active Type IV fluid selection affects `CC-RULE-005`, the Personal Allowed Gap affects `CC-RULE-006`, and the Personal maximum Type I and Type IV rates independently affect `CC-RULE-008` and `CC-RULE-009` immediately on the next upload; settings for pending rules are retained for later implementation.
 
 ## Rules catalog
 
-The read-only Rules page at `/rules` documents all 13 approved audit checks in permanent rule-ID order and shows each implementation status. The application registry in `app/services/rules.py` and [the detailed rules specification](docs/rules.md) must remain synchronized. `CC-RULE-001` through `CC-RULE-008` are implemented; `CC-RULE-009` through `CC-RULE-013` remain implementation pending.
+The read-only Rules page at `/rules` documents all 13 approved audit checks in permanent rule-ID order and shows each implementation status. The application registry in `app/services/rules.py` and [the detailed rules specification](docs/rules.md) must remain synchronized. `CC-RULE-001` through `CC-RULE-009` are implemented; `CC-RULE-010` through `CC-RULE-013` remain implementation pending.
 
 ### Required baseline columns
 

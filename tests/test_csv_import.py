@@ -51,6 +51,7 @@ def _synthetic_csv(
             "ProcessTime1": "1",
             "Type4Used": "0",
             "StartTime4": "08:15",
+            "ProcessTime4": "1",
             "Type4ABrix": "",
         }
         row.update(
@@ -505,7 +506,7 @@ def test_rule_006_default_five_minute_gap_passes_on_results_screen(client):
     assert b"CC-RULE-006" not in response.data
     assert b"No exceptions found" in response.data
     assert b"Rules executed</dt>" in response.data
-    assert b"<dd>8</dd>" in response.data
+    assert b"<dd>9</dd>" in response.data
 
 
 def test_rule_006_default_six_minute_gap_renders_required_details(client):
@@ -902,6 +903,178 @@ def test_personal_type1_maximum_affects_next_upload_and_reset(app, client):
     assert reset_response.status_code == 302
     assert reset_audit_response.status_code == 200
     assert b"CC-RULE-008" not in reset_audit_response.data
+    assert b"No exceptions found" in reset_audit_response.data
+
+
+@pytest.mark.parametrize(
+    ("type4_used", "process_time4"),
+    (("60", "1"), ("30", "0")),
+)
+def test_rule_009_exact_default_boundaries_pass_on_results_screen(
+    client,
+    type4_used,
+    process_time4,
+):
+    response = _upload(
+        client,
+        _synthetic_csv(
+            overrides={
+                0: {
+                    "Type4Used": type4_used,
+                    "Type4ABrix": "35",
+                    "ProcessTime4": process_time4,
+                }
+            }
+        ),
+    )
+
+    assert response.status_code == 200
+    assert b"CC-RULE-009" not in response.data
+    assert b"No exceptions found" in response.data
+
+
+def test_rule_009_exception_renders_required_results_details(client):
+    response = _upload(
+        client,
+        _synthetic_csv(
+            overrides={
+                0: {
+                    "Type4Used": "61.00",
+                    "Type4ABrix": "35",
+                    "ProcessTime4": "1.0",
+                }
+            }
+        ),
+    )
+
+    assert response.status_code == 200
+    assert b"CC-RULE-009" in response.data
+    assert b"Excessive Type IV." in response.data
+    assert b"61.00 gallons" in response.data
+    assert b"1.0 minute" in response.data
+    assert b"2 minutes" in response.data
+    assert b"30.5 gallons per minute" in response.data
+    assert b"30 gallons per minute" in response.data
+
+
+def test_rule_009_invalid_process_time_renders_warning_not_exception(client):
+    response = _upload(
+        client,
+        _synthetic_csv(
+            overrides={
+                0: {
+                    "Type4Used": "10",
+                    "Type4ABrix": "35",
+                    "ProcessTime4": "1.5",
+                }
+            }
+        ),
+    )
+
+    assert response.status_code == 200
+    assert b"Some rule evaluations could not run" in response.data
+    assert response.data.count(b"CC-RULE-009") == 1
+    assert b"finite, nonnegative" in response.data
+    assert b"No exceptions found" in response.data
+    assert b"Excessive Type IV." not in response.data
+
+
+def test_rule_005_and_rule_009_render_together_on_results_screen(client):
+    response = _upload(
+        client,
+        _synthetic_csv(
+            overrides={
+                0: {
+                    "Type4Used": "61",
+                    "Type4ABrix": "33.9",
+                    "ProcessTime4": "1",
+                }
+            }
+        ),
+    )
+
+    assert response.status_code == 200
+    assert response.data.count(b"CC-RULE-005") == 1
+    assert response.data.count(b"CC-RULE-009") == 1
+    assert b"BRIX out of range." in response.data
+    assert b"Excessive Type IV." in response.data
+
+
+def test_personal_type4_maximum_affects_next_upload_and_reset(app, client):
+    with app.app_context():
+        user = User(
+            username="Type4RateUser",
+            username_normalized="type4rateuser",
+        )
+        user.set_password(VALID_PASSWORD)
+        create_default_user_settings(user)
+        db.session.add(user)
+        db.session.commit()
+
+    login_response = client.post(
+        "/login",
+        data={
+            "username": "Type4RateUser",
+            "password": VALID_PASSWORD,
+        },
+    )
+    save_response = client.post(
+        "/settings",
+        data={
+            "late_entry_threshold_hours": "24",
+            "type1_fluid": "Cryotech Polar Plus LT",
+            "type4_fluid": "Cryotech Polar Guard Xtend",
+            "allowed_gap_minutes": "5",
+            "max_type1_rate_gpm": "60",
+            "max_type4_rate_gpm": "20",
+            "max_event_time_minutes": "30",
+        },
+    )
+    personal_response = _upload(
+        client,
+        _synthetic_csv(
+            row_count=2,
+            overrides={
+                0: {
+                    "Type4Used": "40",
+                    "Type4ABrix": "35",
+                    "ProcessTime4": "1",
+                },
+                1: {
+                    "Type4Used": "41",
+                    "Type4ABrix": "35",
+                    "ProcessTime4": "1",
+                },
+            },
+        ),
+    )
+    reset_response = client.post(
+        "/settings/reset",
+        data={"confirm_reset": "y"},
+    )
+    reset_audit_response = _upload(
+        client,
+        _synthetic_csv(
+            overrides={
+                0: {
+                    "Type4Used": "41",
+                    "Type4ABrix": "35",
+                    "ProcessTime4": "1",
+                }
+            }
+        ),
+    )
+
+    assert login_response.status_code == 302
+    assert save_response.status_code == 302
+    assert personal_response.status_code == 200
+    assert b"Personal \xe2\x80\x94 Type4RateUser" in personal_response.data
+    assert personal_response.data.count(b"CC-RULE-009") == 1
+    assert b"20.5 gallons per minute" in personal_response.data
+    assert b"20 gallons per minute" in personal_response.data
+    assert reset_response.status_code == 302
+    assert reset_audit_response.status_code == 200
+    assert b"CC-RULE-009" not in reset_audit_response.data
     assert b"No exceptions found" in reset_audit_response.data
 
 

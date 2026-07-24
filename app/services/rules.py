@@ -385,19 +385,38 @@ RULES: Final[tuple[RuleDefinition, ...]] = (
             "independently configured maximum."
         ),
         logic_summary=(
+            "Run only when Type4Used is numerically greater than 0.",
+            (
+                "Blank, zero, or negative Type4Used skips the rule; malformed "
+                "or non-finite Type4Used is unable to evaluate."
+            ),
             "Use the CSV’s existing whole-number ProcessTime4 value directly.",
             "Do not recalculate duration from StartTime4 and EndTime4.",
+            (
+                "ProcessTime4 must be finite, nonnegative, and numerically a "
+                "whole number when Type IV usage is positive."
+            ),
             "Adjusted Type IV rate = Type4Used / (ProcessTime4 + 1).",
+            (
+                "The added minute conservatively accounts for whole-minute "
+                "recording precision."
+            ),
+            "Use Decimal-safe arithmetic without rounding before comparison.",
             (
                 "Generate an exception only when the adjusted rate is greater "
                 "than the configured maximum."
             ),
             "A rate equal to the maximum passes.",
+            (
+                "Invalid required values or an invalid runtime maximum produce "
+                "an unable-to-evaluate warning, not an exception."
+            ),
         ),
         settings_defaults=(
-            "Maximum Type IV rate",
+            "Maximum Type IV rate: active profile setting",
             "Default: 30 gallons per minute",
-            "Adjustable independently from Type I",
+            "Adjustable independently from the Type I maximum",
+            "Personal Settings apply to the next signed-in upload",
             "Mandatory",
         ),
         exception_message="Excessive Type IV.",
@@ -407,7 +426,9 @@ RULES: Final[tuple[RuleDefinition, ...]] = (
             "Adjusted calculation time",
             "Adjusted gallons per minute",
             "Configured maximum",
+            "Comparison statement",
         ),
+        implementation_status=IMPLEMENTED_STATUS,
     ),
     RuleDefinition(
         rule_id="CC-RULE-010",
