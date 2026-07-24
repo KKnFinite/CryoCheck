@@ -48,6 +48,7 @@ def _synthetic_csv(
             "Type1Concentration": "50",
             "FreezingPoint1": "-17.3",
             "EndTime1": "08:10",
+            "ProcessTime1": "1",
             "Type4Used": "0",
             "StartTime4": "08:15",
             "Type4ABrix": "",
@@ -504,7 +505,7 @@ def test_rule_006_default_five_minute_gap_passes_on_results_screen(client):
     assert b"CC-RULE-006" not in response.data
     assert b"No exceptions found" in response.data
     assert b"Rules executed</dt>" in response.data
-    assert b"<dd>7</dd>" in response.data
+    assert b"<dd>8</dd>" in response.data
 
 
 def test_rule_006_default_six_minute_gap_renders_required_details(client):
@@ -788,6 +789,120 @@ def test_rule_007_is_identical_for_anonymous_and_signed_in_audits(app, client):
     assert personal_response.data.count(b"CC-RULE-007") == 1
     assert b"Default" in anonymous_response.data
     assert b"Personal \xe2\x80\x94 PrecipAuditUser" in personal_response.data
+
+
+def test_rule_008_exception_renders_required_results_details(client):
+    response = _upload(
+        client,
+        _synthetic_csv(
+            overrides={
+                0: {
+                    "Type1Used": "121.00",
+                    "ProcessTime1": "1.0",
+                }
+            }
+        ),
+    )
+
+    assert response.status_code == 200
+    assert b"CC-RULE-008" in response.data
+    assert b"Excessive Type I." in response.data
+    assert b"121.00 gallons" in response.data
+    assert b"1.0 minute" in response.data
+    assert b"2 minutes" in response.data
+    assert b"60.5 gallons per minute" in response.data
+    assert b"60 gallons per minute" in response.data
+
+
+def test_rule_008_invalid_process_time_renders_warning_not_exception(client):
+    response = _upload(
+        client,
+        _synthetic_csv(
+            overrides={0: {"ProcessTime1": "1.5"}}
+        ),
+    )
+
+    assert response.status_code == 200
+    assert b"Some rule evaluations could not run" in response.data
+    assert response.data.count(b"CC-RULE-008") == 1
+    assert b"finite, nonnegative" in response.data
+    assert b"No exceptions found" in response.data
+    assert b"Excessive Type I." not in response.data
+
+
+def test_personal_type1_maximum_affects_next_upload_and_reset(app, client):
+    with app.app_context():
+        user = User(
+            username="Type1RateUser",
+            username_normalized="type1rateuser",
+        )
+        user.set_password(VALID_PASSWORD)
+        create_default_user_settings(user)
+        db.session.add(user)
+        db.session.commit()
+
+    login_response = client.post(
+        "/login",
+        data={
+            "username": "Type1RateUser",
+            "password": VALID_PASSWORD,
+        },
+    )
+    save_response = client.post(
+        "/settings",
+        data={
+            "late_entry_threshold_hours": "24",
+            "type1_fluid": "Cryotech Polar Plus LT",
+            "type4_fluid": "Cryotech Polar Guard Xtend",
+            "allowed_gap_minutes": "5",
+            "max_type1_rate_gpm": "50",
+            "max_type4_rate_gpm": "30",
+            "max_event_time_minutes": "30",
+        },
+    )
+    personal_response = _upload(
+        client,
+        _synthetic_csv(
+            row_count=2,
+            overrides={
+                0: {
+                    "Type1Used": "100",
+                    "ProcessTime1": "1",
+                },
+                1: {
+                    "Type1Used": "101",
+                    "ProcessTime1": "1",
+                },
+            },
+        ),
+    )
+    reset_response = client.post(
+        "/settings/reset",
+        data={"confirm_reset": "y"},
+    )
+    reset_audit_response = _upload(
+        client,
+        _synthetic_csv(
+            overrides={
+                0: {
+                    "Type1Used": "101",
+                    "ProcessTime1": "1",
+                }
+            }
+        ),
+    )
+
+    assert login_response.status_code == 302
+    assert save_response.status_code == 302
+    assert personal_response.status_code == 200
+    assert b"Personal \xe2\x80\x94 Type1RateUser" in personal_response.data
+    assert personal_response.data.count(b"CC-RULE-008") == 1
+    assert b"50.5 gallons per minute" in personal_response.data
+    assert b"50 gallons per minute" in personal_response.data
+    assert reset_response.status_code == 302
+    assert reset_audit_response.status_code == 200
+    assert b"CC-RULE-008" not in reset_audit_response.data
+    assert b"No exceptions found" in reset_audit_response.data
 
 
 def test_invalid_timestamp_warning_is_separate_from_exceptions(client):

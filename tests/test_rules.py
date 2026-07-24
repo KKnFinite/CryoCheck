@@ -84,12 +84,13 @@ def test_exact_exception_messages_appear(client):
         assert page.count(message) == 1
 
 
-def test_first_seven_rules_are_implemented_and_remaining_rules_are_pending(client):
+def test_first_eight_rules_are_implemented_and_remaining_rules_are_pending(client):
     page = client.get("/rules").get_data(as_text=True)
 
     assert IMPLEMENTED_STATUS == "Implemented"
     assert IMPLEMENTATION_PENDING_STATUS == "Documented — implementation pending"
-    assert tuple(rule.implementation_status for rule in RULES[:7]) == (
+    assert tuple(rule.implementation_status for rule in RULES[:8]) == (
+        IMPLEMENTED_STATUS,
         IMPLEMENTED_STATUS,
         IMPLEMENTED_STATUS,
         IMPLEMENTED_STATUS,
@@ -100,10 +101,10 @@ def test_first_seven_rules_are_implemented_and_remaining_rules_are_pending(clien
     )
     assert all(
         rule.implementation_status == IMPLEMENTATION_PENDING_STATUS
-        for rule in RULES[7:]
+        for rule in RULES[8:]
     )
-    assert page.count(IMPLEMENTED_STATUS) == 7
-    assert page.count(IMPLEMENTATION_PENDING_STATUS) == 6
+    assert page.count(IMPLEMENTED_STATUS) == 8
+    assert page.count(IMPLEMENTATION_PENDING_STATUS) == 5
     assert "remaining rules are implementation pending" in page
 
 
@@ -153,10 +154,10 @@ def test_rules_documentation_stays_synchronized_with_registry():
         ):
             assert " ".join(detail.split()) in normalized_documentation
 
-    assert "CC-RULE-001 through CC-RULE-007 are implemented" in (
+    assert "CC-RULE-001 through CC-RULE-008 are implemented" in (
         normalized_documentation
     )
-    assert "CC-RULE-008 through CC-RULE-013 remain implementation pending" in (
+    assert "CC-RULE-009 through CC-RULE-013 remain implementation pending" in (
         normalized_documentation
     )
     assert "must remain synchronized" in normalized_documentation

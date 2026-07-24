@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, localcontext
 from typing import Final
 
 from app.services.csv_import import CSVImportResult, CSVSourceRow
@@ -33,6 +33,7 @@ _RULE_004 = _EXECUTED_RULES_BY_ID["CC-RULE-004"]
 _RULE_005 = _EXECUTED_RULES_BY_ID["CC-RULE-005"]
 _RULE_006 = _EXECUTED_RULES_BY_ID["CC-RULE-006"]
 _RULE_007 = _EXECUTED_RULES_BY_ID["CC-RULE-007"]
+_RULE_008 = _EXECUTED_RULES_BY_ID["CC-RULE-008"]
 _TIMESTAMP_RULES: Final = (_RULE_001, _RULE_002)
 _TYPE1_RULES: Final = (_RULE_003, _RULE_004)
 _REQUIRED_TYPE1_BUFFER: Final = Decimal("18.0")
@@ -128,6 +129,20 @@ class AuditResult:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class AdjustedRateCalculation:
+    """Validated Decimal inputs and output for an adjusted fluid rate."""
+
+    usage_text: str
+    process_time_text: str
+    usage: Decimal
+    recorded_minutes: Decimal
+    adjusted_minutes: Decimal
+    adjusted_rate: Decimal
+    configured_maximum: Decimal
+    exceeds_maximum: bool
+
+
 def run_audit(
     imported_csv: CSVImportResult,
     active_settings: SettingsDefinition,
@@ -203,6 +218,12 @@ def run_audit(
         )
         exceptions.extend(precipitation_exceptions)
         warnings.extend(precipitation_warnings)
+
+        type1_rate_exceptions, type1_rate_warnings = (
+            _evaluate_type1_rate_rule(source_row, active_settings)
+        )
+        exceptions.extend(type1_rate_exceptions)
+        warnings.extend(type1_rate_warnings)
 
     return AuditResult(
         filename=imported_csv.filename,
@@ -461,6 +482,138 @@ def _parse_decimal(source_value: str) -> Decimal | None:
     except InvalidOperation:
         return None
     return parsed if parsed.is_finite() else None
+
+
+def _evaluate_type1_rate_rule(
+    source_row: CSVSourceRow,
+    active_settings: SettingsDefinition,
+) -> tuple[list[AuditException], list[UnableToEvaluate]]:
+    """Evaluate adjusted Type I rate independently of other Type I rules."""
+    calculation, warning = _evaluate_adjusted_rate(
+        source_row,
+        active_settings,
+        rule=_RULE_008,
+        usage_field="Type1Used",
+        process_time_field="ProcessTime1",
+        maximum_setting_name="max_type1_rate_gpm",
+        maximum_setting_label="Maximum Type I rate setting",
+    )
+    if warning is not None:
+        return [], [warning]
+    if calculation is None or not calculation.exceeds_maximum:
+        return [], []
+    return [_rule_008_exception(source_row, calculation)], []
+
+
+def _evaluate_adjusted_rate(
+    source_row: CSVSourceRow,
+    active_settings: SettingsDefinition,
+    *,
+    rule: RuleDefinition,
+    usage_field: str,
+    process_time_field: str,
+    maximum_setting_name: str,
+    maximum_setting_label: str,
+) -> tuple[AdjustedRateCalculation | None, UnableToEvaluate | None]:
+    """Validate and calculate one adjusted fluid rate for reusable rate rules."""
+    usage_text = source_row.get(usage_field)
+    if not usage_text.strip():
+        return None, None
+
+    usage = _parse_decimal(usage_text)
+    if usage is None:
+        return None, _unable_to_evaluate(
+            source_row,
+            rule,
+            (usage_field,),
+            message=(
+                f"{usage_field} is malformed or non-finite, so "
+                f"{rule.rule_id} applicability could not be determined."
+            ),
+        )
+    if usage <= 0:
+        return None, None
+
+    process_time_text = source_row.get(process_time_field)
+    recorded_minutes = _parse_decimal(process_time_text)
+    if (
+        recorded_minutes is None
+        or recorded_minutes < 0
+        or recorded_minutes != recorded_minutes.to_integral_value()
+    ):
+        return None, _unable_to_evaluate(
+            source_row,
+            rule,
+            (process_time_field,),
+            message=(
+                f"{process_time_field} must be a finite, nonnegative, "
+                "numerically whole-minute value when positive fluid usage "
+                "is recorded."
+            ),
+        )
+
+    configured_maximum = _valid_positive_decimal_setting(
+        active_settings,
+        maximum_setting_name,
+    )
+    if configured_maximum is None:
+        return None, _unable_to_evaluate(
+            source_row,
+            rule,
+            (maximum_setting_label,),
+            message=(
+                f"{maximum_setting_label} must be an available, finite, "
+                "positive Decimal value."
+            ),
+        )
+
+    adjusted_minutes = recorded_minutes + Decimal(1)
+    precision = max(
+        28,
+        len(usage.as_tuple().digits)
+        + len(adjusted_minutes.as_tuple().digits)
+        + len(configured_maximum.as_tuple().digits)
+        + 10,
+    )
+    exponent_limit = (
+        abs(usage.adjusted())
+        + abs(adjusted_minutes.adjusted())
+        + abs(configured_maximum.adjusted())
+        + 10
+    )
+    with localcontext() as decimal_context:
+        decimal_context.prec = precision
+        decimal_context.Emax = max(decimal_context.Emax, exponent_limit)
+        decimal_context.Emin = min(decimal_context.Emin, -exponent_limit)
+        adjusted_rate = usage / adjusted_minutes
+        maximum_allowed_usage = configured_maximum * adjusted_minutes
+    return (
+        AdjustedRateCalculation(
+            usage_text=usage_text,
+            process_time_text=process_time_text,
+            usage=usage,
+            recorded_minutes=recorded_minutes,
+            adjusted_minutes=adjusted_minutes,
+            adjusted_rate=adjusted_rate,
+            configured_maximum=configured_maximum,
+            exceeds_maximum=usage > maximum_allowed_usage,
+        ),
+        None,
+    )
+
+
+def _valid_positive_decimal_setting(
+    active_settings: SettingsDefinition,
+    setting_name: str,
+) -> Decimal | None:
+    value = getattr(active_settings, setting_name, None)
+    if (
+        not isinstance(value, Decimal)
+        or not value.is_finite()
+        or value <= 0
+    ):
+        return None
+    return value
 
 
 def _evaluate_type4_rule(
@@ -971,6 +1124,53 @@ def _rule_007_exception(source_row: CSVSourceRow) -> AuditException:
     )
 
 
+def _rule_008_exception(
+    source_row: CSVSourceRow,
+    calculation: AdjustedRateCalculation,
+) -> AuditException:
+    usage_unit = "gallon" if calculation.usage == 1 else "gallons"
+    recorded_time = _format_decimal_minutes(
+        calculation.process_time_text,
+        calculation.recorded_minutes,
+    )
+    adjusted_time = _format_decimal_minutes(
+        _format_compact_decimal(calculation.adjusted_minutes),
+        calculation.adjusted_minutes,
+    )
+    rate_text = _format_compact_decimal(calculation.adjusted_rate)
+    maximum_text = _format_compact_decimal(
+        calculation.configured_maximum
+    )
+    return _build_exception(
+        source_row,
+        _RULE_008,
+        details=(
+            RuleDetail(
+                "Type I gallons used",
+                f"{calculation.usage_text} {usage_unit}",
+            ),
+            RuleDetail("Recorded ProcessTime1", recorded_time),
+            RuleDetail("Adjusted calculation time", adjusted_time),
+            RuleDetail(
+                "Adjusted Type I rate",
+                f"{rate_text} gallons per minute",
+            ),
+            RuleDetail(
+                "Configured maximum Type I rate",
+                f"{maximum_text} gallons per minute",
+            ),
+            RuleDetail(
+                "Comparison",
+                (
+                    f"Adjusted rate {rate_text} gallons per minute exceeds "
+                    f"the configured maximum of {maximum_text} gallons per "
+                    "minute."
+                ),
+            ),
+        ),
+    )
+
+
 def _build_exception(
     source_row: CSVSourceRow,
     rule: RuleDefinition,
@@ -1025,6 +1225,18 @@ def _format_duration(duration: timedelta) -> str:
 
 def _format_minutes(minutes: int) -> str:
     return f"{minutes} minute{'s' if minutes != 1 else ''}"
+
+
+def _format_decimal_minutes(source_text: str, minutes: Decimal) -> str:
+    unit = "minute" if minutes == 1 else "minutes"
+    return f"{source_text} {unit}"
+
+
+def _format_compact_decimal(value: Decimal) -> str:
+    display_value = format(value, "f")
+    if "." in display_value:
+        display_value = display_value.rstrip("0").rstrip(".")
+    return display_value or "0"
 
 
 def _format_temperature(value: Decimal) -> str:

@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import FrozenInstanceError, replace
+from dataclasses import FrozenInstanceError, fields, replace
 from decimal import Decimal
+from types import SimpleNamespace
 
 import pytest
 
@@ -30,6 +31,7 @@ def _source_row(
     freezing_point1: str = "",
     end_time1: str = "08:10",
     ambient_temp: str = "",
+    process_time1: str = "1",
     type4_used: str = "",
     type4_brix: str = "",
     start_time4: str = "08:15",
@@ -55,6 +57,7 @@ def _source_row(
         "FreezingPoint1": freezing_point1,
         "EndTime1": end_time1,
         "AmbientTemp": ambient_temp,
+        "ProcessTime1": process_time1,
         "Type4Used": type4_used,
         "Type4ABrix": type4_brix,
         "StartTime4": start_time4,
@@ -112,6 +115,35 @@ def _audit_gap(
     )
 
 
+def _audit_type1_rate(
+    *,
+    settings=DEFAULT_SETTINGS,
+    **row_values,
+):
+    values = {
+        "type1_used": "120",
+        "type1_concentration": "50",
+        "freezing_point1": "-17.3",
+        "ambient_temp": "1",
+        "process_time1": "1",
+    }
+    values.update(row_values)
+    return run_audit(
+        _import_result(_source_row(**values)),
+        settings,
+    )
+
+
+def _settings_without(field_name: str) -> SimpleNamespace:
+    return SimpleNamespace(
+        **{
+            field.name: getattr(DEFAULT_SETTINGS, field.name)
+            for field in fields(DEFAULT_SETTINGS)
+            if field.name != field_name
+        }
+    )
+
+
 def test_rule_001_entry_one_minute_before_event_fails():
     result = _audit_one(date_created="2026-01-15 07:59")
 
@@ -150,10 +182,10 @@ def test_utc_fields_do_not_influence_rule_001_or_rule_002():
     assert result.unable_to_evaluate_count == 0
 
 
-def test_audit_reports_seven_rules_executed():
+def test_audit_reports_eight_rules_executed():
     result = _audit_one()
 
-    assert result.rules_executed == 7
+    assert result.rules_executed == 8
 
 
 def test_rule_002_23_hours_59_minutes_passes_at_24_hours():
@@ -381,7 +413,7 @@ def test_malformed_type1_used_is_unable_to_evaluate():
     assert result.exception_count == 0
     assert tuple(
         warning.rule_id for warning in result.unable_to_evaluate
-    ) == ("CC-RULE-003", "CC-RULE-004")
+    ) == ("CC-RULE-003", "CC-RULE-004", "CC-RULE-008")
     assert all(
         warning.invalid_fields == ("Type1Used",)
         for warning in result.unable_to_evaluate
@@ -1192,6 +1224,268 @@ def test_rule_007_exception_orders_after_earlier_rule_on_same_row():
     assert tuple(
         exception.rule_id for exception in result.exceptions
     ) == ("CC-RULE-001", "CC-RULE-007")
+
+
+@pytest.mark.parametrize("type1_used", ("", "0", "0.0", "-1"))
+def test_rule_008_nonpositive_or_blank_type1_usage_skips(type1_used):
+    result = _audit_type1_rate(type1_used=type1_used)
+
+    assert all(
+        exception.rule_id != "CC-RULE-008"
+        for exception in result.exceptions
+    )
+    assert all(
+        warning.rule_id != "CC-RULE-008"
+        for warning in result.unable_to_evaluate
+    )
+
+
+@pytest.mark.parametrize("type1_used", ("malformed", "NaN", "Infinity"))
+def test_rule_008_invalid_type1_usage_creates_warning(type1_used):
+    result = _audit_type1_rate(type1_used=type1_used)
+    rule_warnings = tuple(
+        warning
+        for warning in result.unable_to_evaluate
+        if warning.rule_id == "CC-RULE-008"
+    )
+
+    assert len(rule_warnings) == 1
+    assert rule_warnings[0].invalid_fields == ("Type1Used",)
+    assert "malformed or non-finite" in rule_warnings[0].message
+    assert all(
+        exception.rule_id != "CC-RULE-008"
+        for exception in result.exceptions
+    )
+
+
+@pytest.mark.parametrize(
+    ("type1_used", "process_time1", "should_fail", "displayed_rate"),
+    (
+        ("120", "1", False, None),
+        ("121", "1", True, "60.5 gallons per minute"),
+        ("60", "0", False, None),
+        ("61", "0", True, "61 gallons per minute"),
+        ("180", "2", False, None),
+        (
+            "60.000000000000000000000000001",
+            "0",
+            True,
+            "60.000000000000000000000000001 gallons per minute",
+        ),
+    ),
+)
+def test_rule_008_default_maximum_boundaries(
+    type1_used,
+    process_time1,
+    should_fail,
+    displayed_rate,
+):
+    result = _audit_type1_rate(
+        type1_used=type1_used,
+        process_time1=process_time1,
+    )
+    rule_exceptions = tuple(
+        exception
+        for exception in result.exceptions
+        if exception.rule_id == "CC-RULE-008"
+    )
+
+    assert bool(rule_exceptions) is should_fail
+    if displayed_rate is not None:
+        assert rule_exceptions[0].details[3].value == displayed_rate
+
+
+@pytest.mark.parametrize("process_time1", ("0", "1", "1.0", "5.00"))
+def test_rule_008_accepts_numerically_whole_process_times(process_time1):
+    result = _audit_type1_rate(
+        type1_used="1",
+        process_time1=process_time1,
+    )
+
+    assert all(
+        warning.rule_id != "CC-RULE-008"
+        for warning in result.unable_to_evaluate
+    )
+
+
+@pytest.mark.parametrize(
+    "process_time1",
+    ("", "malformed", "NaN", "Infinity", "-1", "1.5"),
+)
+def test_rule_008_invalid_process_time_creates_warning(process_time1):
+    result = _audit_type1_rate(process_time1=process_time1)
+    rule_warnings = tuple(
+        warning
+        for warning in result.unable_to_evaluate
+        if warning.rule_id == "CC-RULE-008"
+    )
+
+    assert len(rule_warnings) == 1
+    assert rule_warnings[0].invalid_fields == ("ProcessTime1",)
+    assert "finite, nonnegative" in rule_warnings[0].message
+    assert all(
+        exception.rule_id != "CC-RULE-008"
+        for exception in result.exceptions
+    )
+
+
+def test_rule_008_personal_maximum_equality_passes():
+    settings = replace(
+        DEFAULT_SETTINGS,
+        name="Personal — RateUser",
+        is_default=False,
+        max_type1_rate_gpm=Decimal("50"),
+    )
+
+    result = _audit_type1_rate(
+        settings=settings,
+        type1_used="100",
+        process_time1="1",
+    )
+
+    assert all(
+        exception.rule_id != "CC-RULE-008"
+        for exception in result.exceptions
+    )
+
+
+def test_rule_008_personal_maximum_above_boundary_fails():
+    settings = replace(
+        DEFAULT_SETTINGS,
+        name="Personal — RateUser",
+        is_default=False,
+        max_type1_rate_gpm=Decimal("50"),
+    )
+
+    result = _audit_type1_rate(
+        settings=settings,
+        type1_used="101",
+        process_time1="1",
+    )
+
+    assert result.exceptions[-1].rule_id == "CC-RULE-008"
+    assert result.exceptions[-1].details[3].value == (
+        "50.5 gallons per minute"
+    )
+    assert result.exceptions[-1].details[4].value == (
+        "50 gallons per minute"
+    )
+
+
+@pytest.mark.parametrize(
+    "invalid_maximum",
+    (
+        None,
+        "60",
+        Decimal("NaN"),
+        Decimal("Infinity"),
+        Decimal("0"),
+        Decimal("-1"),
+    ),
+)
+def test_rule_008_invalid_runtime_maximum_is_warning(invalid_maximum):
+    settings = replace(
+        DEFAULT_SETTINGS,
+        max_type1_rate_gpm=invalid_maximum,
+    )
+
+    result = _audit_type1_rate(settings=settings)
+    rule_warnings = tuple(
+        warning
+        for warning in result.unable_to_evaluate
+        if warning.rule_id == "CC-RULE-008"
+    )
+
+    assert len(rule_warnings) == 1
+    assert rule_warnings[0].invalid_fields == (
+        "Maximum Type I rate setting",
+    )
+    assert all(
+        exception.rule_id != "CC-RULE-008"
+        for exception in result.exceptions
+    )
+
+
+def test_rule_008_missing_runtime_maximum_is_warning():
+    result = _audit_type1_rate(
+        settings=_settings_without("max_type1_rate_gpm")
+    )
+
+    assert tuple(
+        warning.rule_id
+        for warning in result.unable_to_evaluate
+        if warning.rule_id == "CC-RULE-008"
+    ) == ("CC-RULE-008",)
+
+
+def test_rule_008_exception_preserves_source_text_and_details():
+    result = _audit_type1_rate(
+        type1_used="121.00",
+        process_time1="1.0",
+    )
+    exception = tuple(
+        exception
+        for exception in result.exceptions
+        if exception.rule_id == "CC-RULE-008"
+    )[0]
+
+    assert exception.rule_name == "Excessive Type I"
+    assert exception.exception_message == "Excessive Type I."
+    assert tuple(
+        (detail.label, detail.value)
+        for detail in exception.details
+    ) == (
+        ("Type I gallons used", "121.00 gallons"),
+        ("Recorded ProcessTime1", "1.0 minute"),
+        ("Adjusted calculation time", "2 minutes"),
+        ("Adjusted Type I rate", "60.5 gallons per minute"),
+        (
+            "Configured maximum Type I rate",
+            "60 gallons per minute",
+        ),
+        (
+            "Comparison",
+            (
+                "Adjusted rate 60.5 gallons per minute exceeds the "
+                "configured maximum of 60 gallons per minute."
+            ),
+        ),
+    )
+
+
+def test_rule_008_singular_and_plural_minute_wording():
+    singular = _audit_type1_rate(
+        settings=replace(
+            DEFAULT_SETTINGS,
+            max_type1_rate_gpm=Decimal("0.5"),
+        ),
+        type1_used="1",
+        process_time1="0",
+    )
+    plural = _audit_type1_rate(
+        type1_used="121",
+        process_time1="1",
+    )
+
+    singular_details = singular.exceptions[-1].details
+    plural_details = plural.exceptions[-1].details
+    assert singular_details[0].value == "1 gallon"
+    assert singular_details[1].value == "0 minutes"
+    assert singular_details[2].value == "1 minute"
+    assert plural_details[1].value == "1 minute"
+    assert plural_details[2].value == "2 minutes"
+
+
+def test_rule_008_exception_orders_after_earlier_rule_on_same_row():
+    result = _audit_type1_rate(
+        date_created="2026-01-15 07:59",
+        type1_used="121",
+        process_time1="1",
+    )
+
+    assert tuple(
+        exception.rule_id for exception in result.exceptions
+    ) == ("CC-RULE-001", "CC-RULE-008")
 
 
 def test_audit_result_and_exception_structures_are_immutable():

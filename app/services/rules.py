@@ -333,23 +333,37 @@ RULES: Final[tuple[RuleDefinition, ...]] = (
             "maximum."
         ),
         logic_summary=(
+            "Run only when Type1Used is numerically greater than 0.",
+            (
+                "Blank, zero, or negative Type1Used skips the rule; malformed "
+                "or non-finite Type1Used is unable to evaluate."
+            ),
             "Use the CSV’s existing whole-number ProcessTime1 value directly.",
             "Do not recalculate duration from StartTime1 and EndTime1.",
+            (
+                "ProcessTime1 must be finite, nonnegative, and numerically a "
+                "whole number when Type I usage is positive."
+            ),
             "Adjusted Type I rate = Type1Used / (ProcessTime1 + 1).",
             (
                 "The added minute conservatively accounts for whole-minute "
                 "recording precision."
             ),
+            "Use Decimal-safe arithmetic without rounding before comparison.",
             (
                 "Generate an exception only when the adjusted rate is greater "
                 "than the configured maximum."
             ),
             "A rate equal to the maximum passes.",
+            (
+                "Invalid required values or an invalid runtime maximum produce "
+                "an unable-to-evaluate warning, not an exception."
+            ),
         ),
         settings_defaults=(
-            "Maximum Type I rate",
+            "Maximum Type I rate: active profile setting",
             "Default: 60 gallons per minute",
-            "Adjustable",
+            "Personal Settings apply to the next signed-in upload",
             "Mandatory",
         ),
         exception_message="Excessive Type I.",
@@ -359,7 +373,9 @@ RULES: Final[tuple[RuleDefinition, ...]] = (
             "Adjusted calculation time",
             "Adjusted gallons per minute",
             "Configured maximum",
+            "Comparison statement",
         ),
+        implementation_status=IMPLEMENTED_STATUS,
     ),
     RuleDefinition(
         rule_id="CC-RULE-009",
