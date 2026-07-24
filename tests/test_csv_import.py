@@ -40,7 +40,7 @@ def _synthetic_csv(
             "DateCreated": f"2026-01-{index + 1:02d} 08:00",
             "AircraftType": "2",
             "TailNumber": f"N{index:05d}",
-            "TruckNumber": "TRUCK-TEST",
+            "TruckNumber": "1",
             "Operator": "Synthetic Operator",
             "Driver": "Synthetic Driver",
             "AmbientTemp": "1",
@@ -54,6 +54,7 @@ def _synthetic_csv(
             "StartTime4": "08:15",
             "ProcessTime4": "1",
             "Type4ABrix": "",
+            "Notes": "Type I applied by truck 2",
         }
         row.update(
             {
@@ -507,7 +508,7 @@ def test_rule_006_default_five_minute_gap_passes_on_results_screen(client):
     assert b"CC-RULE-006" not in response.data
     assert b"No exceptions found" in response.data
     assert b"Rules executed</dt>" in response.data
-    assert b"<dd>13</dd>" in response.data
+    assert b"<dd>14</dd>" in response.data
 
 
 def test_rule_006_default_six_minute_gap_renders_required_details(client):
@@ -1681,6 +1682,149 @@ def test_rule_013_invalid_required_time_renders_warning(
     assert response.data.count(b"CC-RULE-013") == 1
     assert expected_field in response.data
     assert b"Pass overlap." not in response.data
+
+
+def test_rule_014_aircraft_type_0_is_exempt_on_results_screen(client):
+    response = _upload(
+        client,
+        _synthetic_csv(
+            overrides={
+                0: {
+                    "AircraftType": "0",
+                    "TailNumber": "",
+                    "Notes": "Equipment treatment",
+                    "TruckNumber": "malformed",
+                    "Type1Used": "",
+                    "Type4Used": "1",
+                    "Type4ABrix": "35",
+                }
+            }
+        ),
+    )
+
+    assert response.status_code == 200
+    assert b"CC-RULE-014" not in response.data
+    assert b"Type IV applied without documented Type I truck." not in (
+        response.data
+    )
+
+
+@pytest.mark.parametrize(
+    ("aircraft_type", "tail_number", "notes"),
+    (
+        ("1", "N121UP", "Type I applied by truck 2"),
+        ("2", "AB-123", "T1 was sprayed by truck #7"),
+    ),
+)
+def test_rule_014_valid_other_truck_explanation_passes_on_results_screen(
+    client,
+    aircraft_type,
+    tail_number,
+    notes,
+):
+    response = _upload(
+        client,
+        _synthetic_csv(
+            overrides={
+                0: {
+                    "AircraftType": aircraft_type,
+                    "TailNumber": tail_number,
+                    "TruckNumber": "1",
+                    "Notes": notes,
+                    "Type1Used": "",
+                    "Type4Used": "1",
+                    "Type4ABrix": "35",
+                }
+            }
+        ),
+    )
+
+    assert response.status_code == 200
+    assert b"CC-RULE-014" not in response.data
+
+
+@pytest.mark.parametrize(
+    ("notes", "expected_reason"),
+    (
+        (
+            "Type I applied by another truck",
+            b"Missing documented truck number",
+        ),
+        (
+            "Type I applied by truck 1",
+            b"Documented truck number matches current TruckNumber",
+        ),
+        (
+            "Truck 2 applied the fluid",
+            b"Missing Type I reference",
+        ),
+        (
+            "Type I from truck 2",
+            b"Missing application wording",
+        ),
+    ),
+)
+def test_rule_014_invalid_explanation_renders_specific_failure(
+    client,
+    notes,
+    expected_reason,
+):
+    response = _upload(
+        client,
+        _synthetic_csv(
+            overrides={
+                0: {
+                    "AircraftType": "2",
+                    "TailNumber": "AB-123",
+                    "TruckNumber": "1",
+                    "Notes": notes,
+                    "Type1Used": "",
+                    "Type4Used": "1",
+                    "Type4ABrix": "35",
+                }
+            }
+        ),
+    )
+
+    assert response.status_code == 200
+    assert response.data.count(b"CC-RULE-014") == 1
+    assert b"Type IV applied without documented Type I truck." in (
+        response.data
+    )
+    assert expected_reason in response.data
+    assert b"AircraftType" in response.data
+    assert b"Type1Used" in response.data
+    assert b"Type4Used" in response.data
+    assert b"Current TruckNumber" in response.data
+    assert b"Original Notes" in response.data
+    assert b"Missing or failed requirement" in response.data
+
+
+def test_rule_014_invalid_current_truck_number_renders_warning(client):
+    response = _upload(
+        client,
+        _synthetic_csv(
+            overrides={
+                0: {
+                    "AircraftType": "2",
+                    "TailNumber": "AB-123",
+                    "TruckNumber": "TRUCK-1",
+                    "Notes": "Type I applied by truck 2",
+                    "Type1Used": "",
+                    "Type4Used": "1",
+                    "Type4ABrix": "35",
+                }
+            }
+        ),
+    )
+
+    assert response.status_code == 200
+    assert b"Some rule evaluations could not run" in response.data
+    assert response.data.count(b"CC-RULE-014") == 1
+    assert b"TruckNumber" in response.data
+    assert b"Type IV applied without documented Type I truck." not in (
+        response.data
+    )
 
 
 def test_invalid_timestamp_warning_is_separate_from_exceptions(client):

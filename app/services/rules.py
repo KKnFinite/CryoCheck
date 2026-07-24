@@ -716,33 +716,52 @@ RULES: Final[tuple[RuleDefinition, ...]] = (
         ),
         logic_summary=(
             (
-                "Future applicability: Type4Used is greater than 0 while "
-                "Type1Used is blank, zero, or negative."
+                "Run only for AircraftType 1 or 2 when Type4Used is "
+                "numerically greater than 0 and Type1Used is blank, zero, or "
+                "negative."
             ),
             (
-                "Notes must deterministically state that Type I was applied by "
-                "another truck and include that truck's numeric identifier."
+                "AircraftType 0 is always exempt; known non-applicable usage "
+                "also skips the rule."
             ),
             (
-                "Recognize a Type I reference such as Type I, Type 1, or T1."
+                "Invalid AircraftType or malformed or non-finite usage is "
+                "unable to evaluate when applicability cannot otherwise be "
+                "determined."
             ),
             (
-                "Require language indicating Type I was applied, sprayed, "
-                "completed, performed, or done."
+                "Notes must contain a Type I reference, approved application "
+                "wording, and another truck's numeric identifier."
             ),
             (
-                "Require a whole-number identifier of any length clearly "
-                "associated with the word truck."
+                "Recognize Type I, Type 1, or T1 as the Type I reference."
             ),
             (
-                "The documented other-truck number must differ from the current "
-                "row's TruckNumber."
+                "Recognize applied, sprayed, completed, performed, or done as "
+                "application wording."
             ),
             (
-                "An unrelated number not associated with the word truck does "
-                "not qualify."
+                "Recognize truck 12, truck #12, truck no. 12, and truck number "
+                "12 formats with a whole-number identifier of any length."
             ),
-            "Do not use AI or semantic guessing.",
+            (
+                "The documented truck number must differ numerically from the "
+                "current row's whole-number TruckNumber, ignoring leading "
+                "zeros."
+            ),
+            (
+                "When multiple documented truck numbers are present, at least "
+                "one numerically different identifier passes."
+            ),
+            (
+                "Blank, malformed, or nonnumeric current TruckNumber is unable "
+                "to evaluate when the rule applies."
+            ),
+            "Unrelated numbers without a truck association do not qualify.",
+            (
+                "Normalize case, whitespace, and punctuation only; do not use "
+                "AI, fuzzy interpretation, web lookups, or external validation."
+            ),
         ),
         settings_defaults=(
             "No configurable setting.",
@@ -752,12 +771,15 @@ RULES: Final[tuple[RuleDefinition, ...]] = (
             "Type IV applied without documented Type I truck."
         ),
         output_details=(
+            "AircraftType",
             "Type1Used",
             "Type4Used",
             "Current TruckNumber",
-            "Entered Notes",
-            "Deterministic qualification failure",
+            "Original Notes",
+            "Missing or failed requirement",
+            "Documented truck number when found",
         ),
+        implementation_status=IMPLEMENTED_STATUS,
     ),
 )
 

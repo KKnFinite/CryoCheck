@@ -20,7 +20,8 @@ def _source_row(
     source_row_number: int = 2,
     aircraft_type: str = "2",
     tail_number: str = "N12345",
-    notes: str = "",
+    notes: str = "Type I applied by truck 2",
+    truck_number: str = "1",
     application_date: str = "2026-01-15",
     start_time: str = "08:00",
     end_time: str = "08:30",
@@ -52,7 +53,7 @@ def _source_row(
         "StartTime": start_time,
         "EndTime": end_time,
         "DateCreated": date_created,
-        "TruckNumber": "TRUCK-1",
+        "TruckNumber": truck_number,
         "Operator": "Test Operator",
         "Driver": "Test Driver",
         "DateCreatedUTC": date_created_utc,
@@ -205,6 +206,25 @@ def _audit_overlap(**row_values):
     )
 
 
+def _audit_type4_explanation(**row_values):
+    values = {
+        "aircraft_type": "2",
+        "tail_number": "N12345",
+        "notes": "Type I applied by truck 2",
+        "truck_number": "1",
+        "type1_used": "",
+        "type4_used": "1",
+        "type4_brix": "35",
+        "type4_concentration": "100",
+        "process_time4": "1",
+    }
+    values.update(row_values)
+    return run_audit(
+        _import_result(_source_row(**values)),
+        DEFAULT_SETTINGS,
+    )
+
+
 def _audit_event_time(
     *,
     settings=DEFAULT_SETTINGS,
@@ -275,10 +295,10 @@ def test_utc_fields_do_not_influence_rule_001_or_rule_002():
     assert result.unable_to_evaluate_count == 0
 
 
-def test_audit_reports_thirteen_rules_executed():
+def test_audit_reports_fourteen_rules_executed():
     result = _audit_one()
 
-    assert result.rules_executed == 13
+    assert result.rules_executed == 14
 
 
 def test_rule_002_23_hours_59_minutes_passes_at_24_hours():
@@ -1450,7 +1470,7 @@ def test_rule_012_orders_by_csv_row_then_rule_id():
     ) == ((2, "CC-RULE-012"), (3, "CC-RULE-012"))
 
 
-def test_rule_012_does_not_execute_pending_rule_014():
+def test_rule_012_failure_does_not_trigger_nonapplicable_rule_014():
     result = _audit_tail_number(
         aircraft_type="2",
         tail_number="N121UP",
@@ -1717,6 +1737,434 @@ def test_rule_013_orders_by_csv_row_then_rule_id():
         (2, "CC-RULE-012"),
         (2, "CC-RULE-013"),
         (3, "CC-RULE-013"),
+    )
+
+
+def test_rule_014_aircraft_type_0_is_always_exempt():
+    result = _audit_type4_explanation(
+        aircraft_type="0",
+        tail_number="",
+        notes="",
+        truck_number="malformed",
+        type1_used="malformed",
+        type4_used="Infinity",
+    )
+
+    assert all(
+        exception.rule_id != "CC-RULE-014"
+        for exception in result.exceptions
+    )
+    assert all(
+        warning.rule_id != "CC-RULE-014"
+        for warning in result.unable_to_evaluate
+    )
+
+
+@pytest.mark.parametrize(
+    ("aircraft_type", "tail_number"),
+    (("1", "N121UP"), ("1.0", "N121UP"), ("2", "N12345"), ("2.00", "AB-123")),
+)
+def test_rule_014_aircraft_types_1_and_2_apply_and_valid_notes_pass(
+    aircraft_type,
+    tail_number,
+):
+    result = _audit_type4_explanation(
+        aircraft_type=aircraft_type,
+        tail_number=tail_number,
+    )
+
+    assert all(
+        exception.rule_id != "CC-RULE-014"
+        for exception in result.exceptions
+    )
+    assert all(
+        warning.rule_id != "CC-RULE-014"
+        for warning in result.unable_to_evaluate
+    )
+
+
+@pytest.mark.parametrize("type1_used", ("", "0", "-1"))
+def test_rule_014_blank_zero_and_negative_type1_usage_are_applicable(
+    type1_used,
+):
+    result = _audit_type4_explanation(
+        type1_used=type1_used,
+        notes="",
+    )
+
+    assert tuple(
+        exception.rule_id
+        for exception in result.exceptions
+        if exception.rule_id == "CC-RULE-014"
+    ) == ("CC-RULE-014",)
+
+
+@pytest.mark.parametrize(
+    "aircraft_type",
+    ("", "malformed", "NaN", "Infinity", "1.5", "-1", "3"),
+)
+def test_rule_014_invalid_aircraft_type_warns_when_usage_would_apply(
+    aircraft_type,
+):
+    result = _audit_type4_explanation(aircraft_type=aircraft_type)
+    warnings = tuple(
+        warning
+        for warning in result.unable_to_evaluate
+        if warning.rule_id == "CC-RULE-014"
+    )
+
+    assert len(warnings) == 1
+    assert warnings[0].invalid_fields == ("AircraftType",)
+
+
+@pytest.mark.parametrize("type4_used", ("", "0", "-1"))
+def test_rule_014_nonpositive_or_blank_type4_usage_skips(type4_used):
+    result = _audit_type4_explanation(
+        type1_used="malformed",
+        type4_used=type4_used,
+        notes="",
+        truck_number="malformed",
+    )
+
+    assert all(
+        finding.rule_id != "CC-RULE-014"
+        for finding in result.exceptions
+    )
+    assert all(
+        warning.rule_id != "CC-RULE-014"
+        for warning in result.unable_to_evaluate
+    )
+
+
+def test_rule_014_positive_type1_usage_skips_even_with_invalid_type4_usage():
+    result = _audit_type4_explanation(
+        type1_used="1",
+        type4_used="malformed",
+        notes="",
+        truck_number="malformed",
+    )
+
+    assert all(
+        finding.rule_id != "CC-RULE-014"
+        for finding in result.exceptions
+    )
+    assert all(
+        warning.rule_id != "CC-RULE-014"
+        for warning in result.unable_to_evaluate
+    )
+
+
+@pytest.mark.parametrize(
+    ("type1_used", "type4_used", "expected_fields"),
+    (
+        ("malformed", "1", ("Type1Used",)),
+        ("NaN", "1", ("Type1Used",)),
+        ("", "malformed", ("Type4Used",)),
+        ("", "Infinity", ("Type4Used",)),
+        ("malformed", "Infinity", ("Type1Used", "Type4Used")),
+    ),
+)
+def test_rule_014_invalid_usage_warns_when_applicability_is_ambiguous(
+    type1_used,
+    type4_used,
+    expected_fields,
+):
+    result = _audit_type4_explanation(
+        type1_used=type1_used,
+        type4_used=type4_used,
+    )
+    warnings = tuple(
+        warning
+        for warning in result.unable_to_evaluate
+        if warning.rule_id == "CC-RULE-014"
+    )
+
+    assert len(warnings) == 1
+    assert warnings[0].invalid_fields == expected_fields
+
+
+@pytest.mark.parametrize(
+    "notes",
+    (
+        "Type I applied by truck 2",
+        "Type 1 applied by truck 2",
+        "T1 applied by truck 2",
+        "TYPE-I APPLIED BY TRUCK 2",
+    ),
+)
+def test_rule_014_accepts_each_type1_reference(notes):
+    result = _audit_type4_explanation(notes=notes)
+
+    assert all(
+        exception.rule_id != "CC-RULE-014"
+        for exception in result.exceptions
+    )
+
+
+@pytest.mark.parametrize(
+    "application_word",
+    ("applied", "sprayed", "completed", "performed", "done"),
+)
+def test_rule_014_accepts_each_application_word(application_word):
+    result = _audit_type4_explanation(
+        notes=f"Type I {application_word} by truck 2"
+    )
+
+    assert all(
+        exception.rule_id != "CC-RULE-014"
+        for exception in result.exceptions
+    )
+
+
+@pytest.mark.parametrize(
+    "truck_phrase",
+    ("truck 2", "truck #2", "truck no. 2", "truck number 2"),
+)
+def test_rule_014_accepts_each_truck_number_format(truck_phrase):
+    result = _audit_type4_explanation(
+        notes=f"Type I applied by {truck_phrase}"
+    )
+
+    assert all(
+        exception.rule_id != "CC-RULE-014"
+        for exception in result.exceptions
+    )
+
+
+@pytest.mark.parametrize(
+    ("notes", "expected_reasons"),
+    (
+        (
+            "",
+            (
+                "Notes are blank",
+                "Missing Type I reference",
+                "Missing application wording",
+                "Missing documented truck number",
+            ),
+        ),
+        (
+            "Type IV only",
+            (
+                "Missing Type I reference",
+                "Missing application wording",
+                "Missing documented truck number",
+            ),
+        ),
+        (
+            "Another truck applied Type I",
+            ("Missing documented truck number",),
+        ),
+        (
+            "Type I completed",
+            ("Missing documented truck number",),
+        ),
+        (
+            "Type I applied; flight 123",
+            ("Missing documented truck number",),
+        ),
+        (
+            "Truck 2 applied the fluid",
+            ("Missing Type I reference",),
+        ),
+        (
+            "Type I from truck 2",
+            ("Missing application wording",),
+        ),
+    ),
+)
+def test_rule_014_missing_note_components_fail(notes, expected_reasons):
+    result = _audit_type4_explanation(notes=notes)
+    exception = tuple(
+        exception
+        for exception in result.exceptions
+        if exception.rule_id == "CC-RULE-014"
+    )[0]
+
+    assert exception.details[5].value == "; ".join(expected_reasons)
+
+
+def test_rule_014_same_truck_fails_and_different_truck_passes():
+    failing = _audit_type4_explanation(
+        truck_number="12",
+        notes="Type I applied by truck 12",
+    )
+    passing = _audit_type4_explanation(
+        truck_number="12",
+        notes="Type I applied by truck 13",
+    )
+    exception = tuple(
+        exception
+        for exception in failing.exceptions
+        if exception.rule_id == "CC-RULE-014"
+    )[0]
+
+    assert exception.details[5].value == (
+        "Documented truck number matches current TruckNumber"
+    )
+    assert exception.details[6].value == "12"
+    assert all(
+        finding.rule_id != "CC-RULE-014"
+        for finding in passing.exceptions
+    )
+
+
+@pytest.mark.parametrize(
+    ("current_truck", "documented_truck", "should_fail"),
+    (
+        ("0012", "12", True),
+        ("12", "0012", True),
+        ("0012", "00013", False),
+    ),
+)
+def test_rule_014_compares_truck_numbers_numerically(
+    current_truck,
+    documented_truck,
+    should_fail,
+):
+    result = _audit_type4_explanation(
+        truck_number=current_truck,
+        notes=f"Type I applied by truck {documented_truck}",
+    )
+    exceptions = tuple(
+        exception
+        for exception in result.exceptions
+        if exception.rule_id == "CC-RULE-014"
+    )
+
+    assert bool(exceptions) is should_fail
+
+
+def test_rule_014_supports_truck_identifiers_of_any_length():
+    very_long_identifier = "9" * 5000
+    result = _audit_type4_explanation(
+        truck_number="1",
+        notes=f"Type I completed by truck {very_long_identifier}",
+    )
+
+    assert all(
+        exception.rule_id != "CC-RULE-014"
+        for exception in result.exceptions
+    )
+    assert all(
+        warning.rule_id != "CC-RULE-014"
+        for warning in result.unable_to_evaluate
+    )
+
+
+def test_rule_014_multiple_documented_trucks_pass_when_one_differs():
+    passing = _audit_type4_explanation(
+        truck_number="12",
+        notes=(
+            "Type I applied by truck 0012 and completed by truck number 13"
+        ),
+    )
+    failing = _audit_type4_explanation(
+        truck_number="12",
+        notes="Type I applied by truck 0012 and truck #00012",
+    )
+
+    assert all(
+        exception.rule_id != "CC-RULE-014"
+        for exception in passing.exceptions
+    )
+    exception = tuple(
+        exception
+        for exception in failing.exceptions
+        if exception.rule_id == "CC-RULE-014"
+    )[0]
+    assert exception.details[-1].value == "0012, 00012"
+
+
+@pytest.mark.parametrize(
+    "truck_number",
+    ("", "TRUCK-1", "12.0", "-1"),
+)
+def test_rule_014_invalid_current_truck_number_warns(truck_number):
+    result = _audit_type4_explanation(truck_number=truck_number)
+    warnings = tuple(
+        warning
+        for warning in result.unable_to_evaluate
+        if warning.rule_id == "CC-RULE-014"
+    )
+
+    assert len(warnings) == 1
+    assert warnings[0].invalid_fields == ("TruckNumber",)
+    assert all(
+        exception.rule_id != "CC-RULE-014"
+        for exception in result.exceptions
+    )
+
+
+def test_rule_014_exception_details_preserve_original_values():
+    result = _audit_type4_explanation(
+        aircraft_type=" 2.00 ",
+        type1_used=" -1 ",
+        type4_used=" 1.0 ",
+        truck_number="0012",
+        notes="  TYPE-I applied by truck #00012!  ",
+    )
+    exception = tuple(
+        exception
+        for exception in result.exceptions
+        if exception.rule_id == "CC-RULE-014"
+    )[0]
+
+    assert exception.rule_name == (
+        "Type IV Without Type I Explanation Required"
+    )
+    assert exception.exception_message == (
+        "Type IV applied without documented Type I truck."
+    )
+    assert tuple(
+        (detail.label, detail.value)
+        for detail in exception.details
+    ) == (
+        ("AircraftType", " 2.00 "),
+        ("Type1Used", " -1 "),
+        ("Type4Used", " 1.0 "),
+        ("Current TruckNumber", "0012"),
+        ("Original Notes", "  TYPE-I applied by truck #00012!  "),
+        (
+            "Missing or failed requirement",
+            "Documented truck number matches current TruckNumber",
+        ),
+        ("Documented truck number", "00012"),
+    )
+
+
+def test_rule_014_orders_by_csv_row_then_rule_id():
+    common_values = {
+        "type1_used": "",
+        "type4_used": "1",
+        "type4_brix": "35",
+        "type4_concentration": "100",
+        "process_time4": "1",
+        "truck_number": "1",
+        "notes": "",
+    }
+    result = run_audit(
+        _import_result(
+            _source_row(
+                source_row_number=3,
+                **common_values,
+            ),
+            _source_row(
+                source_row_number=2,
+                tail_number="N121UP",
+                **common_values,
+            ),
+        ),
+        DEFAULT_SETTINGS,
+    )
+
+    assert tuple(
+        (exception.source_row_number, exception.rule_id)
+        for exception in result.exceptions
+    ) == (
+        (2, "CC-RULE-012"),
+        (2, "CC-RULE-014"),
+        (3, "CC-RULE-014"),
     )
 
 
@@ -3332,7 +3780,7 @@ def test_rule_006_and_rule_010_can_both_fail_on_one_row():
     ) == ("CC-RULE-006", "CC-RULE-010")
 
 
-def test_rule_010_type4_only_does_not_execute_pending_rule_014():
+def test_rule_010_type4_only_valid_explanation_adds_no_rule_014_finding():
     result = _audit_event_time(
         type1_used="",
         type4_used="1",

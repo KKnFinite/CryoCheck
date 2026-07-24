@@ -1,9 +1,8 @@
 # CryoCheck Rules
 
 This document is the approved specification for CryoCheck’s audit rules.
-CC-RULE-001 through CC-RULE-013 are implemented and execute automatically
-after a structurally valid CSV upload. CC-RULE-014 remains implementation
-pending.
+CC-RULE-001 through CC-RULE-014 are implemented and execute automatically
+after a structurally valid CSV upload.
 
 The in-application registry and this documentation must remain synchronized.
 Rule IDs are permanent: they must never be reused or renumbered. No rule
@@ -571,37 +570,48 @@ exception.
 
 ## CC-RULE-014 — Type IV Without Type I Explanation Required
 
-**Implementation status:** Documented — implementation pending
+**Implementation status:** Implemented
 
 ### Logic
 
-- Future applicability: Type4Used is greater than 0 while Type1Used is blank,
-  zero, or negative.
-- Notes must deterministically state that Type I was applied by another truck
-  and include that truck's numeric identifier.
-- Recognize a Type I reference such as Type I, Type 1, or T1.
-- Require language indicating Type I was applied, sprayed, completed,
-  performed, or done.
-- Require a whole-number identifier of any length clearly associated with the
-  word truck.
-- The documented other-truck number must differ from the current row's
-  TruckNumber.
-- An unrelated number not associated with the word truck does not qualify.
-- Do not use AI or semantic guessing.
+- Run only for AircraftType 1 or 2 when Type4Used is numerically greater than
+  0 and Type1Used is blank, zero, or negative.
+- AircraftType 0 is always exempt; known non-applicable usage also skips the
+  rule.
+- Invalid AircraftType or malformed or non-finite usage is unable to evaluate
+  when applicability cannot otherwise be determined.
+- Notes must contain a Type I reference, approved application wording, and
+  another truck's numeric identifier.
+- Recognize Type I, Type 1, or T1 as the Type I reference.
+- Recognize applied, sprayed, completed, performed, or done as application
+  wording.
+- Recognize truck 12, truck #12, truck no. 12, and truck number 12 formats with
+  a whole-number identifier of any length.
+- The documented truck number must differ numerically from the current row's
+  whole-number TruckNumber, ignoring leading zeros.
+- When multiple documented truck numbers are present, at least one numerically
+  different identifier passes.
+- Blank, malformed, or nonnumeric current TruckNumber is unable to evaluate
+  when the rule applies.
+- Unrelated numbers without a truck association do not qualify.
+- Normalize case, whitespace, and punctuation only; do not use AI, fuzzy
+  interpretation, web lookups, or external validation.
 
-Examples that a future deterministic implementation should accept:
+Examples that pass:
 
 - `Type I applied by truck 12`
 - `Truck 831996 completed Type 1`
-- `T1 was sprayed by another truck, truck 7`
+- `T1 was sprayed by truck #7`
 
-Examples that a future deterministic implementation should reject:
+Examples that fail:
 
+- Blank Notes
 - `Type IV only`
 - `Another truck applied Type I`
 - `Type I completed`
 - Type I applied by the current record's own truck number
-- Notes containing an unrelated number without a truck-number association
+- `Type I applied; flight 123`
+- Notes with a truck number but no Type I reference or application wording
 
 ### Settings
 
@@ -614,8 +624,10 @@ Examples that a future deterministic implementation should reject:
 
 ### Output details
 
+- AircraftType
 - Type1Used
 - Type4Used
 - Current TruckNumber
-- Entered Notes
-- Deterministic qualification failure
+- Original Notes
+- Missing or failed requirement
+- Documented truck number when found

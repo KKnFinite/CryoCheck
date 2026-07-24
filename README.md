@@ -1,6 +1,6 @@
 # CryoCheck
 
-CryoCheck is a standalone deice log audit application. This repository contains the production-ready Flask application, Neon PostgreSQL integration, an in-memory CSV audit workflow, optional local accounts with private Personal Settings, and the approved audit-rule registry. The first thirteen rules now execute and produce reviewable Results; the remaining rule and Excel export will be added in later development phases.
+CryoCheck is a standalone deice log audit application. This repository contains the production-ready Flask application, Neon PostgreSQL integration, an in-memory CSV audit workflow, optional local accounts with private Personal Settings, and the approved audit-rule registry. All fourteen approved rules now execute and produce reviewable Results; Excel export will be added in a later development phase.
 
 ## Purpose
 
@@ -90,6 +90,8 @@ Type IV fluid profiles are also version-controlled, read-only reference data. Th
 
 `CC-RULE-013` runs only when both fluid usages are numerically positive. Equality and a later Type IV start pass. When `StartTime4` is earlier than `EndTime1`, valid overall times determine whether the event crossed midnight: an earlier overall `EndTime` means the Type IV start belongs to the next day and passes; otherwise CryoCheck reports the exact whole-minute overlap. Invalid usage or required time values produce unable-to-evaluate warnings. Rule 006 continues treating overlap as no excessive gap, and Rule 010 continues adding zero gap when Include Gap is On.
 
+`CC-RULE-014` applies to AircraftType 1 and 2 rows with positive Type IV usage and blank or nonpositive Type I usage. Notes must deterministically contain a Type I reference (`Type I`, `Type 1`, or `T1`), approved application wording, and a whole-number identifier associated with `truck`. The documented truck must differ numerically from the current whole-number `TruckNumber`; leading zeros are ignored, while any different identifier passes when several trucks are documented. Matching normalizes case, whitespace, and punctuation only and never uses AI, fuzzy interpretation, web lookups, or external validation.
+
 The upload limit is configured with `MAX_UPLOAD_MB` and defaults to 10 MB. Oversized requests receive a branded HTTP 413 response.
 
 ## Optional accounts
@@ -114,7 +116,7 @@ Registering creates exactly one private `UserSettings` record copied from the cu
 
 ## Rules catalog
 
-The read-only Rules page at `/rules` documents all 14 approved audit checks in permanent rule-ID order and shows each implementation status. The application registry in `app/services/rules.py` and [the detailed rules specification](docs/rules.md) must remain synchronized. `CC-RULE-001` through `CC-RULE-013` are implemented; `CC-RULE-014` remains implementation pending.
+The read-only Rules page at `/rules` documents all 14 approved audit checks in permanent rule-ID order and shows each implementation status. The application registry in `app/services/rules.py` and [the detailed rules specification](docs/rules.md) must remain synchronized. `CC-RULE-001` through `CC-RULE-014` are implemented.
 
 ### Required baseline columns
 

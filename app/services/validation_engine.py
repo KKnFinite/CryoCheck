@@ -40,12 +40,23 @@ _RULE_010 = _EXECUTED_RULES_BY_ID["CC-RULE-010"]
 _RULE_011 = _EXECUTED_RULES_BY_ID["CC-RULE-011"]
 _RULE_012 = _EXECUTED_RULES_BY_ID["CC-RULE-012"]
 _RULE_013 = _EXECUTED_RULES_BY_ID["CC-RULE-013"]
+_RULE_014 = _EXECUTED_RULES_BY_ID["CC-RULE-014"]
 _TIMESTAMP_RULES: Final = (_RULE_001, _RULE_002)
 _TYPE1_RULES: Final = (_RULE_003, _RULE_004)
 _REQUIRED_TYPE1_BUFFER: Final = Decimal("18.0")
 _UPS_TAIL_PATTERN: Final = re.compile(r"^N[0-9]{3}UP$", re.IGNORECASE)
 _TYPE2_TAIL_CHARACTERS_PATTERN: Final = re.compile(r"^[A-Z0-9-]+$")
 _TYPE2_TAIL_ALPHANUMERIC_PATTERN: Final = re.compile(r"[A-Z0-9]")
+_TYPE1_NOTE_REFERENCE_PATTERN: Final = re.compile(
+    r"\b(?:type\s+(?:i|1)|t\s*1)\b"
+)
+_APPLICATION_NOTE_WORDING_PATTERN: Final = re.compile(
+    r"\b(?:applied|sprayed|completed|performed|done)\b"
+)
+_TRUCK_NOTE_IDENTIFIER_PATTERN: Final = re.compile(
+    r"\btruck\s+(?:(?:no|number)\s+)?(?P<number>[0-9]+)\b"
+)
+_WHOLE_NUMBER_IDENTIFIER_PATTERN: Final = re.compile(r"^[0-9]+$")
 
 _APPLICATION_DATE_FORMATS: Final[tuple[str, ...]] = (
     "%Y-%m-%d",
@@ -286,6 +297,12 @@ def run_audit(
         )
         exceptions.extend(overlap_exceptions)
         warnings.extend(overlap_warnings)
+
+        explanation_exceptions, explanation_warnings = (
+            _evaluate_type4_without_type1_rule(source_row)
+        )
+        exceptions.extend(explanation_exceptions)
+        warnings.extend(explanation_warnings)
 
     return AuditResult(
         filename=imported_csv.filename,
@@ -1353,6 +1370,154 @@ def _evaluate_pass_overlap_rule(
     ], []
 
 
+def _evaluate_type4_without_type1_rule(
+    source_row: CSVSourceRow,
+) -> tuple[list[AuditException], list[UnableToEvaluate]]:
+    """Require a deterministic other-truck explanation for Type IV-only use."""
+    aircraft_type_text = source_row.get("AircraftType")
+    aircraft_type = _parse_decimal(aircraft_type_text)
+    aircraft_type_state = "invalid"
+    if (
+        aircraft_type is not None
+        and aircraft_type == aircraft_type.to_integral_value()
+        and aircraft_type in (Decimal(0), Decimal(1), Decimal(2))
+    ):
+        aircraft_type_state = (
+            "exempt" if aircraft_type == 0 else "eligible"
+        )
+
+    usage_states: dict[str, str] = {}
+    for field_name in ("Type1Used", "Type4Used"):
+        source_text = source_row.get(field_name)
+        if not source_text.strip():
+            usage_states[field_name] = "inactive"
+            continue
+        parsed_usage = _parse_decimal(source_text)
+        if parsed_usage is None:
+            usage_states[field_name] = "invalid"
+        elif parsed_usage > 0:
+            usage_states[field_name] = "positive"
+        else:
+            usage_states[field_name] = "inactive"
+
+    if (
+        aircraft_type_state == "exempt"
+        or usage_states["Type4Used"] == "inactive"
+        or usage_states["Type1Used"] == "positive"
+    ):
+        return [], []
+
+    invalid_applicability_fields = tuple(
+        field_name
+        for field_name, is_invalid in (
+            ("AircraftType", aircraft_type_state == "invalid"),
+            ("Type1Used", usage_states["Type1Used"] == "invalid"),
+            ("Type4Used", usage_states["Type4Used"] == "invalid"),
+        )
+        if is_invalid
+    )
+    if invalid_applicability_fields:
+        return [], [
+            _unable_to_evaluate(
+                source_row,
+                _RULE_014,
+                invalid_applicability_fields,
+                message=(
+                    "Type IV-only explanation applicability could not be "
+                    "determined because these values are invalid, malformed, "
+                    "or non-finite: "
+                    f"{', '.join(invalid_applicability_fields)}."
+                ),
+            )
+        ]
+
+    current_truck_text = source_row.get("TruckNumber")
+    normalized_current_truck = current_truck_text.strip()
+    if (
+        _WHOLE_NUMBER_IDENTIFIER_PATTERN.fullmatch(
+            normalized_current_truck
+        )
+        is None
+    ):
+        return [], [
+            _unable_to_evaluate(
+                source_row,
+                _RULE_014,
+                ("TruckNumber",),
+                message=(
+                    "Current TruckNumber must contain only whole-number "
+                    "digits so documented truck identifiers can be compared."
+                ),
+            )
+        ]
+
+    current_truck_number = _canonical_whole_number(
+        normalized_current_truck
+    )
+    notes_text = source_row.get("Notes")
+    normalized_notes = _normalize_note_text(notes_text)
+    has_type1_reference = (
+        _TYPE1_NOTE_REFERENCE_PATTERN.search(normalized_notes) is not None
+    )
+    has_application_wording = (
+        _APPLICATION_NOTE_WORDING_PATTERN.search(normalized_notes) is not None
+    )
+    documented_truck_texts = tuple(
+        match.group("number")
+        for match in _TRUCK_NOTE_IDENTIFIER_PATTERN.finditer(
+            normalized_notes
+        )
+    )
+    documented_truck_numbers = tuple(
+        _canonical_whole_number(identifier)
+        for identifier in documented_truck_texts
+    )
+
+    failure_reasons: list[str] = []
+    if not notes_text.strip():
+        failure_reasons.append("Notes are blank")
+    if not has_type1_reference:
+        failure_reasons.append("Missing Type I reference")
+    if not has_application_wording:
+        failure_reasons.append("Missing application wording")
+    if not documented_truck_texts:
+        failure_reasons.append("Missing documented truck number")
+    elif all(
+        truck_number == current_truck_number
+        for truck_number in documented_truck_numbers
+    ):
+        failure_reasons.append(
+            "Documented truck number matches current TruckNumber"
+        )
+
+    if not failure_reasons:
+        return [], []
+
+    return [
+        _rule_014_exception(
+            source_row,
+            failure_reasons=tuple(failure_reasons),
+            documented_truck_numbers=documented_truck_texts,
+        )
+    ], []
+
+
+def _normalize_note_text(source_text: str) -> str:
+    """Normalize case, punctuation, and whitespace for exact note matching."""
+    punctuation_as_spaces = re.sub(
+        r"[^a-z0-9]+",
+        " ",
+        source_text.casefold(),
+    )
+    return " ".join(punctuation_as_spaces.split())
+
+
+def _canonical_whole_number(source_text: str) -> str:
+    """Remove insignificant leading zeros without integer conversion."""
+    without_leading_zeros = source_text.lstrip("0")
+    return without_leading_zeros or "0"
+
+
 def _evaluate_step_gap_rule(
     source_row: CSVSourceRow,
     active_settings: SettingsDefinition,
@@ -2069,6 +2234,37 @@ def _rule_013_exception(
                 ),
             ),
         ),
+    )
+
+
+def _rule_014_exception(
+    source_row: CSVSourceRow,
+    *,
+    failure_reasons: tuple[str, ...],
+    documented_truck_numbers: tuple[str, ...],
+) -> AuditException:
+    details: list[RuleDetail] = [
+        RuleDetail("AircraftType", source_row.get("AircraftType")),
+        RuleDetail("Type1Used", source_row.get("Type1Used")),
+        RuleDetail("Type4Used", source_row.get("Type4Used")),
+        RuleDetail("Current TruckNumber", source_row.get("TruckNumber")),
+        RuleDetail("Original Notes", source_row.get("Notes")),
+        RuleDetail(
+            "Missing or failed requirement",
+            "; ".join(failure_reasons),
+        ),
+    ]
+    if documented_truck_numbers:
+        details.append(
+            RuleDetail(
+                "Documented truck number",
+                ", ".join(documented_truck_numbers),
+            )
+        )
+    return _build_exception(
+        source_row,
+        _RULE_014,
+        details=tuple(details),
     )
 
 
