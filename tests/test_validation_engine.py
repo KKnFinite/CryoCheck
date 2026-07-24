@@ -153,6 +153,28 @@ def _audit_type4_rate(
     )
 
 
+def _audit_event_time(
+    *,
+    settings=DEFAULT_SETTINGS,
+    **row_values,
+):
+    values = {
+        "type1_used": "1",
+        "type1_concentration": "50",
+        "freezing_point1": "-17.3",
+        "ambient_temp": "1",
+        "process_time1": "30",
+        "type4_used": "",
+        "type4_brix": "35",
+        "process_time4": "",
+    }
+    values.update(row_values)
+    return run_audit(
+        _import_result(_source_row(**values)),
+        settings,
+    )
+
+
 def _settings_without(field_name: str) -> SimpleNamespace:
     return SimpleNamespace(
         **{
@@ -201,10 +223,10 @@ def test_utc_fields_do_not_influence_rule_001_or_rule_002():
     assert result.unable_to_evaluate_count == 0
 
 
-def test_audit_reports_nine_rules_executed():
+def test_audit_reports_ten_rules_executed():
     result = _audit_one()
 
-    assert result.rules_executed == 9
+    assert result.rules_executed == 10
 
 
 def test_rule_002_23_hours_59_minutes_passes_at_24_hours():
@@ -432,7 +454,7 @@ def test_malformed_type1_used_is_unable_to_evaluate():
     assert result.exception_count == 0
     assert tuple(
         warning.rule_id for warning in result.unable_to_evaluate
-    ) == ("CC-RULE-003", "CC-RULE-004", "CC-RULE-008")
+    ) == ("CC-RULE-003", "CC-RULE-004", "CC-RULE-008", "CC-RULE-010")
     assert all(
         warning.invalid_fields == ("Type1Used",)
         for warning in result.unable_to_evaluate
@@ -1858,7 +1880,7 @@ def test_rule_009_warning_does_not_block_rule_005():
     ) == ("CC-RULE-005",)
     assert tuple(
         warning.rule_id for warning in result.unable_to_evaluate
-    ) == ("CC-RULE-009",)
+    ) == ("CC-RULE-009", "CC-RULE-010")
 
 
 def test_rule_009_orders_by_csv_row_then_rule_id():
@@ -1888,6 +1910,645 @@ def test_rule_009_orders_by_csv_row_then_rule_id():
         (2, "CC-RULE-009"),
         (3, "CC-RULE-009"),
     )
+
+
+def test_rule_010_neither_fluid_used_skips_without_warning():
+    result = _audit_event_time(
+        type1_used="0",
+        type4_used="-1",
+        process_time1="malformed",
+        process_time4="malformed",
+    )
+
+    assert all(
+        exception.rule_id != "CC-RULE-010"
+        for exception in result.exceptions
+    )
+    assert all(
+        warning.rule_id != "CC-RULE-010"
+        for warning in result.unable_to_evaluate
+    )
+
+
+@pytest.mark.parametrize(
+    ("field_name", "field_value", "other_field", "expected_field"),
+    (
+        ("type1_used", "malformed", "type4_used", "Type1Used"),
+        ("type4_used", "malformed", "type1_used", "Type4Used"),
+        ("type1_used", "NaN", "type4_used", "Type1Used"),
+        ("type4_used", "Infinity", "type1_used", "Type4Used"),
+    ),
+)
+def test_rule_010_malformed_or_nonfinite_usage_warns(
+    field_name,
+    field_value,
+    other_field,
+    expected_field,
+):
+    result = _audit_event_time(
+        **{
+            field_name: field_value,
+            other_field: "",
+        }
+    )
+    warnings = tuple(
+        warning
+        for warning in result.unable_to_evaluate
+        if warning.rule_id == "CC-RULE-010"
+    )
+
+    assert len(warnings) == 1
+    assert warnings[0].invalid_fields == (expected_field,)
+    assert all(
+        exception.rule_id != "CC-RULE-010"
+        for exception in result.exceptions
+    )
+
+
+@pytest.mark.parametrize(
+    ("process_time1", "should_fail"),
+    (("30", False), ("31", True)),
+)
+def test_rule_010_type1_only_boundaries(process_time1, should_fail):
+    result = _audit_event_time(
+        process_time1=process_time1,
+        process_time4="malformed",
+    )
+    rule_exceptions = tuple(
+        exception
+        for exception in result.exceptions
+        if exception.rule_id == "CC-RULE-010"
+    )
+
+    assert bool(rule_exceptions) is should_fail
+    assert all(
+        warning.rule_id != "CC-RULE-010"
+        for warning in result.unable_to_evaluate
+    )
+
+
+@pytest.mark.parametrize(
+    ("process_time4", "should_fail"),
+    (("30", False), ("31", True)),
+)
+def test_rule_010_type4_only_boundaries(process_time4, should_fail):
+    result = _audit_event_time(
+        type1_used="",
+        process_time1="malformed",
+        type4_used="1",
+        type4_brix="35",
+        process_time4=process_time4,
+    )
+    rule_exceptions = tuple(
+        exception
+        for exception in result.exceptions
+        if exception.rule_id == "CC-RULE-010"
+    )
+
+    assert bool(rule_exceptions) is should_fail
+    assert all(
+        warning.rule_id != "CC-RULE-010"
+        for warning in result.unable_to_evaluate
+    )
+
+
+@pytest.mark.parametrize(
+    ("used_field", "process_field", "process_value", "expected_field"),
+    (
+        ("type1_used", "process_time1", "", "ProcessTime1"),
+        ("type1_used", "process_time1", "malformed", "ProcessTime1"),
+        ("type1_used", "process_time1", "NaN", "ProcessTime1"),
+        ("type1_used", "process_time1", "Infinity", "ProcessTime1"),
+        ("type1_used", "process_time1", "-1", "ProcessTime1"),
+        ("type1_used", "process_time1", "1.5", "ProcessTime1"),
+        ("type4_used", "process_time4", "", "ProcessTime4"),
+        ("type4_used", "process_time4", "malformed", "ProcessTime4"),
+        ("type4_used", "process_time4", "NaN", "ProcessTime4"),
+        ("type4_used", "process_time4", "Infinity", "ProcessTime4"),
+        ("type4_used", "process_time4", "-1", "ProcessTime4"),
+        ("type4_used", "process_time4", "1.5", "ProcessTime4"),
+    ),
+)
+def test_rule_010_invalid_applicable_process_time_warns(
+    used_field,
+    process_field,
+    process_value,
+    expected_field,
+):
+    row_values = {
+        "type1_used": "",
+        "type4_used": "",
+        "process_time1": "",
+        "process_time4": "",
+        used_field: "1",
+        process_field: process_value,
+    }
+    result = _audit_event_time(**row_values)
+    warnings = tuple(
+        warning
+        for warning in result.unable_to_evaluate
+        if warning.rule_id == "CC-RULE-010"
+    )
+
+    assert len(warnings) == 1
+    assert warnings[0].invalid_fields == (expected_field,)
+    assert all(
+        exception.rule_id != "CC-RULE-010"
+        for exception in result.exceptions
+    )
+
+
+@pytest.mark.parametrize("process_time", ("0", "1", "1.0", "5.00"))
+def test_rule_010_accepts_equivalent_whole_process_times(process_time):
+    result = _audit_event_time(process_time1=process_time)
+
+    assert all(
+        warning.rule_id != "CC-RULE-010"
+        for warning in result.unable_to_evaluate
+    )
+
+
+@pytest.mark.parametrize(
+    ("process_time1", "process_time4", "should_fail"),
+    (("15", "15", False), ("15", "16", True)),
+)
+def test_rule_010_combined_include_gap_off_boundaries(
+    process_time1,
+    process_time4,
+    should_fail,
+):
+    result = _audit_event_time(
+        type4_used="1",
+        process_time1=process_time1,
+        process_time4=process_time4,
+        end_time1="08:10",
+        start_time4="08:25",
+    )
+    rule_exceptions = tuple(
+        exception
+        for exception in result.exceptions
+        if exception.rule_id == "CC-RULE-010"
+    )
+
+    assert bool(rule_exceptions) is should_fail
+
+
+@pytest.mark.parametrize(
+    ("field_name", "field_value"),
+    (
+        ("end_time1", "malformed"),
+        ("start_time4", "malformed"),
+        ("start_time", "malformed"),
+        ("end_time", "malformed"),
+    ),
+)
+def test_rule_010_include_gap_off_ignores_clock_fields(
+    field_name,
+    field_value,
+):
+    result = _audit_event_time(
+        type4_used="1",
+        process_time1="15",
+        process_time4="16",
+        **{field_name: field_value},
+    )
+
+    assert tuple(
+        exception.rule_id
+        for exception in result.exceptions
+        if exception.rule_id == "CC-RULE-010"
+    ) == ("CC-RULE-010",)
+    assert all(
+        warning.rule_id != "CC-RULE-010"
+        for warning in result.unable_to_evaluate
+    )
+
+
+@pytest.mark.parametrize(
+    ("type4_start", "should_fail", "expected_gap"),
+    (("08:15", False, None), ("08:16", True, "6 minutes")),
+)
+def test_rule_010_include_gap_on_same_day_boundaries(
+    type4_start,
+    should_fail,
+    expected_gap,
+):
+    settings = replace(DEFAULT_SETTINGS, include_gap_in_event_time=True)
+    result = _audit_event_time(
+        settings=settings,
+        type4_used="1",
+        process_time1="10",
+        process_time4="15",
+        end_time1="08:10",
+        start_time4=type4_start,
+    )
+    rule_exceptions = tuple(
+        exception
+        for exception in result.exceptions
+        if exception.rule_id == "CC-RULE-010"
+    )
+
+    assert bool(rule_exceptions) is should_fail
+    if expected_gap is not None:
+        assert expected_gap in rule_exceptions[0].details[5].value
+
+
+@pytest.mark.parametrize(
+    ("type4_start", "should_fail", "expected_gap"),
+    (("00:03", False, None), ("00:04", True, "6 minutes overnight")),
+)
+def test_rule_010_include_gap_on_overnight_boundaries(
+    type4_start,
+    should_fail,
+    expected_gap,
+):
+    settings = replace(DEFAULT_SETTINGS, include_gap_in_event_time=True)
+    result = _audit_event_time(
+        settings=settings,
+        start_time="23:45",
+        end_time="00:15",
+        date_created="2026-01-15 23:45",
+        type4_used="1",
+        process_time1="10",
+        process_time4="15",
+        end_time1="23:58",
+        start_time4=type4_start,
+    )
+    rule_exceptions = tuple(
+        exception
+        for exception in result.exceptions
+        if exception.rule_id == "CC-RULE-010"
+    )
+
+    assert bool(rule_exceptions) is should_fail
+    if expected_gap is not None:
+        assert expected_gap in rule_exceptions[0].details[5].value
+
+
+def test_rule_010_same_day_overlap_uses_zero_gap_and_continues():
+    settings = replace(DEFAULT_SETTINGS, include_gap_in_event_time=True)
+    result = _audit_event_time(
+        settings=settings,
+        start_time="08:00",
+        end_time="09:00",
+        type4_used="1",
+        process_time1="20",
+        process_time4="11",
+        end_time1="08:20",
+        start_time4="08:10",
+    )
+    exception = tuple(
+        exception
+        for exception in result.exceptions
+        if exception.rule_id == "CC-RULE-010"
+    )[0]
+
+    assert exception.details[5].value.startswith("0 minutes")
+    assert exception.details[6].label == "Overlap handling"
+    assert "used a 0-minute gap" in exception.details[6].value
+    assert all(
+        finding.rule_id != "CC-RULE-013"
+        for finding in result.exceptions
+    )
+
+
+@pytest.mark.parametrize(
+    ("field_name", "field_value", "expected_field"),
+    (
+        ("end_time1", "", "EndTime1"),
+        ("end_time1", "malformed", "EndTime1"),
+        ("start_time4", "", "StartTime4"),
+        ("start_time4", "malformed", "StartTime4"),
+    ),
+)
+def test_rule_010_include_gap_on_invalid_step_time_warns(
+    field_name,
+    field_value,
+    expected_field,
+):
+    settings = replace(DEFAULT_SETTINGS, include_gap_in_event_time=True)
+    result = _audit_event_time(
+        settings=settings,
+        type4_used="1",
+        process_time1="10",
+        process_time4="15",
+        **{field_name: field_value},
+    )
+    warnings = tuple(
+        warning
+        for warning in result.unable_to_evaluate
+        if warning.rule_id == "CC-RULE-010"
+    )
+
+    assert len(warnings) == 1
+    assert warnings[0].invalid_fields == (expected_field,)
+
+
+@pytest.mark.parametrize(
+    ("field_name", "expected_field"),
+    (("start_time", "StartTime"), ("end_time", "EndTime")),
+)
+def test_rule_010_ambiguous_earlier_step_with_invalid_overall_time_warns(
+    field_name,
+    expected_field,
+):
+    settings = replace(DEFAULT_SETTINGS, include_gap_in_event_time=True)
+    result = _audit_event_time(
+        settings=settings,
+        type4_used="1",
+        process_time1="10",
+        process_time4="15",
+        end_time1="23:58",
+        start_time4="00:03",
+        **{field_name: "malformed"},
+    )
+    warnings = tuple(
+        warning
+        for warning in result.unable_to_evaluate
+        if warning.rule_id == "CC-RULE-010"
+    )
+
+    assert len(warnings) == 1
+    assert warnings[0].invalid_fields == (expected_field,)
+
+
+def test_rule_010_one_step_never_requires_gap_times_when_gap_is_on():
+    settings = replace(DEFAULT_SETTINGS, include_gap_in_event_time=True)
+    type1_only = _audit_event_time(
+        settings=settings,
+        process_time1="31",
+        end_time1="malformed",
+        start_time4="malformed",
+    )
+    type4_only = _audit_event_time(
+        settings=settings,
+        type1_used="",
+        type4_used="1",
+        process_time4="31",
+        end_time1="malformed",
+        start_time4="malformed",
+    )
+
+    assert tuple(
+        exception.rule_id
+        for exception in type1_only.exceptions
+        if exception.rule_id == "CC-RULE-010"
+    ) == ("CC-RULE-010",)
+    assert tuple(
+        exception.rule_id
+        for exception in type4_only.exceptions
+        if exception.rule_id == "CC-RULE-010"
+    ) == ("CC-RULE-010",)
+    assert all(
+        warning.rule_id != "CC-RULE-010"
+        for result in (type1_only, type4_only)
+        for warning in result.unable_to_evaluate
+    )
+
+
+def test_rule_010_personal_maximum_equality_passes_and_above_fails():
+    settings = replace(
+        DEFAULT_SETTINGS,
+        name="Personal — EventUser",
+        is_default=False,
+        max_event_time_minutes=20,
+    )
+
+    passing = _audit_event_time(
+        settings=settings,
+        process_time1="20",
+    )
+    failing = _audit_event_time(
+        settings=settings,
+        process_time1="21",
+    )
+
+    assert all(
+        exception.rule_id != "CC-RULE-010"
+        for exception in passing.exceptions
+    )
+    assert tuple(
+        exception.rule_id
+        for exception in failing.exceptions
+        if exception.rule_id == "CC-RULE-010"
+    ) == ("CC-RULE-010",)
+
+
+@pytest.mark.parametrize(
+    "invalid_maximum",
+    (None, "30", True, 0, -1, 1000, 30.0),
+)
+def test_rule_010_invalid_runtime_maximum_warns(invalid_maximum):
+    settings = replace(
+        DEFAULT_SETTINGS,
+        max_event_time_minutes=invalid_maximum,
+    )
+    result = _audit_event_time(settings=settings)
+    warnings = tuple(
+        warning
+        for warning in result.unable_to_evaluate
+        if warning.rule_id == "CC-RULE-010"
+    )
+
+    assert len(warnings) == 1
+    assert warnings[0].invalid_fields == (
+        "Maximum event time setting",
+    )
+
+
+def test_rule_010_missing_runtime_maximum_warns():
+    result = _audit_event_time(
+        settings=_settings_without("max_event_time_minutes")
+    )
+
+    assert tuple(
+        warning.rule_id
+        for warning in result.unable_to_evaluate
+        if warning.rule_id == "CC-RULE-010"
+    ) == ("CC-RULE-010",)
+
+
+@pytest.mark.parametrize("invalid_include_gap", (None, 0, 1, "on"))
+def test_rule_010_invalid_runtime_include_gap_warns(invalid_include_gap):
+    settings = replace(
+        DEFAULT_SETTINGS,
+        include_gap_in_event_time=invalid_include_gap,
+    )
+    result = _audit_event_time(settings=settings)
+    warnings = tuple(
+        warning
+        for warning in result.unable_to_evaluate
+        if warning.rule_id == "CC-RULE-010"
+    )
+
+    assert len(warnings) == 1
+    assert warnings[0].invalid_fields == ("Include Gap setting",)
+
+
+def test_rule_010_missing_runtime_include_gap_warns():
+    result = _audit_event_time(
+        settings=_settings_without("include_gap_in_event_time")
+    )
+
+    assert tuple(
+        warning.rule_id
+        for warning in result.unable_to_evaluate
+        if warning.rule_id == "CC-RULE-010"
+    ) == ("CC-RULE-010",)
+
+
+def test_rule_006_and_rule_010_can_both_fail_on_one_row():
+    settings = replace(DEFAULT_SETTINGS, include_gap_in_event_time=True)
+    result = _audit_event_time(
+        settings=settings,
+        type4_used="1",
+        process_time1="10",
+        process_time4="15",
+        end_time1="08:10",
+        start_time4="08:16",
+    )
+
+    assert tuple(
+        exception.rule_id for exception in result.exceptions
+    ) == ("CC-RULE-006", "CC-RULE-010")
+
+
+def test_rule_010_type4_only_does_not_execute_pending_rule_014():
+    result = _audit_event_time(
+        type1_used="",
+        type4_used="1",
+        process_time4="31",
+    )
+
+    assert tuple(
+        exception.rule_id for exception in result.exceptions
+    ) == ("CC-RULE-010",)
+    assert all(
+        warning.rule_id != "CC-RULE-014"
+        for warning in result.unable_to_evaluate
+    )
+
+
+def test_rule_010_type1_only_exception_details_are_exact():
+    result = _audit_event_time(process_time1="31.0")
+    exception = tuple(
+        exception
+        for exception in result.exceptions
+        if exception.rule_id == "CC-RULE-010"
+    )[0]
+
+    assert exception.rule_name == "Excessive Event Time"
+    assert exception.exception_message == "Excessive event time."
+    assert tuple(
+        (detail.label, detail.value)
+        for detail in exception.details
+    ) == (
+        ("Type I usage status", "Included — 1 gallon recorded"),
+        ("Type IV usage status", "Not included — usage is blank"),
+        ("ProcessTime1", "31.0 minutes"),
+        ("Include Gap setting", "Off"),
+        ("Calculated event time", "31 minutes"),
+        ("Configured maximum event time", "30 minutes"),
+        ("Minutes over the maximum", "1 minute"),
+        (
+            "Comparison",
+            (
+                "Calculated event time 31 minutes exceeds the configured "
+                "maximum of 30 minutes by 1 minute."
+            ),
+        ),
+    )
+    assert all(
+        detail.label != "ProcessTime4" for detail in exception.details
+    )
+
+
+def test_rule_010_combined_gap_details_preserve_source_times():
+    settings = replace(DEFAULT_SETTINGS, include_gap_in_event_time=True)
+    result = _audit_event_time(
+        settings=settings,
+        type4_used="1",
+        process_time1="10",
+        process_time4="15",
+        end_time1="08:10",
+        start_time4="08:16",
+    )
+    exception = tuple(
+        exception
+        for exception in result.exceptions
+        if exception.rule_id == "CC-RULE-010"
+    )[0]
+
+    assert tuple(
+        (detail.label, detail.value)
+        for detail in exception.details
+    ) == (
+        ("Type I usage status", "Included — 1 gallon recorded"),
+        ("Type IV usage status", "Included — 1 gallon recorded"),
+        ("ProcessTime1", "10 minutes"),
+        ("ProcessTime4", "15 minutes"),
+        ("Include Gap setting", "On"),
+        (
+            "Included gap",
+            "6 minutes (EndTime1 08:10 to StartTime4 08:16)",
+        ),
+        ("Calculated event time", "31 minutes"),
+        ("Configured maximum event time", "30 minutes"),
+        ("Minutes over the maximum", "1 minute"),
+        (
+            "Comparison",
+            (
+                "Calculated event time 31 minutes exceeds the configured "
+                "maximum of 30 minutes by 1 minute."
+            ),
+        ),
+    )
+
+
+def test_rule_010_singular_and_plural_wording():
+    result = _audit_event_time(
+        settings=replace(DEFAULT_SETTINGS, max_event_time_minutes=1),
+        process_time1="2",
+    )
+    exception = tuple(
+        exception
+        for exception in result.exceptions
+        if exception.rule_id == "CC-RULE-010"
+    )[0]
+
+    assert exception.details[-4].value == "2 minutes"
+    assert exception.details[-3].value == "1 minute"
+    assert exception.details[-2].value == "1 minute"
+    assert exception.details[-1].value.endswith("by 1 minute.")
+
+
+def test_rule_010_orders_by_csv_row_then_rule_id():
+    result = run_audit(
+        _import_result(
+            _source_row(
+                source_row_number=3,
+                type1_used="1",
+                type1_concentration="50",
+                freezing_point1="-17.3",
+                ambient_temp="1",
+                process_time1="31",
+            ),
+            _source_row(
+                source_row_number=2,
+                type1_used="1",
+                type1_concentration="50",
+                freezing_point1="-17.3",
+                ambient_temp="1",
+                process_time1="31",
+            ),
+        ),
+        DEFAULT_SETTINGS,
+    )
+
+    assert tuple(
+        (exception.source_row_number, exception.rule_id)
+        for exception in result.exceptions
+    ) == ((2, "CC-RULE-010"), (3, "CC-RULE-010"))
 
 
 def test_audit_result_and_exception_structures_are_immutable():

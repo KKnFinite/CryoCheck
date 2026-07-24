@@ -1,6 +1,6 @@
 # CryoCheck
 
-CryoCheck is a standalone deice log audit application. This repository contains the production-ready Flask application, Neon PostgreSQL integration, an in-memory CSV audit workflow, optional local accounts with private Personal Settings, and the approved audit-rule registry. The first nine rules now execute and produce reviewable Results; the remaining rules and Excel export will be added in later development phases.
+CryoCheck is a standalone deice log audit application. This repository contains the production-ready Flask application, Neon PostgreSQL integration, an in-memory CSV audit workflow, optional local accounts with private Personal Settings, and the approved audit-rule registry. The first ten rules now execute and produce reviewable Results; the remaining rules and Excel export will be added in later development phases.
 
 ## Purpose
 
@@ -84,6 +84,8 @@ Type IV BRIX limits are also version-controlled, read-only reference data. The r
 
 `CC-RULE-008` runs only for positive `Type1Used` and uses the CSV’s existing whole-minute `ProcessTime1` value without recalculating it from start/end times. The adjusted rate is `Type1Used / (ProcessTime1 + 1)` using Decimal-safe arithmetic. A rate equal to the active profile’s maximum passes; only a greater rate fails. Default is 60 GPM, and signed-in Personal Settings apply immediately to the next upload. Malformed or non-finite usage, invalid whole-minute process time, and invalid runtime maximum settings produce unable-to-evaluate warnings rather than exceptions.
 
+`CC-RULE-010` sums the original whole-minute process time for every positively used fluid step and compares the result with the active profile’s maximum event time. Default is 30 minutes. Type I-only and Type IV-only rows are both evaluated. For combined events, the Include Gap setting optionally adds the whole-minute Type I-to-Type IV gap, including a recognized overnight gap; same-day overlaps contribute zero and remain assigned to pending `CC-RULE-013`. Equality passes, and invalid required inputs produce unable-to-evaluate warnings.
+
 The upload limit is configured with `MAX_UPLOAD_MB` and defaults to 10 MB. Oversized requests receive a branded HTTP 413 response.
 
 ## Optional accounts
@@ -104,11 +106,11 @@ Login and registration are protected by CSRF validation and IP-based rate limits
 
 The `/settings` page is public. Anonymous users see the authoritative, immutable **Default** profile in read-only form. Default is the fallback for all anonymous use and is never stored as an editable database row.
 
-Registering creates exactly one private `UserSettings` record copied from the current Default values. A signed-in user can explicitly save changes to that record or reset it to the current Default. Personal changes affect only the owning account and never modify Default or another user’s settings. Anonymous audits use **Default**; signed-in audits use that account’s **Personal** profile. The Personal late-entry threshold affects `CC-RULE-002`, the active Type I fluid selection affects `CC-RULE-003` and `CC-RULE-004`, the active Type IV fluid selection affects `CC-RULE-005`, the Personal Allowed Gap affects `CC-RULE-006`, and the Personal maximum Type I and Type IV rates independently affect `CC-RULE-008` and `CC-RULE-009` immediately on the next upload; settings for pending rules are retained for later implementation.
+Registering creates exactly one private `UserSettings` record copied from the current Default values. A signed-in user can explicitly save changes to that record or reset it to the current Default. Personal changes affect only the owning account and never modify Default or another user’s settings. Anonymous audits use **Default**; signed-in audits use that account’s **Personal** profile. The Personal late-entry threshold affects `CC-RULE-002`, the active Type I fluid selection affects `CC-RULE-003` and `CC-RULE-004`, the active Type IV fluid selection affects `CC-RULE-005`, the Personal Allowed Gap affects `CC-RULE-006`, the Personal maximum Type I and Type IV rates independently affect `CC-RULE-008` and `CC-RULE-009`, and the Personal maximum event time and Include Gap setting affect `CC-RULE-010` immediately on the next upload; settings for pending rules are retained for later implementation.
 
 ## Rules catalog
 
-The read-only Rules page at `/rules` documents all 13 approved audit checks in permanent rule-ID order and shows each implementation status. The application registry in `app/services/rules.py` and [the detailed rules specification](docs/rules.md) must remain synchronized. `CC-RULE-001` through `CC-RULE-009` are implemented; `CC-RULE-010` through `CC-RULE-013` remain implementation pending.
+The read-only Rules page at `/rules` documents all 14 approved audit checks in permanent rule-ID order and shows each implementation status. The application registry in `app/services/rules.py` and [the detailed rules specification](docs/rules.md) must remain synchronized. `CC-RULE-001` through `CC-RULE-010` are implemented; `CC-RULE-011` through `CC-RULE-014` remain implementation pending.
 
 ### Required baseline columns
 

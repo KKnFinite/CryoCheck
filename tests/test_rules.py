@@ -16,7 +16,7 @@ from app.services.rules import (
 )
 
 
-EXPECTED_RULE_IDS = tuple(f"CC-RULE-{number:03d}" for number in range(1, 14))
+EXPECTED_RULE_IDS = tuple(f"CC-RULE-{number:03d}" for number in range(1, 15))
 EXPECTED_EXCEPTION_MESSAGES = (
     "Application entry proceeds event.",
     "Late entry.",
@@ -31,6 +31,7 @@ EXPECTED_EXCEPTION_MESSAGES = (
     "Incorrect Type IV concentration.",
     "Incorrect tail number.",
     "Pass overlap.",
+    "Type IV applied without documented Type I truck.",
 )
 
 
@@ -39,7 +40,7 @@ def test_rules_page_returns_200_with_documented_count(client):
 
     assert response.status_code == 200
     assert b"CryoCheck Rules" in response.data
-    assert b"13 documented rules" in response.data
+    assert b"14 documented rules" in response.data
 
 
 def test_rule_ids_are_unique_and_in_permanent_numeric_order():
@@ -84,12 +85,13 @@ def test_exact_exception_messages_appear(client):
         assert page.count(message) == 1
 
 
-def test_first_nine_rules_are_implemented_and_remaining_rules_are_pending(client):
+def test_first_ten_rules_are_implemented_and_remaining_rules_are_pending(client):
     page = client.get("/rules").get_data(as_text=True)
 
     assert IMPLEMENTED_STATUS == "Implemented"
     assert IMPLEMENTATION_PENDING_STATUS == "Documented — implementation pending"
-    assert tuple(rule.implementation_status for rule in RULES[:9]) == (
+    assert tuple(rule.implementation_status for rule in RULES[:10]) == (
+        IMPLEMENTED_STATUS,
         IMPLEMENTED_STATUS,
         IMPLEMENTED_STATUS,
         IMPLEMENTED_STATUS,
@@ -102,9 +104,9 @@ def test_first_nine_rules_are_implemented_and_remaining_rules_are_pending(client
     )
     assert all(
         rule.implementation_status == IMPLEMENTATION_PENDING_STATUS
-        for rule in RULES[9:]
+        for rule in RULES[10:]
     )
-    assert page.count(IMPLEMENTED_STATUS) == 9
+    assert page.count(IMPLEMENTED_STATUS) == 10
     assert page.count(IMPLEMENTATION_PENDING_STATUS) == 4
     assert "remaining rules are implementation pending" in page
 
@@ -155,10 +157,10 @@ def test_rules_documentation_stays_synchronized_with_registry():
         ):
             assert " ".join(detail.split()) in normalized_documentation
 
-    assert "CC-RULE-001 through CC-RULE-009 are implemented" in (
+    assert "CC-RULE-001 through CC-RULE-010 are implemented" in (
         normalized_documentation
     )
-    assert "CC-RULE-010 through CC-RULE-013 remain implementation pending" in (
+    assert "CC-RULE-011 through CC-RULE-014 remain implementation pending" in (
         normalized_documentation
     )
     assert "must remain synchronized" in normalized_documentation

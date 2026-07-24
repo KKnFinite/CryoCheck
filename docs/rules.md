@@ -1,8 +1,8 @@
 # CryoCheck Rules
 
 This document is the approved specification for CryoCheck’s audit rules.
-CC-RULE-001 through CC-RULE-009 are implemented and execute automatically
-after a structurally valid CSV upload. CC-RULE-010 through CC-RULE-013 remain
+CC-RULE-001 through CC-RULE-010 are implemented and execute automatically
+after a structurally valid CSV upload. CC-RULE-011 through CC-RULE-014 remain
 implementation pending.
 
 The in-application registry and this documentation must remain synchronized.
@@ -347,23 +347,56 @@ Settings. Uploaded rows, audit results, and exceptions are not persisted.
 
 ## CC-RULE-010 — Excessive Event Time
 
-**Implementation status:** Documented — implementation pending
+**Implementation status:** Implemented
 
 ### Logic
 
+- Parse Type1Used and Type4Used with Decimal-safe logic; a step is used only
+  when its recorded amount is greater than 0.
+- Blank, zero, or negative usage excludes that step; malformed or non-finite
+  usage is unable to evaluate.
+- When neither step is positively used, skip without an exception or warning.
 - If only Type I is used, event time = ProcessTime1.
+- If only Type IV is used, event time = ProcessTime4.
 - If Type I and Type IV are used, event time = ProcessTime1 + ProcessTime4.
-- The optional gap setting may add the gap between EndTime1 and StartTime4.
+- Use original process times directly without the one-minute rate adjustment
+  from CC-RULE-008 and CC-RULE-009.
+- Every positively used step requires a finite, nonnegative, numerically whole
+  process time.
+- When Include Gap is Off, do not add a gap or require step or overall clock
+  times.
+- When Include Gap is On and both steps are used, add the whole-minute gap from
+  EndTime1 to StartTime4.
+- Use overall StartTime and EndTime to recognize an overnight gap when
+  StartTime4 is earlier than EndTime1.
+- A same-day overlap contributes a 0-minute gap and remains assigned to pending
+  CC-RULE-013.
+- Type I-only and Type IV-only events never include a gap, even when Include
+  Gap is On.
+- Invalid required process, clock, maximum, or Include Gap values produce an
+  unable-to-evaluate warning.
 - Generate an exception only when event time is greater than the configured
   maximum.
 - Event time equal to the maximum passes.
 
+Type I-only events use only `ProcessTime1`; Type IV-only events use only
+`ProcessTime4`. For combined events with Include Gap Off, invalid or missing
+step and overall clock times do not block this rule because they are not used.
+
+With Include Gap On for a combined event, same-day forward gaps are added
+directly. When `StartTime4` is earlier than `EndTime1`, valid overall
+`StartTime` and `EndTime` determine whether to add an overnight gap or use a
+0-minute same-day-overlap gap. Ambiguous or invalid required clock values
+produce a warning.
+
 ### Settings
 
-- Maximum event time
+- Maximum event time: active profile setting
 - Default: 30 minutes
+- Valid range: whole numbers from 1 through 999 minutes
 - Include gap between Type I and Type IV: On or Off
 - Default Include Gap value: Off
+- Personal Settings apply to the next signed-in upload
 - Mandatory
 
 ### Exception message
@@ -372,12 +405,16 @@ Settings. Uploaded rows, audit results, and exceptions are not persisted.
 
 ### Output details
 
-- ProcessTime1
-- ProcessTime4 when applicable
-- Gap when included
+- Type I usage status
+- Type IV usage status
+- Applicable original process times
+- Include Gap setting
+- Included gap and source clock times when applicable
+- Overlap handling when a 0-minute gap is used
 - Calculated event time
-- Configured maximum
+- Configured maximum event time
 - Minutes over the maximum
+- Comparison statement
 
 ## CC-RULE-011 — Incorrect Type IV Concentration
 
@@ -479,3 +516,54 @@ Settings. Uploaded rows, audit results, and exceptions are not persisted.
 - Type I EndTime1
 - Type IV StartTime4
 - Calculated overlap in minutes when an exception occurs
+
+## CC-RULE-014 — Type IV Without Type I Explanation Required
+
+**Implementation status:** Documented — implementation pending
+
+### Logic
+
+- Future applicability: Type4Used is greater than 0 while Type1Used is blank,
+  zero, or negative.
+- Notes must deterministically state that Type I was applied by another truck
+  and include that truck's numeric identifier.
+- Recognize a Type I reference such as Type I, Type 1, or T1.
+- Require language indicating Type I was applied, sprayed, completed,
+  performed, or done.
+- Require a whole-number identifier of any length clearly associated with the
+  word truck.
+- The documented other-truck number must differ from the current row's
+  TruckNumber.
+- An unrelated number not associated with the word truck does not qualify.
+- Do not use AI or semantic guessing.
+
+Examples that a future deterministic implementation should accept:
+
+- `Type I applied by truck 12`
+- `Truck 831996 completed Type 1`
+- `T1 was sprayed by another truck, truck 7`
+
+Examples that a future deterministic implementation should reject:
+
+- `Type IV only`
+- `Another truck applied Type I`
+- `Type I completed`
+- Type I applied by the current record's own truck number
+- Notes containing an unrelated number without a truck-number association
+
+### Settings
+
+- No configurable setting.
+- Mandatory
+
+### Exception message
+
+`Type IV applied without documented Type I truck.`
+
+### Output details
+
+- Type1Used
+- Type4Used
+- Current TruckNumber
+- Entered Notes
+- Deterministic qualification failure

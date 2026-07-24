@@ -35,6 +35,7 @@ _RULE_006 = _EXECUTED_RULES_BY_ID["CC-RULE-006"]
 _RULE_007 = _EXECUTED_RULES_BY_ID["CC-RULE-007"]
 _RULE_008 = _EXECUTED_RULES_BY_ID["CC-RULE-008"]
 _RULE_009 = _EXECUTED_RULES_BY_ID["CC-RULE-009"]
+_RULE_010 = _EXECUTED_RULES_BY_ID["CC-RULE-010"]
 _TIMESTAMP_RULES: Final = (_RULE_001, _RULE_002)
 _TYPE1_RULES: Final = (_RULE_003, _RULE_004)
 _REQUIRED_TYPE1_BUFFER: Final = Decimal("18.0")
@@ -144,6 +145,31 @@ class AdjustedRateCalculation:
     exceeds_maximum: bool
 
 
+@dataclass(frozen=True, slots=True)
+class EventTimeCalculation:
+    """Validated inputs and output for one event-time calculation."""
+
+    type1_used: bool
+    type4_used: bool
+    type1_usage_text: str
+    type4_usage_text: str
+    type1_usage: Decimal | None
+    type4_usage: Decimal | None
+    process_time1_text: str | None
+    process_time4_text: str | None
+    process_time1: Decimal | None
+    process_time4: Decimal | None
+    include_gap: bool
+    gap_minutes: int | None
+    gap_crossed_midnight: bool
+    overlap_zero_gap: bool
+    type1_end_text: str | None
+    type4_start_text: str | None
+    calculated_minutes: Decimal
+    configured_maximum: int
+    minutes_over: Decimal
+
+
 def run_audit(
     imported_csv: CSVImportResult,
     active_settings: SettingsDefinition,
@@ -231,6 +257,12 @@ def run_audit(
         )
         exceptions.extend(type4_rate_exceptions)
         warnings.extend(type4_rate_warnings)
+
+        event_time_exceptions, event_time_warnings = (
+            _evaluate_event_time_rule(source_row, active_settings)
+        )
+        exceptions.extend(event_time_exceptions)
+        warnings.extend(event_time_warnings)
 
     return AuditResult(
         filename=imported_csv.filename,
@@ -642,6 +674,241 @@ def _valid_positive_decimal_setting(
     ):
         return None
     return value
+
+
+def _evaluate_event_time_rule(
+    source_row: CSVSourceRow,
+    active_settings: SettingsDefinition,
+) -> tuple[list[AuditException], list[UnableToEvaluate]]:
+    """Evaluate original whole-minute process times and an optional step gap."""
+    usage_values: dict[str, Decimal | None] = {}
+    used_steps: dict[str, bool] = {}
+    invalid_usage_fields: list[str] = []
+
+    for field_name in ("Type1Used", "Type4Used"):
+        source_text = source_row.get(field_name)
+        if not source_text.strip():
+            usage_values[field_name] = None
+            used_steps[field_name] = False
+            continue
+
+        parsed_usage = _parse_decimal(source_text)
+        if parsed_usage is None:
+            invalid_usage_fields.append(field_name)
+            continue
+        usage_values[field_name] = parsed_usage
+        used_steps[field_name] = parsed_usage > 0
+
+    if invalid_usage_fields:
+        invalid_fields = tuple(invalid_usage_fields)
+        return [], [
+            _unable_to_evaluate(
+                source_row,
+                _RULE_010,
+                invalid_fields,
+                message=(
+                    "Event-time applicability could not be determined because "
+                    "these usage values are malformed or non-finite: "
+                    f"{', '.join(invalid_fields)}."
+                ),
+            )
+        ]
+
+    type1_used = used_steps["Type1Used"]
+    type4_used = used_steps["Type4Used"]
+    if not type1_used and not type4_used:
+        return [], []
+
+    process_values: dict[str, Decimal] = {}
+    process_texts: dict[str, str] = {}
+    invalid_process_fields: list[str] = []
+    for is_used, field_name in (
+        (type1_used, "ProcessTime1"),
+        (type4_used, "ProcessTime4"),
+    ):
+        if not is_used:
+            continue
+        source_text = source_row.get(field_name)
+        process_time = _parse_decimal(source_text)
+        if (
+            process_time is None
+            or process_time < 0
+            or process_time != process_time.to_integral_value()
+        ):
+            invalid_process_fields.append(field_name)
+            continue
+        process_texts[field_name] = source_text
+        process_values[field_name] = process_time
+
+    if invalid_process_fields:
+        invalid_fields = tuple(invalid_process_fields)
+        return [], [
+            _unable_to_evaluate(
+                source_row,
+                _RULE_010,
+                invalid_fields,
+                message=(
+                    "Every positively used step requires a finite, "
+                    "nonnegative, numerically whole-minute process time. "
+                    f"Invalid fields: {', '.join(invalid_fields)}."
+                ),
+            )
+        ]
+
+    configured_maximum = getattr(
+        active_settings,
+        "max_event_time_minutes",
+        None,
+    )
+    if (
+        type(configured_maximum) is not int
+        or not 1 <= configured_maximum <= 999
+    ):
+        return [], [
+            _unable_to_evaluate(
+                source_row,
+                _RULE_010,
+                ("Maximum event time setting",),
+                message=(
+                    "Maximum event time must be an available whole number "
+                    "from 1 through 999 minutes."
+                ),
+            )
+        ]
+
+    include_gap = getattr(
+        active_settings,
+        "include_gap_in_event_time",
+        None,
+    )
+    if type(include_gap) is not bool:
+        return [], [
+            _unable_to_evaluate(
+                source_row,
+                _RULE_010,
+                ("Include Gap setting",),
+                message="Include Gap must be an available On or Off value.",
+            )
+        ]
+
+    gap_minutes: int | None = None
+    gap_crossed_midnight = False
+    overlap_zero_gap = False
+    type1_end_text: str | None = None
+    type4_start_text: str | None = None
+    if include_gap and type1_used and type4_used:
+        type1_end_text = source_row.get("EndTime1")
+        type4_start_text = source_row.get("StartTime4")
+        type1_end = parse_military_time(type1_end_text)
+        type4_start = parse_military_time(type4_start_text)
+        invalid_step_fields = tuple(
+            field_name
+            for field_name, value in (
+                ("EndTime1", type1_end),
+                ("StartTime4", type4_start),
+            )
+            if value is None
+        )
+        if invalid_step_fields:
+            return [], [
+                _unable_to_evaluate(
+                    source_row,
+                    _RULE_010,
+                    invalid_step_fields,
+                    message=(
+                        "Include Gap is On, so both step times must be valid "
+                        "whole-minute HH:MM values. Invalid fields: "
+                        f"{', '.join(invalid_step_fields)}."
+                    ),
+                )
+            ]
+
+        direct_gap = elapsed_minutes(type1_end, type4_start)
+        if direct_gap is not None:
+            gap_minutes = direct_gap
+        else:
+            event_start = parse_military_time(source_row.get("StartTime"))
+            event_end = parse_military_time(source_row.get("EndTime"))
+            invalid_event_fields = tuple(
+                field_name
+                for field_name, value in (
+                    ("StartTime", event_start),
+                    ("EndTime", event_end),
+                )
+                if value is None
+            )
+            if invalid_event_fields:
+                return [], [
+                    _unable_to_evaluate(
+                        source_row,
+                        _RULE_010,
+                        invalid_event_fields,
+                        message=(
+                            "The overall event time is needed to distinguish "
+                            "an overnight included gap from an overlap. "
+                            "Invalid fields: "
+                            f"{', '.join(invalid_event_fields)}."
+                        ),
+                    )
+                ]
+
+            if crosses_midnight(event_start, event_end):
+                gap_crossed_midnight = True
+                gap_minutes = elapsed_minutes(
+                    type1_end,
+                    type4_start,
+                    crossed_midnight=True,
+                )
+            else:
+                overlap_zero_gap = True
+                gap_minutes = 0
+
+    calculation_parts = tuple(process_values.values())
+    if gap_minutes is not None:
+        calculation_parts = (
+            *calculation_parts,
+            Decimal(gap_minutes),
+        )
+    precision = max(
+        28,
+        sum(len(value.as_tuple().digits) for value in calculation_parts)
+        + 10,
+    )
+    exponent_limit = (
+        sum(abs(value.adjusted()) for value in calculation_parts) + 10
+    )
+    with localcontext() as decimal_context:
+        decimal_context.prec = precision
+        decimal_context.Emax = max(decimal_context.Emax, exponent_limit)
+        decimal_context.Emin = min(decimal_context.Emin, -exponent_limit)
+        calculated_minutes = sum(calculation_parts, Decimal(0))
+        minutes_over = calculated_minutes - Decimal(configured_maximum)
+
+    if calculated_minutes <= configured_maximum:
+        return [], []
+
+    calculation = EventTimeCalculation(
+        type1_used=type1_used,
+        type4_used=type4_used,
+        type1_usage_text=source_row.get("Type1Used"),
+        type4_usage_text=source_row.get("Type4Used"),
+        type1_usage=usage_values.get("Type1Used"),
+        type4_usage=usage_values.get("Type4Used"),
+        process_time1_text=process_texts.get("ProcessTime1"),
+        process_time4_text=process_texts.get("ProcessTime4"),
+        process_time1=process_values.get("ProcessTime1"),
+        process_time4=process_values.get("ProcessTime4"),
+        include_gap=include_gap,
+        gap_minutes=gap_minutes,
+        gap_crossed_midnight=gap_crossed_midnight,
+        overlap_zero_gap=overlap_zero_gap,
+        type1_end_text=type1_end_text,
+        type4_start_text=type4_start_text,
+        calculated_minutes=calculated_minutes,
+        configured_maximum=configured_maximum,
+        minutes_over=minutes_over,
+    )
+    return [_rule_010_exception(source_row, calculation)], []
 
 
 def _evaluate_type4_rule(
@@ -1244,6 +1511,149 @@ def _rule_009_exception(
             ),
         ),
     )
+
+
+def _rule_010_exception(
+    source_row: CSVSourceRow,
+    calculation: EventTimeCalculation,
+) -> AuditException:
+    details: list[RuleDetail] = [
+        RuleDetail(
+            "Type I usage status",
+            _event_usage_status(
+                calculation.type1_used,
+                calculation.type1_usage_text,
+                calculation.type1_usage,
+            ),
+        ),
+        RuleDetail(
+            "Type IV usage status",
+            _event_usage_status(
+                calculation.type4_used,
+                calculation.type4_usage_text,
+                calculation.type4_usage,
+            ),
+        ),
+    ]
+
+    if (
+        calculation.type1_used
+        and calculation.process_time1_text is not None
+        and calculation.process_time1 is not None
+    ):
+        details.append(
+            RuleDetail(
+                "ProcessTime1",
+                _format_decimal_minutes(
+                    calculation.process_time1_text,
+                    calculation.process_time1,
+                ),
+            )
+        )
+    if (
+        calculation.type4_used
+        and calculation.process_time4_text is not None
+        and calculation.process_time4 is not None
+    ):
+        details.append(
+            RuleDetail(
+                "ProcessTime4",
+                _format_decimal_minutes(
+                    calculation.process_time4_text,
+                    calculation.process_time4,
+                ),
+            )
+        )
+
+    details.append(
+        RuleDetail(
+            "Include Gap setting",
+            "On" if calculation.include_gap else "Off",
+        )
+    )
+    if (
+        calculation.gap_minutes is not None
+        and calculation.type1_end_text is not None
+        and calculation.type4_start_text is not None
+    ):
+        gap_context = " overnight" if calculation.gap_crossed_midnight else ""
+        details.append(
+            RuleDetail(
+                "Included gap",
+                (
+                    f"{_format_minutes(calculation.gap_minutes)}{gap_context} "
+                    f"(EndTime1 {calculation.type1_end_text} to StartTime4 "
+                    f"{calculation.type4_start_text})"
+                ),
+            )
+        )
+    if calculation.overlap_zero_gap:
+        details.append(
+            RuleDetail(
+                "Overlap handling",
+                (
+                    f"StartTime4 {calculation.type4_start_text} is earlier than "
+                    f"EndTime1 {calculation.type1_end_text}; CC-RULE-010 used "
+                    "a 0-minute gap."
+                ),
+            )
+        )
+
+    calculated_text = _format_compact_decimal(
+        calculation.calculated_minutes
+    )
+    over_text = _format_compact_decimal(calculation.minutes_over)
+    calculated_display = _format_decimal_minutes(
+        calculated_text,
+        calculation.calculated_minutes,
+    )
+    maximum_display = _format_minutes(calculation.configured_maximum)
+    over_display = _format_decimal_minutes(
+        over_text,
+        calculation.minutes_over,
+    )
+    details.extend(
+        (
+            RuleDetail(
+                "Calculated event time",
+                calculated_display,
+            ),
+            RuleDetail(
+                "Configured maximum event time",
+                maximum_display,
+            ),
+            RuleDetail(
+                "Minutes over the maximum",
+                over_display,
+            ),
+            RuleDetail(
+                "Comparison",
+                (
+                    f"Calculated event time {calculated_display} exceeds the "
+                    f"configured maximum of {maximum_display} by "
+                    f"{over_display}."
+                ),
+            ),
+        )
+    )
+    return _build_exception(
+        source_row,
+        _RULE_010,
+        details=tuple(details),
+    )
+
+
+def _event_usage_status(
+    is_used: bool,
+    source_text: str,
+    parsed_usage: Decimal | None,
+) -> str:
+    if is_used and parsed_usage is not None:
+        unit = "gallon" if parsed_usage == 1 else "gallons"
+        return f"Included — {source_text} {unit} recorded"
+    if not source_text.strip():
+        return "Not included — usage is blank"
+    return f"Not included — recorded amount {source_text} is not positive"
 
 
 def _build_exception(

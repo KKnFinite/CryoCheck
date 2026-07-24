@@ -506,7 +506,7 @@ def test_rule_006_default_five_minute_gap_passes_on_results_screen(client):
     assert b"CC-RULE-006" not in response.data
     assert b"No exceptions found" in response.data
     assert b"Rules executed</dt>" in response.data
-    assert b"<dd>9</dd>" in response.data
+    assert b"<dd>10</dd>" in response.data
 
 
 def test_rule_006_default_six_minute_gap_renders_required_details(client):
@@ -1075,6 +1075,289 @@ def test_personal_type4_maximum_affects_next_upload_and_reset(app, client):
     assert reset_response.status_code == 302
     assert reset_audit_response.status_code == 200
     assert b"CC-RULE-009" not in reset_audit_response.data
+    assert b"No exceptions found" in reset_audit_response.data
+
+
+@pytest.mark.parametrize(
+    ("overrides", "should_fail"),
+    (
+        (
+            {
+                "Type1Used": "10",
+                "ProcessTime1": "30",
+                "Type4Used": "0",
+                "ProcessTime4": "not-required",
+            },
+            False,
+        ),
+        (
+            {
+                "Type1Used": "10",
+                "ProcessTime1": "31",
+                "Type4Used": "0",
+                "ProcessTime4": "not-required",
+            },
+            True,
+        ),
+        (
+            {
+                "Type1Used": "0",
+                "ProcessTime1": "not-required",
+                "Type4Used": "10",
+                "ProcessTime4": "30",
+                "Type4ABrix": "35",
+            },
+            False,
+        ),
+        (
+            {
+                "Type1Used": "0",
+                "ProcessTime1": "not-required",
+                "Type4Used": "10",
+                "ProcessTime4": "31",
+                "Type4ABrix": "35",
+            },
+            True,
+        ),
+    ),
+)
+def test_rule_010_single_step_boundaries_on_results_screen(
+    client,
+    overrides,
+    should_fail,
+):
+    response = _upload(
+        client,
+        _synthetic_csv(overrides={0: overrides}),
+    )
+
+    assert response.status_code == 200
+    assert (b"CC-RULE-010" in response.data) is should_fail
+    assert (b"Excessive event time." in response.data) is should_fail
+
+
+def test_rule_010_combined_event_ignores_clocks_when_gap_is_off(client):
+    response = _upload(
+        client,
+        _synthetic_csv(
+            overrides={
+                0: {
+                    "Type1Used": "1",
+                    "ProcessTime1": "15",
+                    "Type4Used": "1",
+                    "Type4ABrix": "35",
+                    "ProcessTime4": "16",
+                    "EndTime1": "invalid",
+                    "StartTime4": "invalid",
+                    "StartTime": "invalid",
+                    "EndTime": "invalid",
+                }
+            }
+        ),
+    )
+
+    assert response.status_code == 200
+    assert response.data.count(b"CC-RULE-010") == 1
+    assert b"Include Gap setting" in response.data
+    assert b">Off</dd>" in response.data
+    assert b"Calculated event time" in response.data
+    assert b">31 minutes</dd>" in response.data
+
+
+@pytest.mark.parametrize(
+    ("overall_start", "overall_end", "type1_end", "type4_start", "expected"),
+    (
+        ("08:00", "08:45", "08:10", "08:16", b"6 minutes"),
+        ("23:30", "00:30", "23:58", "00:04", b"6 minutes overnight"),
+    ),
+)
+def test_rule_010_personal_include_gap_adds_same_day_and_overnight_gaps(
+    app,
+    client,
+    overall_start,
+    overall_end,
+    type1_end,
+    type4_start,
+    expected,
+):
+    with app.app_context():
+        user = User(
+            username="EventGapUser",
+            username_normalized="eventgapuser",
+        )
+        user.set_password(VALID_PASSWORD)
+        create_default_user_settings(user)
+        db.session.add(user)
+        db.session.commit()
+
+    assert client.post(
+        "/login",
+        data={
+            "username": "EventGapUser",
+            "password": VALID_PASSWORD,
+        },
+    ).status_code == 302
+    assert client.post(
+        "/settings",
+        data={
+            "late_entry_threshold_hours": "24",
+            "type1_fluid": "Cryotech Polar Plus LT",
+            "type4_fluid": "Cryotech Polar Guard Xtend",
+            "allowed_gap_minutes": "5",
+            "max_type1_rate_gpm": "60",
+            "max_type4_rate_gpm": "30",
+            "max_event_time_minutes": "30",
+            "include_gap_in_event_time": "y",
+        },
+    ).status_code == 302
+
+    response = _upload(
+        client,
+        _synthetic_csv(
+            overrides={
+                0: {
+                    "StartTime": overall_start,
+                    "EndTime": overall_end,
+                    "DateCreated": f"2026-01-01 {overall_start}",
+                    "Type1Used": "1",
+                    "ProcessTime1": "10",
+                    "EndTime1": type1_end,
+                    "Type4Used": "1",
+                    "Type4ABrix": "35",
+                    "ProcessTime4": "15",
+                    "StartTime4": type4_start,
+                }
+            }
+        ),
+    )
+
+    assert response.status_code == 200
+    assert response.data.count(b"CC-RULE-010") == 1
+    assert b"Include Gap setting" in response.data
+    assert b">On</dd>" in response.data
+    assert expected in response.data
+    assert b"Calculated event time" in response.data
+    assert b">31 minutes</dd>" in response.data
+
+
+def test_rule_010_overlap_uses_zero_gap_without_running_rule_013(app, client):
+    with app.app_context():
+        user = User(
+            username="OverlapEventUser",
+            username_normalized="overlapeventuser",
+        )
+        user.set_password(VALID_PASSWORD)
+        create_default_user_settings(user)
+        db.session.add(user)
+        db.session.commit()
+
+    client.post(
+        "/login",
+        data={
+            "username": "OverlapEventUser",
+            "password": VALID_PASSWORD,
+        },
+    )
+    client.post(
+        "/settings",
+        data={
+            "late_entry_threshold_hours": "24",
+            "type1_fluid": "Cryotech Polar Plus LT",
+            "type4_fluid": "Cryotech Polar Guard Xtend",
+            "allowed_gap_minutes": "5",
+            "max_type1_rate_gpm": "60",
+            "max_type4_rate_gpm": "30",
+            "max_event_time_minutes": "30",
+            "include_gap_in_event_time": "y",
+        },
+    )
+
+    response = _upload(
+        client,
+        _synthetic_csv(
+            overrides={
+                0: {
+                    "Type1Used": "1",
+                    "ProcessTime1": "20",
+                    "EndTime1": "08:16",
+                    "Type4Used": "1",
+                    "Type4ABrix": "35",
+                    "ProcessTime4": "11",
+                    "StartTime4": "08:10",
+                }
+            }
+        ),
+    )
+
+    assert response.status_code == 200
+    assert response.data.count(b"Excessive event time.") == 1
+    assert b"Included gap" in response.data
+    assert b"0 minutes (EndTime1 08:16 to StartTime4 08:10)" in response.data
+    assert b"CC-RULE-010 used a 0-minute gap" in response.data
+    assert b"CC-RULE-013" not in response.data
+
+
+def test_personal_event_time_settings_affect_next_upload_and_reset(app, client):
+    with app.app_context():
+        user = User(
+            username="EventSettingsUser",
+            username_normalized="eventsettingsuser",
+        )
+        user.set_password(VALID_PASSWORD)
+        create_default_user_settings(user)
+        db.session.add(user)
+        db.session.commit()
+
+    assert client.post(
+        "/login",
+        data={
+            "username": "EventSettingsUser",
+            "password": VALID_PASSWORD,
+        },
+    ).status_code == 302
+    assert client.post(
+        "/settings",
+        data={
+            "late_entry_threshold_hours": "24",
+            "type1_fluid": "Cryotech Polar Plus LT",
+            "type4_fluid": "Cryotech Polar Guard Xtend",
+            "allowed_gap_minutes": "5",
+            "max_type1_rate_gpm": "60",
+            "max_type4_rate_gpm": "30",
+            "max_event_time_minutes": "20",
+            "include_gap_in_event_time": "y",
+        },
+    ).status_code == 302
+
+    payload = _synthetic_csv(
+        overrides={
+            0: {
+                "Type1Used": "1",
+                "ProcessTime1": "10",
+                "EndTime1": "08:10",
+                "Type4Used": "1",
+                "Type4ABrix": "35",
+                "ProcessTime4": "10",
+                "StartTime4": "08:11",
+            }
+        }
+    )
+    personal_response = _upload(client, payload)
+    reset_response = client.post(
+        "/settings/reset",
+        data={"confirm_reset": "y"},
+    )
+    reset_audit_response = _upload(client, payload)
+
+    assert personal_response.status_code == 200
+    assert personal_response.data.count(b"CC-RULE-010") == 1
+    assert b"Calculated event time" in personal_response.data
+    assert b">21 minutes</dd>" in personal_response.data
+    assert b"Configured maximum event time" in personal_response.data
+    assert b">20 minutes</dd>" in personal_response.data
+    assert reset_response.status_code == 302
+    assert reset_audit_response.status_code == 200
+    assert b"CC-RULE-010" not in reset_audit_response.data
     assert b"No exceptions found" in reset_audit_response.data
 
 
