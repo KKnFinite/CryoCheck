@@ -252,7 +252,7 @@ RULES: Final[tuple[RuleDefinition, ...]] = (
             ),
             (
                 "An earlier StartTime4 during a same-day event is an overlap "
-                "left to pending CC-RULE-013, not a 24-hour gap."
+                "evaluated by CC-RULE-013, not a 24-hour gap."
             ),
             (
                 "Blank or malformed required values produce an "
@@ -477,8 +477,8 @@ RULES: Final[tuple[RuleDefinition, ...]] = (
                 "gap when StartTime4 is earlier than EndTime1."
             ),
             (
-                "A same-day overlap contributes a 0-minute gap and remains "
-                "assigned to pending CC-RULE-013."
+                "A same-day overlap contributes a 0-minute gap to CC-RULE-010 "
+                "and is independently evaluated by CC-RULE-013."
             ),
             (
                 "Type I-only and Type IV-only events never include a gap, even "
@@ -656,27 +656,41 @@ RULES: Final[tuple[RuleDefinition, ...]] = (
             "ends, while accounting for events that cross midnight."
         ),
         logic_summary=(
-            "Applies when both Type I and Type IV are used.",
-            "Equality between EndTime1 and StartTime4 passes.",
-            "Type IV must not begin before Type I ends.",
             (
-                "Use overall StartTime and EndTime to determine whether the "
-                "event crossed midnight."
+                "Run only when Type1Used and Type4Used are both numerically "
+                "greater than 0."
             ),
             (
-                "If overall EndTime is earlier than overall StartTime, treat "
-                "the event as crossing midnight and allow the Type IV time to "
-                "roll into the next day."
+                "Blank, zero, or negative usage skips the rule; malformed or "
+                "non-finite usage is unable to evaluate."
             ),
             (
-                "If the overall event did not cross midnight and StartTime4 is "
-                "earlier than EndTime1, generate an exception."
+                "Parse EndTime1 and StartTime4 as exact whole-minute military "
+                "HH:MM values."
             ),
-            "Example overnight pass:",
-            "EndTime1 = 23:59",
-            "StartTime4 = 00:01",
-            "Overall event crosses midnight",
-            "Result: pass with a two-minute gap",
+            (
+                "Equality or a later StartTime4 passes without requiring "
+                "overall StartTime or EndTime."
+            ),
+            (
+                "When StartTime4 is earlier than EndTime1, use overall "
+                "StartTime and EndTime to determine whether the event crossed "
+                "midnight."
+            ),
+            (
+                "Overall event crosses midnight only when EndTime is earlier "
+                "than StartTime; then treat StartTime4 as occurring the next "
+                "day and pass."
+            ),
+            (
+                "If the overall event did not cross midnight, generate an "
+                "exception and calculate overlap as EndTime1 minus StartTime4."
+            ),
+            (
+                "Missing or malformed step times, or missing or malformed "
+                "overall times needed to resolve an earlier StartTime4, are "
+                "unable to evaluate."
+            ),
         ),
         settings_defaults=(
             "None",
@@ -684,12 +698,14 @@ RULES: Final[tuple[RuleDefinition, ...]] = (
         ),
         exception_message="Pass overlap.",
         output_details=(
-            "Overall event StartTime",
-            "Overall event EndTime",
-            "Type I EndTime1",
-            "Type IV StartTime4",
-            "Calculated overlap in minutes when an exception occurs",
+            "Original overall StartTime",
+            "Original overall EndTime",
+            "Original Type I EndTime1",
+            "Original Type IV StartTime4",
+            "Calculated overlap minutes",
+            "Concise explanation",
         ),
+        implementation_status=IMPLEMENTED_STATUS,
     ),
     RuleDefinition(
         rule_id="CC-RULE-014",

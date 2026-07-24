@@ -1,9 +1,9 @@
 # CryoCheck Rules
 
 This document is the approved specification for CryoCheck’s audit rules.
-CC-RULE-001 through CC-RULE-012 are implemented and execute automatically
-after a structurally valid CSV upload. CC-RULE-013 through CC-RULE-014 remain
-implementation pending.
+CC-RULE-001 through CC-RULE-013 are implemented and execute automatically
+after a structurally valid CSV upload. CC-RULE-014 remains implementation
+pending.
 
 The in-application registry and this documentation must remain synchronized.
 Rule IDs are permanent: they must never be reused or renumbered. No rule
@@ -201,7 +201,7 @@ Settings. Uploaded rows, audit results, and exceptions are not persisted.
 - A gap equal to the setting passes.
 - When the overall event crosses midnight, treat an earlier StartTime4 as
   occurring on the next calendar day.
-- An earlier StartTime4 during a same-day event is an overlap left to pending
+- An earlier StartTime4 during a same-day event is an overlap evaluated by
   CC-RULE-013, not a 24-hour gap.
 - Blank or malformed required values produce an unable-to-evaluate warning when
   applicability is positive.
@@ -369,8 +369,8 @@ Settings. Uploaded rows, audit results, and exceptions are not persisted.
   EndTime1 to StartTime4.
 - Use overall StartTime and EndTime to recognize an overnight gap when
   StartTime4 is earlier than EndTime1.
-- A same-day overlap contributes a 0-minute gap and remains assigned to pending
-  CC-RULE-013.
+- A same-day overlap contributes a 0-minute gap to CC-RULE-010 and is
+  independently evaluated by CC-RULE-013.
 - Type I-only and Type IV-only events never include a gap, even when Include
   Gap is On.
 - Invalid required process, clock, maximum, or Include Gap values produce an
@@ -527,24 +527,29 @@ characters. CryoCheck does not query external registries or infer ownership.
 
 ## CC-RULE-013 — Pass Overlap
 
-**Implementation status:** Documented — implementation pending
+**Implementation status:** Implemented
 
 ### Logic
 
-- Applies when both Type I and Type IV are used.
-- Equality between EndTime1 and StartTime4 passes.
-- Type IV must not begin before Type I ends.
-- Use overall StartTime and EndTime to determine whether the event crossed
-  midnight.
-- If overall EndTime is earlier than overall StartTime, treat the event as
-  crossing midnight and allow the Type IV time to roll into the next day.
-- If the overall event did not cross midnight and StartTime4 is earlier than
-  EndTime1, generate an exception.
-- Example overnight pass:
-  - EndTime1 = 23:59
-  - StartTime4 = 00:01
-  - Overall event crosses midnight
-  - Result: pass with a two-minute gap
+- Run only when Type1Used and Type4Used are both numerically greater than 0.
+- Blank, zero, or negative usage skips the rule; malformed or non-finite usage
+  is unable to evaluate.
+- Parse EndTime1 and StartTime4 as exact whole-minute military HH:MM values.
+- Equality or a later StartTime4 passes without requiring overall StartTime or
+  EndTime.
+- When StartTime4 is earlier than EndTime1, use overall StartTime and EndTime
+  to determine whether the event crossed midnight.
+- Overall event crosses midnight only when EndTime is earlier than StartTime;
+  then treat StartTime4 as occurring the next day and pass.
+- If the overall event did not cross midnight, generate an exception and
+  calculate overlap as EndTime1 minus StartTime4.
+- Missing or malformed step times, or missing or malformed overall times
+  needed to resolve an earlier StartTime4, are unable to evaluate.
+
+For example, an overall event from 23:45 through 00:10 with EndTime1 `23:59`
+and StartTime4 `00:01` passes. A same-day event from 20:00 through 20:30 with
+EndTime1 `20:20` and StartTime4 `20:15` produces a five-minute overlap
+exception.
 
 ### Settings
 
@@ -557,11 +562,12 @@ characters. CryoCheck does not query external registries or infer ownership.
 
 ### Output details
 
-- Overall event StartTime
-- Overall event EndTime
-- Type I EndTime1
-- Type IV StartTime4
-- Calculated overlap in minutes when an exception occurs
+- Original overall StartTime
+- Original overall EndTime
+- Original Type I EndTime1
+- Original Type IV StartTime4
+- Calculated overlap minutes
+- Concise explanation
 
 ## CC-RULE-014 — Type IV Without Type I Explanation Required
 

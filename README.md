@@ -1,6 +1,6 @@
 # CryoCheck
 
-CryoCheck is a standalone deice log audit application. This repository contains the production-ready Flask application, Neon PostgreSQL integration, an in-memory CSV audit workflow, optional local accounts with private Personal Settings, and the approved audit-rule registry. The first twelve rules now execute and produce reviewable Results; the remaining rules and Excel export will be added in later development phases.
+CryoCheck is a standalone deice log audit application. This repository contains the production-ready Flask application, Neon PostgreSQL integration, an in-memory CSV audit workflow, optional local accounts with private Personal Settings, and the approved audit-rule registry. The first thirteen rules now execute and produce reviewable Results; the remaining rule and Excel export will be added in later development phases.
 
 ## Purpose
 
@@ -78,15 +78,17 @@ Cryotech Polar Plus LT manufacturer data is stored as a version-controlled, read
 
 Type IV fluid profiles are also version-controlled, read-only reference data. The reusable registry in `app/services/type4_fluids.py` validates fluid names, finite Decimal BRIX ranges, and required Decimal concentrations without database or network access. `CC-RULE-005` runs only for positive `Type4Used`, compares `Type4ABrix` without rounding, and treats the Cryotech Polar Guard Xtend range of 34.6–36.6 as inclusive. `CC-RULE-011` independently requires its recorded Type IV concentration to equal that profile’s 100% requirement, accepting one optional trailing percent sign and never rounding values into compliance. Missing or invalid rule inputs and unknown or invalid fluid profiles produce rule-specific unable-to-evaluate warnings.
 
-`CC-RULE-006` runs only when both `Type1Used` and `Type4Used` are positive. It compares `EndTime1` with `StartTime4` using exact whole-minute HH:MM arithmetic and fails only when the calculated gap exceeds the active profile’s Allowed Gap; equality passes and Default is 5 minutes. Overall `StartTime` and `EndTime` distinguish a positive overnight gap from a same-day overlap. Same-day overlaps remain assigned to pending `CC-RULE-013`, while missing or malformed values needed for evaluation produce non-exception warnings.
+`CC-RULE-006` runs only when both `Type1Used` and `Type4Used` are positive. It compares `EndTime1` with `StartTime4` using exact whole-minute HH:MM arithmetic and fails only when the calculated gap exceeds the active profile’s Allowed Gap; equality passes and Default is 5 minutes. Overall `StartTime` and `EndTime` distinguish a positive overnight gap from a same-day overlap. Same-day overlaps remain a zero-gap condition for this rule and are evaluated independently by `CC-RULE-013`, while missing or malformed values needed for evaluation produce non-exception warnings.
 
 `CC-RULE-007` treats blank, whitespace-only, and case-insensitive `None` precipitation as inactive; every other nonblank source value is active without requiring a fixed condition list. During active precipitation, blank or Decimal-equivalent zero `Type4Used` produces an exception, positive usage passes, and malformed, non-finite, or negative usage produces an unable-to-evaluate warning. Original source text is preserved for Results. The rule has no setting, so anonymous and signed-in audits behave identically.
 
 `CC-RULE-008` runs only for positive `Type1Used` and uses the CSV’s existing whole-minute `ProcessTime1` value without recalculating it from start/end times. The adjusted rate is `Type1Used / (ProcessTime1 + 1)` using Decimal-safe arithmetic. A rate equal to the active profile’s maximum passes; only a greater rate fails. Default is 60 GPM, and signed-in Personal Settings apply immediately to the next upload. Malformed or non-finite usage, invalid whole-minute process time, and invalid runtime maximum settings produce unable-to-evaluate warnings rather than exceptions.
 
-`CC-RULE-010` sums the original whole-minute process time for every positively used fluid step and compares the result with the active profile’s maximum event time. Default is 30 minutes. Type I-only and Type IV-only rows are both evaluated. For combined events, the Include Gap setting optionally adds the whole-minute Type I-to-Type IV gap, including a recognized overnight gap; same-day overlaps contribute zero and remain assigned to pending `CC-RULE-013`. Equality passes, and invalid required inputs produce unable-to-evaluate warnings.
+`CC-RULE-010` sums the original whole-minute process time for every positively used fluid step and compares the result with the active profile’s maximum event time. Default is 30 minutes. Type I-only and Type IV-only rows are both evaluated. For combined events, the Include Gap setting optionally adds the whole-minute Type I-to-Type IV gap, including a recognized overnight gap; same-day overlaps contribute zero and are evaluated independently by `CC-RULE-013`. Equality passes, and invalid required inputs produce unable-to-evaluate warnings.
 
 `CC-RULE-012` validates trimmed, case-insensitive tail-number requirements for numeric AircraftType 0, 1, and 2 without external registry, web, API, or ownership checks. Type 0 requires a blank tail and nonblank Notes, Type 1 requires UPS format `NxxxUP`, and Type 2 requires a nonblank non-UPS value containing only letters, numbers, and hyphens with at least one letter or number. Original CSV values remain unchanged for Results display.
+
+`CC-RULE-013` runs only when both fluid usages are numerically positive. Equality and a later Type IV start pass. When `StartTime4` is earlier than `EndTime1`, valid overall times determine whether the event crossed midnight: an earlier overall `EndTime` means the Type IV start belongs to the next day and passes; otherwise CryoCheck reports the exact whole-minute overlap. Invalid usage or required time values produce unable-to-evaluate warnings. Rule 006 continues treating overlap as no excessive gap, and Rule 010 continues adding zero gap when Include Gap is On.
 
 The upload limit is configured with `MAX_UPLOAD_MB` and defaults to 10 MB. Oversized requests receive a branded HTTP 413 response.
 
@@ -112,7 +114,7 @@ Registering creates exactly one private `UserSettings` record copied from the cu
 
 ## Rules catalog
 
-The read-only Rules page at `/rules` documents all 14 approved audit checks in permanent rule-ID order and shows each implementation status. The application registry in `app/services/rules.py` and [the detailed rules specification](docs/rules.md) must remain synchronized. `CC-RULE-001` through `CC-RULE-012` are implemented; `CC-RULE-013` and `CC-RULE-014` remain implementation pending.
+The read-only Rules page at `/rules` documents all 14 approved audit checks in permanent rule-ID order and shows each implementation status. The application registry in `app/services/rules.py` and [the detailed rules specification](docs/rules.md) must remain synchronized. `CC-RULE-001` through `CC-RULE-013` are implemented; `CC-RULE-014` remains implementation pending.
 
 ### Required baseline columns
 

@@ -39,6 +39,7 @@ _RULE_009 = _EXECUTED_RULES_BY_ID["CC-RULE-009"]
 _RULE_010 = _EXECUTED_RULES_BY_ID["CC-RULE-010"]
 _RULE_011 = _EXECUTED_RULES_BY_ID["CC-RULE-011"]
 _RULE_012 = _EXECUTED_RULES_BY_ID["CC-RULE-012"]
+_RULE_013 = _EXECUTED_RULES_BY_ID["CC-RULE-013"]
 _TIMESTAMP_RULES: Final = (_RULE_001, _RULE_002)
 _TYPE1_RULES: Final = (_RULE_003, _RULE_004)
 _REQUIRED_TYPE1_BUFFER: Final = Decimal("18.0")
@@ -279,6 +280,12 @@ def run_audit(
         tail_exceptions, tail_warnings = _evaluate_tail_number_rule(source_row)
         exceptions.extend(tail_exceptions)
         warnings.extend(tail_warnings)
+
+        overlap_exceptions, overlap_warnings = _evaluate_pass_overlap_rule(
+            source_row
+        )
+        exceptions.extend(overlap_exceptions)
+        warnings.extend(overlap_warnings)
 
     return AuditResult(
         filename=imported_csv.filename,
@@ -1236,6 +1243,116 @@ def _evaluate_tail_number_rule(
     ], []
 
 
+def _evaluate_pass_overlap_rule(
+    source_row: CSVSourceRow,
+) -> tuple[list[AuditException], list[UnableToEvaluate]]:
+    """Detect a same-day Type IV start before the Type I pass ends."""
+    parsed_usage: dict[str, Decimal] = {}
+    invalid_usage_fields: list[str] = []
+    has_nonpositive_or_blank_usage = False
+
+    for field_name in ("Type1Used", "Type4Used"):
+        source_text = source_row.get(field_name)
+        if not source_text.strip():
+            has_nonpositive_or_blank_usage = True
+            continue
+
+        usage = _parse_decimal(source_text)
+        if usage is None:
+            invalid_usage_fields.append(field_name)
+        elif usage <= 0:
+            has_nonpositive_or_blank_usage = True
+        else:
+            parsed_usage[field_name] = usage
+
+    if invalid_usage_fields:
+        invalid_fields = tuple(invalid_usage_fields)
+        return [], [
+            _unable_to_evaluate(
+                source_row,
+                _RULE_013,
+                invalid_fields,
+                message=(
+                    "Pass-overlap applicability could not be determined "
+                    "because these usage values are malformed or non-finite: "
+                    f"{', '.join(invalid_fields)}."
+                ),
+            )
+        ]
+    if has_nonpositive_or_blank_usage or len(parsed_usage) != 2:
+        return [], []
+
+    type1_end_text = source_row.get("EndTime1")
+    type4_start_text = source_row.get("StartTime4")
+    type1_end = parse_military_time(type1_end_text)
+    type4_start = parse_military_time(type4_start_text)
+    invalid_step_fields = tuple(
+        field_name
+        for field_name, value in (
+            ("EndTime1", type1_end),
+            ("StartTime4", type4_start),
+        )
+        if value is None
+    )
+    if invalid_step_fields:
+        return [], [
+            _unable_to_evaluate(
+                source_row,
+                _RULE_013,
+                invalid_step_fields,
+                message=(
+                    "Pass overlap requires valid whole-minute HH:MM values "
+                    "for EndTime1 and StartTime4. Invalid fields: "
+                    f"{', '.join(invalid_step_fields)}."
+                ),
+            )
+        ]
+
+    if elapsed_minutes(type1_end, type4_start) is not None:
+        return [], []
+
+    overall_start_text = source_row.get("StartTime")
+    overall_end_text = source_row.get("EndTime")
+    overall_start = parse_military_time(overall_start_text)
+    overall_end = parse_military_time(overall_end_text)
+    invalid_overall_fields = tuple(
+        field_name
+        for field_name, value in (
+            ("StartTime", overall_start),
+            ("EndTime", overall_end),
+        )
+        if value is None
+    )
+    if invalid_overall_fields:
+        return [], [
+            _unable_to_evaluate(
+                source_row,
+                _RULE_013,
+                invalid_overall_fields,
+                message=(
+                    "StartTime4 is earlier than EndTime1, so valid overall "
+                    "StartTime and EndTime values are required to determine "
+                    "whether the event crossed midnight. Invalid fields: "
+                    f"{', '.join(invalid_overall_fields)}."
+                ),
+            )
+        ]
+
+    if crosses_midnight(overall_start, overall_end):
+        return [], []
+
+    overlap_minutes = elapsed_minutes(type4_start, type1_end)
+    if overlap_minutes is None:
+        raise RuntimeError("Validated same-day overlap must have a duration.")
+
+    return [
+        _rule_013_exception(
+            source_row,
+            overlap_minutes=overlap_minutes,
+        )
+    ], []
+
+
 def _evaluate_step_gap_rule(
     source_row: CSVSourceRow,
     active_settings: SettingsDefinition,
@@ -1916,6 +2033,42 @@ def _rule_012_exception(
         source_row,
         _RULE_012,
         details=tuple(details),
+    )
+
+
+def _rule_013_exception(
+    source_row: CSVSourceRow,
+    *,
+    overlap_minutes: int,
+) -> AuditException:
+    overlap_display = _format_minutes(overlap_minutes)
+    type1_end_text = source_row.get("EndTime1")
+    type4_start_text = source_row.get("StartTime4")
+    return _build_exception(
+        source_row,
+        _RULE_013,
+        details=(
+            RuleDetail(
+                "Overall StartTime",
+                source_row.get("StartTime"),
+            ),
+            RuleDetail(
+                "Overall EndTime",
+                source_row.get("EndTime"),
+            ),
+            RuleDetail("Type I EndTime1", type1_end_text),
+            RuleDetail("Type IV StartTime4", type4_start_text),
+            RuleDetail("Calculated overlap", overlap_display),
+            RuleDetail(
+                "Explanation",
+                (
+                    f"Type IV began at {type4_start_text}, "
+                    f"{overlap_display} before Type I ended at "
+                    f"{type1_end_text}, and the overall event did not cross "
+                    "midnight."
+                ),
+            ),
+        ),
     )
 
 

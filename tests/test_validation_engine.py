@@ -184,6 +184,27 @@ def _audit_tail_number(**row_values):
     )
 
 
+def _audit_overlap(**row_values):
+    values = {
+        "type1_used": "1",
+        "type1_concentration": "50",
+        "freezing_point1": "-17.3",
+        "ambient_temp": "1",
+        "process_time1": "1",
+        "type4_used": "1",
+        "type4_brix": "35",
+        "type4_concentration": "100",
+        "process_time4": "1",
+        "end_time1": "08:10",
+        "start_time4": "08:15",
+    }
+    values.update(row_values)
+    return run_audit(
+        _import_result(_source_row(**values)),
+        DEFAULT_SETTINGS,
+    )
+
+
 def _audit_event_time(
     *,
     settings=DEFAULT_SETTINGS,
@@ -254,10 +275,10 @@ def test_utc_fields_do_not_influence_rule_001_or_rule_002():
     assert result.unable_to_evaluate_count == 0
 
 
-def test_audit_reports_twelve_rules_executed():
+def test_audit_reports_thirteen_rules_executed():
     result = _audit_one()
 
-    assert result.rules_executed == 12
+    assert result.rules_executed == 13
 
 
 def test_rule_002_23_hours_59_minutes_passes_at_24_hours():
@@ -485,7 +506,13 @@ def test_malformed_type1_used_is_unable_to_evaluate():
     assert result.exception_count == 0
     assert tuple(
         warning.rule_id for warning in result.unable_to_evaluate
-    ) == ("CC-RULE-003", "CC-RULE-004", "CC-RULE-008", "CC-RULE-010")
+    ) == (
+        "CC-RULE-003",
+        "CC-RULE-004",
+        "CC-RULE-008",
+        "CC-RULE-010",
+        "CC-RULE-013",
+    )
     assert all(
         warning.invalid_fields == ("Type1Used",)
         for warning in result.unable_to_evaluate
@@ -1423,7 +1450,7 @@ def test_rule_012_orders_by_csv_row_then_rule_id():
     ) == ((2, "CC-RULE-012"), (3, "CC-RULE-012"))
 
 
-def test_rule_012_does_not_execute_pending_rules_013_or_014():
+def test_rule_012_does_not_execute_pending_rule_014():
     result = _audit_tail_number(
         aircraft_type="2",
         tail_number="N121UP",
@@ -1433,8 +1460,263 @@ def test_rule_012_does_not_execute_pending_rules_013_or_014():
         exception.rule_id for exception in result.exceptions
     ) == ("CC-RULE-012",)
     assert all(
-        warning.rule_id not in ("CC-RULE-013", "CC-RULE-014")
+        warning.rule_id != "CC-RULE-014"
         for warning in result.unable_to_evaluate
+    )
+
+
+@pytest.mark.parametrize(
+    ("field_name", "field_value"),
+    (
+        ("type1_used", ""),
+        ("type1_used", "0"),
+        ("type1_used", "-1"),
+        ("type4_used", ""),
+        ("type4_used", "0"),
+        ("type4_used", "-1"),
+    ),
+)
+def test_rule_013_blank_or_nonpositive_usage_skips(field_name, field_value):
+    result = _audit_overlap(
+        **{
+            field_name: field_value,
+            "end_time1": "08:20",
+            "start_time4": "08:15",
+        }
+    )
+
+    assert all(
+        exception.rule_id != "CC-RULE-013"
+        for exception in result.exceptions
+    )
+    assert all(
+        warning.rule_id != "CC-RULE-013"
+        for warning in result.unable_to_evaluate
+    )
+
+
+@pytest.mark.parametrize(
+    ("field_name", "field_value", "expected_field"),
+    (
+        ("type1_used", "malformed", "Type1Used"),
+        ("type1_used", "NaN", "Type1Used"),
+        ("type4_used", "malformed", "Type4Used"),
+        ("type4_used", "Infinity", "Type4Used"),
+    ),
+)
+def test_rule_013_malformed_or_nonfinite_usage_warns(
+    field_name,
+    field_value,
+    expected_field,
+):
+    result = _audit_overlap(**{field_name: field_value})
+    warnings = tuple(
+        warning
+        for warning in result.unable_to_evaluate
+        if warning.rule_id == "CC-RULE-013"
+    )
+
+    assert len(warnings) == 1
+    assert warnings[0].invalid_fields == (expected_field,)
+    assert "malformed or non-finite" in warnings[0].message
+
+
+@pytest.mark.parametrize("start_time4", ("08:10", "08:11"))
+def test_rule_013_equality_and_same_day_positive_gap_pass_without_overall_times(
+    start_time4,
+):
+    result = _audit_overlap(
+        start_time="malformed",
+        end_time="",
+        end_time1="08:10",
+        start_time4=start_time4,
+    )
+
+    assert all(
+        exception.rule_id != "CC-RULE-013"
+        for exception in result.exceptions
+    )
+    assert all(
+        warning.rule_id != "CC-RULE-013"
+        for warning in result.unable_to_evaluate
+    )
+
+
+@pytest.mark.parametrize(
+    ("end_time1", "start_time4", "expected_overlap"),
+    (
+        ("08:16", "08:15", "1 minute"),
+        ("20:20", "20:15", "5 minutes"),
+    ),
+)
+def test_rule_013_same_day_overlap_fails_with_exact_details(
+    end_time1,
+    start_time4,
+    expected_overlap,
+):
+    result = _audit_overlap(
+        start_time="20:00",
+        end_time="20:30",
+        end_time1=end_time1,
+        start_time4=start_time4,
+    )
+    exception = tuple(
+        exception
+        for exception in result.exceptions
+        if exception.rule_id == "CC-RULE-013"
+    )[0]
+
+    assert exception.rule_name == "Pass Overlap"
+    assert exception.exception_message == "Pass overlap."
+    assert tuple(
+        (detail.label, detail.value)
+        for detail in exception.details
+    ) == (
+        ("Overall StartTime", "20:00"),
+        ("Overall EndTime", "20:30"),
+        ("Type I EndTime1", end_time1),
+        ("Type IV StartTime4", start_time4),
+        ("Calculated overlap", expected_overlap),
+        (
+            "Explanation",
+            (
+                f"Type IV began at {start_time4}, {expected_overlap} before "
+                f"Type I ended at {end_time1}, and the overall event did not "
+                "cross midnight."
+            ),
+        ),
+    )
+
+
+def test_rule_013_overnight_sequence_passes():
+    result = _audit_overlap(
+        start_time="23:45",
+        end_time="00:10",
+        date_created="2026-01-15 23:45",
+        end_time1="23:59",
+        start_time4="00:01",
+    )
+
+    assert all(
+        exception.rule_id != "CC-RULE-013"
+        for exception in result.exceptions
+    )
+    assert all(
+        warning.rule_id != "CC-RULE-013"
+        for warning in result.unable_to_evaluate
+    )
+
+
+@pytest.mark.parametrize(
+    ("field_name", "field_value", "expected_field"),
+    (
+        ("end_time1", "", "EndTime1"),
+        ("end_time1", "malformed", "EndTime1"),
+        ("start_time4", "", "StartTime4"),
+        ("start_time4", "malformed", "StartTime4"),
+    ),
+)
+def test_rule_013_missing_or_malformed_step_time_warns(
+    field_name,
+    field_value,
+    expected_field,
+):
+    result = _audit_overlap(**{field_name: field_value})
+    warnings = tuple(
+        warning
+        for warning in result.unable_to_evaluate
+        if warning.rule_id == "CC-RULE-013"
+    )
+
+    assert len(warnings) == 1
+    assert warnings[0].invalid_fields == (expected_field,)
+    assert all(
+        exception.rule_id != "CC-RULE-013"
+        for exception in result.exceptions
+    )
+
+
+@pytest.mark.parametrize(
+    ("field_name", "field_value", "expected_field"),
+    (
+        ("start_time", "", "StartTime"),
+        ("start_time", "malformed", "StartTime"),
+        ("end_time", "", "EndTime"),
+        ("end_time", "malformed", "EndTime"),
+    ),
+)
+def test_rule_013_ambiguous_midnight_status_warns(
+    field_name,
+    field_value,
+    expected_field,
+):
+    result = _audit_overlap(
+        end_time1="23:59",
+        start_time4="00:01",
+        **{field_name: field_value},
+    )
+    warnings = tuple(
+        warning
+        for warning in result.unable_to_evaluate
+        if warning.rule_id == "CC-RULE-013"
+    )
+
+    assert len(warnings) == 1
+    assert warnings[0].invalid_fields == (expected_field,)
+    assert "determine whether the event crossed midnight" in (
+        warnings[0].message
+    )
+
+
+def test_rule_006_treats_overlap_as_no_excessive_gap_while_rule_013_fails():
+    result = _audit_overlap(
+        start_time="08:00",
+        end_time="08:30",
+        end_time1="08:20",
+        start_time4="08:15",
+    )
+
+    assert tuple(
+        exception.rule_id for exception in result.exceptions
+    ) == ("CC-RULE-013",)
+
+
+def test_rule_013_orders_by_csv_row_then_rule_id():
+    common_values = {
+        "type1_used": "1",
+        "type1_concentration": "50",
+        "freezing_point1": "-17.3",
+        "ambient_temp": "1",
+        "process_time1": "1",
+        "type4_used": "1",
+        "type4_brix": "35",
+        "type4_concentration": "100",
+        "process_time4": "1",
+        "end_time1": "08:20",
+        "start_time4": "08:15",
+    }
+    result = run_audit(
+        _import_result(
+            _source_row(
+                source_row_number=3,
+                **common_values,
+            ),
+            _source_row(
+                source_row_number=2,
+                tail_number="N121UP",
+                **common_values,
+            ),
+        ),
+        DEFAULT_SETTINGS,
+    )
+
+    assert tuple(
+        (exception.source_row_number, exception.rule_id)
+        for exception in result.exceptions
+    ) == (
+        (2, "CC-RULE-012"),
+        (2, "CC-RULE-013"),
+        (3, "CC-RULE-013"),
     )
 
 
@@ -2844,10 +3126,9 @@ def test_rule_010_same_day_overlap_uses_zero_gap_and_continues():
     assert exception.details[5].value.startswith("0 minutes")
     assert exception.details[6].label == "Overlap handling"
     assert "used a 0-minute gap" in exception.details[6].value
-    assert all(
-        finding.rule_id != "CC-RULE-013"
-        for finding in result.exceptions
-    )
+    assert tuple(
+        finding.rule_id for finding in result.exceptions
+    ) == ("CC-RULE-010", "CC-RULE-013")
 
 
 @pytest.mark.parametrize(

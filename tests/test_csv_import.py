@@ -507,7 +507,7 @@ def test_rule_006_default_five_minute_gap_passes_on_results_screen(client):
     assert b"CC-RULE-006" not in response.data
     assert b"No exceptions found" in response.data
     assert b"Rules executed</dt>" in response.data
-    assert b"<dd>12</dd>" in response.data
+    assert b"<dd>13</dd>" in response.data
 
 
 def test_rule_006_default_six_minute_gap_renders_required_details(client):
@@ -561,7 +561,7 @@ def test_rule_006_overnight_results_screen(client, type4_start, should_fail):
     assert (b"CC-RULE-006" in response.data) is should_fail
 
 
-def test_rule_006_same_day_overlap_does_not_render_exception(client):
+def test_rule_006_same_day_overlap_defers_exception_to_rule_013(client):
     response = _upload(
         client,
         _synthetic_csv(
@@ -580,7 +580,8 @@ def test_rule_006_same_day_overlap_does_not_render_exception(client):
 
     assert response.status_code == 200
     assert b"CC-RULE-006" not in response.data
-    assert b"No exceptions found" in response.data
+    assert response.data.count(b"CC-RULE-013") == 1
+    assert b"Pass overlap." in response.data
 
 
 def test_personal_allowed_gap_affects_next_upload_and_reset(app, client):
@@ -1241,7 +1242,10 @@ def test_rule_010_personal_include_gap_adds_same_day_and_overnight_gaps(
     assert b">31 minutes</dd>" in response.data
 
 
-def test_rule_010_overlap_uses_zero_gap_without_running_rule_013(app, client):
+def test_rule_010_overlap_uses_zero_gap_while_rule_013_reports_overlap(
+    app,
+    client,
+):
     with app.app_context():
         user = User(
             username="OverlapEventUser",
@@ -1295,7 +1299,9 @@ def test_rule_010_overlap_uses_zero_gap_without_running_rule_013(app, client):
     assert b"Included gap" in response.data
     assert b"0 minutes (EndTime1 08:16 to StartTime4 08:10)" in response.data
     assert b"CC-RULE-010 used a 0-minute gap" in response.data
-    assert b"CC-RULE-013" not in response.data
+    assert response.data.count(b"CC-RULE-013") == 1
+    assert b"Pass overlap." in response.data
+    assert b">6 minutes</dd>" in response.data
 
 
 def test_personal_event_time_settings_affect_next_upload_and_reset(app, client):
@@ -1563,6 +1569,120 @@ def test_rule_012_invalid_aircraft_type_renders_warning(client):
     assert b"No exceptions found" in response.data
 
 
+@pytest.mark.parametrize(
+    "overrides",
+    (
+        {
+            "Type1Used": "1",
+            "EndTime1": "08:10",
+            "Type4Used": "1",
+            "Type4ABrix": "35",
+            "StartTime4": "08:10",
+        },
+        {
+            "StartTime": "23:45",
+            "EndTime": "00:10",
+            "DateCreated": "2026-01-01 23:45",
+            "Type1Used": "1",
+            "EndTime1": "23:59",
+            "Type4Used": "1",
+            "Type4ABrix": "35",
+            "StartTime4": "00:01",
+        },
+    ),
+)
+def test_rule_013_equality_and_overnight_paths_pass_on_results_screen(
+    client,
+    overrides,
+):
+    response = _upload(
+        client,
+        _synthetic_csv(overrides={0: overrides}),
+    )
+
+    assert response.status_code == 200
+    assert b"CC-RULE-013" not in response.data
+    assert b"Pass overlap." not in response.data
+
+
+def test_rule_013_same_day_overlap_renders_required_results_details(client):
+    response = _upload(
+        client,
+        _synthetic_csv(
+            overrides={
+                0: {
+                    "StartTime": "20:00",
+                    "EndTime": "20:30",
+                    "DateCreated": "2026-01-01 20:00",
+                    "Type1Used": "1",
+                    "EndTime1": "20:20",
+                    "Type4Used": "1",
+                    "Type4ABrix": "35",
+                    "StartTime4": "20:15",
+                }
+            }
+        ),
+    )
+
+    assert response.status_code == 200
+    assert response.data.count(b"CC-RULE-013") == 1
+    assert b"Pass overlap." in response.data
+    assert b"Overall StartTime" in response.data
+    assert b">20:00</dd>" in response.data
+    assert b"Overall EndTime" in response.data
+    assert b">20:30</dd>" in response.data
+    assert b"Type I EndTime1" in response.data
+    assert b">20:20</dd>" in response.data
+    assert b"Type IV StartTime4" in response.data
+    assert b">20:15</dd>" in response.data
+    assert b"Calculated overlap" in response.data
+    assert b">5 minutes</dd>" in response.data
+    assert b"the overall event did not cross midnight" in response.data
+
+
+@pytest.mark.parametrize(
+    ("overrides", "expected_field"),
+    (
+        (
+            {
+                "Type1Used": "1",
+                "EndTime1": "",
+                "Type4Used": "1",
+                "Type4ABrix": "35",
+                "StartTime4": "08:15",
+            },
+            b"EndTime1",
+        ),
+        (
+            {
+                "StartTime": "malformed",
+                "Type1Used": "1",
+                "EndTime1": "23:59",
+                "Type4Used": "1",
+                "Type4ABrix": "35",
+                "StartTime4": "00:01",
+            },
+            b"StartTime",
+        ),
+    ),
+)
+def test_rule_013_invalid_required_time_renders_warning(
+    client,
+    overrides,
+    expected_field,
+):
+    response = _upload(
+        client,
+        _synthetic_csv(overrides={0: overrides}),
+    )
+
+    assert response.status_code == 200
+    assert b"Some rule evaluations could not run" in response.data
+    assert response.data.count(b"CC-RULE-013") == 1
+    assert expected_field in response.data
+    assert b"Pass overlap." not in response.data
+
+
 def test_invalid_timestamp_warning_is_separate_from_exceptions(client):
     response = _upload(
         client,
@@ -1675,9 +1795,23 @@ def test_successful_import_performs_no_database_operations(app, client):
         engine = db.engine
         event.listen(engine, "before_cursor_execute", record_statement)
         try:
-            response = _upload(client, _synthetic_csv())
+            response = _upload(
+                client,
+                _synthetic_csv(
+                    overrides={
+                        0: {
+                            "Type1Used": "1",
+                            "EndTime1": "08:20",
+                            "Type4Used": "1",
+                            "Type4ABrix": "35",
+                            "StartTime4": "08:15",
+                        }
+                    }
+                ),
+            )
         finally:
             event.remove(engine, "before_cursor_execute", record_statement)
 
     assert response.status_code == 200
+    assert b"CC-RULE-013" in response.data
     assert executed_statements == []
