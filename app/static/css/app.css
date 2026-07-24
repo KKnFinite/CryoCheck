@@ -492,6 +492,12 @@ h1 {
   filter: saturate(0.7);
 }
 
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+  filter: saturate(0.7);
+}
+
 .button--with-tag {
   flex-wrap: wrap;
 }
@@ -936,6 +942,54 @@ h1 {
   font-size: 0.82rem;
 }
 
+.exception-export__toolbar {
+  display: flex;
+  gap: 1.5rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid rgb(9 34 62 / 9%);
+  background: rgb(233 249 252 / 54%);
+}
+
+.exception-export__selection-controls,
+.exception-export__actions {
+  display: flex;
+  gap: 0.65rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.exception-export__text-control {
+  padding: 0.3rem 0.15rem;
+  border: 0;
+  border-radius: 0.35rem;
+  color: var(--color-blue-600);
+  background: transparent;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.exception-export__text-control:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.exception-export__status {
+  margin-left: 0.4rem;
+  color: var(--color-muted);
+  font-size: 0.78rem;
+}
+
+.exception-export__actions .button {
+  min-width: 10.5rem;
+  min-height: 2.6rem;
+  margin-top: 0;
+  padding-block: 0.65rem;
+}
+
 .exception-list {
   display: grid;
   gap: 1.25rem;
@@ -982,6 +1036,28 @@ h1 {
   margin: 0;
   color: var(--color-muted);
   font-size: 0.82rem;
+}
+
+.exception-card__selection {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 0.45rem;
+  align-items: center;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid rgb(25 118 168 / 25%);
+  border-radius: 0.65rem;
+  color: var(--color-navy-800);
+  background: rgb(255 255 255 / 82%);
+  font-size: 0.76rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.exception-card__selection input {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--color-blue-600);
 }
 
 .exception-card__row {
@@ -1828,6 +1904,7 @@ h1 {
 
   .results-heading,
   .exceptions-heading,
+  .exception-export__toolbar,
   .exception-card__header {
     display: grid;
     gap: 1rem;
@@ -1942,6 +2019,15 @@ h1 {
 
   .results-actions,
   .results-heading .button {
+    width: 100%;
+  }
+
+  .exception-export__actions {
+    display: grid;
+    width: 100%;
+  }
+
+  .exception-export__actions .button {
     width: 100%;
   }
 

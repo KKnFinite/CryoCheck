@@ -48,6 +48,10 @@ class Config:
     TESTING = False
     MAX_UPLOAD_MB = _positive_integer_setting("MAX_UPLOAD_MB", 10)
     MAX_CONTENT_LENGTH = MAX_UPLOAD_MB * 1024 * 1024
+    EXPORT_TOKEN_MAX_AGE_SECONDS = _positive_integer_setting(
+        "EXPORT_TOKEN_MAX_AGE_SECONDS",
+        1800,
+    )
     SQLALCHEMY_DATABASE_URI = prepare_database_url(os.getenv("DATABASE_URL"))
     SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True}
     SQLALCHEMY_TRACK_MODIFICATIONS = False

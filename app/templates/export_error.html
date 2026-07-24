@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block title %}Export Unavailable | CryoCheck{% endblock %}
+
+{% block content %}
+  <section class="error-panel" aria-labelledby="error-title">
+    <p class="error-panel__code">Export unavailable</p>
+    <h1 id="error-title">The exception export could not be created</h1>
+    <p>{{ error }}</p>
+    <a class="button button--secondary" href="{{ url_for('main.index') }}">
+      Import CSV Again
+    </a>
+  </section>
+{% endblock %}

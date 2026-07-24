@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import secrets
 from urllib.parse import urlsplit
 
 from flask import (
@@ -12,6 +13,7 @@ from flask import (
     redirect,
     render_template,
     request,
+    send_file,
     session,
     url_for,
 )
@@ -31,6 +33,13 @@ from app.services.csv_import import (
     CSVImportError,
     PREVIEW_DISPLAY_COLUMNS,
     parse_csv_upload,
+)
+from app.services.excel_export import (
+    ExportRequestError,
+    build_exception_workbook,
+    load_export_snapshot,
+    prepare_export,
+    select_export_rows,
 )
 from app.services.rules import RULES
 from app.services.settings import (
@@ -77,13 +86,78 @@ def import_csv():
 
     active_settings = get_active_settings()
     audit_result = run_audit(result, active_settings)
+    if audit_result.exceptions:
+        export_context_id = secrets.token_urlsafe(32)
+        session["export_context_id"] = export_context_id
+        prepared_export = prepare_export(
+            audit_result,
+            secret_key=current_app.config["SECRET_KEY"],
+            context_id=export_context_id,
+        )
+    else:
+        session.pop("export_context_id", None)
+        prepared_export = None
     return render_template(
         "results.html",
         active_page="import",
         audit=audit_result,
         import_result=result,
         preview_columns=PREVIEW_DISPLAY_COLUMNS,
+        export_token=(
+            prepared_export.token if prepared_export is not None else None
+        ),
+        export_entries=(
+            tuple(
+                zip(
+                    prepared_export.identifiers,
+                    audit_result.exceptions,
+                )
+            )
+            if prepared_export is not None
+            else ()
+        ),
     )
+
+
+@main.post("/export")
+def export_exceptions():
+    """Validate one Results snapshot and stream an in-memory XLSX file."""
+    try:
+        snapshot = load_export_snapshot(
+            request.form.get("export_token", ""),
+            secret_key=current_app.config["SECRET_KEY"],
+            max_age_seconds=current_app.config[
+                "EXPORT_TOKEN_MAX_AGE_SECONDS"
+            ],
+            expected_context_id=session.get("export_context_id", ""),
+        )
+        selected_rows = select_export_rows(
+            snapshot,
+            scope=request.form.get("scope", ""),
+            selected_identifiers=request.form.getlist("exception_id"),
+        )
+    except ExportRequestError as error:
+        return (
+            render_template(
+                "export_error.html",
+                active_page="import",
+                error=error,
+            ),
+            400,
+        )
+
+    workbook, filename = build_exception_workbook(selected_rows)
+    response = send_file(
+        workbook,
+        as_attachment=True,
+        download_name=filename,
+        mimetype=(
+            "application/vnd.openxmlformats-officedocument."
+            "spreadsheetml.sheet"
+        ),
+    )
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @main.get("/rules")

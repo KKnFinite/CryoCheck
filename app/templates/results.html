@@ -103,79 +103,145 @@
       </div>
 
       {% if audit.exceptions %}
-        <ol class="exception-list">
-          {% for exception in audit.exceptions %}
-            <li>
-              <article class="exception-card" aria-labelledby="exception-{{ loop.index }}-title">
-                <header class="exception-card__header">
-                  <div>
-                    <p class="exception-card__rule">{{ exception.rule_id }}</p>
-                    <h3 id="exception-{{ loop.index }}-title">
-                      {{ exception.exception_message }}
-                    </h3>
-                    <p>{{ exception.rule_name }}</p>
-                  </div>
-                  <p class="exception-card__row">
-                    CSV row <strong>{{ exception.source_row_number }}</strong>
-                  </p>
-                </header>
+        <form
+          class="exception-export"
+          action="{{ url_for('main.export_exceptions') }}"
+          method="post"
+          data-export-form
+        >
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="export_token" value="{{ export_token }}">
 
-                <dl class="exception-record">
-                  <div>
-                    <dt>RecordID</dt>
-                    <dd>{{ exception.record_id or "Not reported" }}</dd>
-                  </div>
-                  <div>
-                    <dt>ApplicationNumber</dt>
-                    <dd>{{ exception.application_number or "Not reported" }}</dd>
-                  </div>
-                  <div>
-                    <dt>Gateway</dt>
-                    <dd>{{ exception.gateway_code or "Not reported" }}</dd>
-                  </div>
-                  <div>
-                    <dt>Aircraft / tail</dt>
-                    <dd>
-                      {{ exception.aircraft_type or "Not reported" }}
-                      /
-                      {{ exception.tail_number or "Not reported" }}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Application date/time</dt>
-                    <dd>{{ exception.application_date }} {{ exception.start_time }}</dd>
-                  </div>
-                  <div>
-                    <dt>Entry date/time</dt>
-                    <dd>{{ exception.date_created }}</dd>
-                  </div>
-                  <div class="exception-record__wide">
-                    <dt>Truck / operator / driver</dt>
-                    <dd>
-                      {{ exception.truck_number or "Not reported" }}
-                      /
-                      {{ exception.operator or "Not reported" }}
-                      /
-                      {{ exception.driver or "Not reported" }}
-                    </dd>
-                  </div>
-                </dl>
+          <div class="exception-export__toolbar">
+            <div class="exception-export__selection-controls">
+              <button
+                class="exception-export__text-control"
+                type="button"
+                data-select-all
+              >
+                Select All
+              </button>
+              <span aria-hidden="true">/</span>
+              <button
+                class="exception-export__text-control"
+                type="button"
+                data-clear-all
+              >
+                Clear All
+              </button>
+              <span
+                class="exception-export__status"
+                aria-live="polite"
+                data-selection-status
+              >
+                0 of {{ audit.exception_count }} selected
+              </span>
+            </div>
+            <div class="exception-export__actions">
+              <button
+                class="button button--secondary"
+                type="submit"
+                name="scope"
+                value="selected"
+                disabled
+                data-export-selected
+              >
+                Export Selected
+              </button>
+              <button
+                class="button button--primary"
+                type="submit"
+                name="scope"
+                value="all"
+              >
+                Export All
+              </button>
+            </div>
+          </div>
 
-                <section class="exception-details" aria-label="Calculated rule details">
-                  <h4>Calculated rule details</h4>
-                  <dl>
-                    {% for detail in exception.details %}
-                      <div>
-                        <dt>{{ detail.label }}</dt>
-                        <dd>{{ detail.value }}</dd>
-                      </div>
-                    {% endfor %}
+          <ol class="exception-list">
+            {% for identifier, exception in export_entries %}
+              <li>
+                <article class="exception-card" aria-labelledby="exception-{{ loop.index }}-title">
+                  <header class="exception-card__header">
+                    <div>
+                      <p class="exception-card__rule">{{ exception.rule_id }}</p>
+                      <h3 id="exception-{{ loop.index }}-title">
+                        {{ exception.exception_message }}
+                      </h3>
+                      <p>{{ exception.rule_name }}</p>
+                    </div>
+                    <label class="exception-card__selection">
+                      <input
+                        type="checkbox"
+                        name="exception_id"
+                        value="{{ identifier }}"
+                        data-exception-checkbox
+                      >
+                      <span>Select</span>
+                    </label>
+                    <p class="exception-card__row">
+                      CSV row <strong>{{ exception.source_row_number }}</strong>
+                    </p>
+                  </header>
+
+                  <dl class="exception-record">
+                    <div>
+                      <dt>RecordID</dt>
+                      <dd>{{ exception.record_id or "Not reported" }}</dd>
+                    </div>
+                    <div>
+                      <dt>ApplicationNumber</dt>
+                      <dd>{{ exception.application_number or "Not reported" }}</dd>
+                    </div>
+                    <div>
+                      <dt>Gateway</dt>
+                      <dd>{{ exception.gateway_code or "Not reported" }}</dd>
+                    </div>
+                    <div>
+                      <dt>Aircraft / tail</dt>
+                      <dd>
+                        {{ exception.aircraft_type or "Not reported" }}
+                        /
+                        {{ exception.tail_number or "Not reported" }}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Application date/time</dt>
+                      <dd>{{ exception.application_date }} {{ exception.start_time }}</dd>
+                    </div>
+                    <div>
+                      <dt>Entry date/time</dt>
+                      <dd>{{ exception.date_created }}</dd>
+                    </div>
+                    <div class="exception-record__wide">
+                      <dt>Truck / operator / driver</dt>
+                      <dd>
+                        {{ exception.truck_number or "Not reported" }}
+                        /
+                        {{ exception.operator or "Not reported" }}
+                        /
+                        {{ exception.driver or "Not reported" }}
+                      </dd>
+                    </div>
                   </dl>
-                </section>
-              </article>
-            </li>
-          {% endfor %}
-        </ol>
+
+                  <section class="exception-details" aria-label="Calculated rule details">
+                    <h4>Calculated rule details</h4>
+                    <dl>
+                      {% for detail in exception.details %}
+                        <div>
+                          <dt>{{ detail.label }}</dt>
+                          <dd>{{ detail.value }}</dd>
+                        </div>
+                      {% endfor %}
+                    </dl>
+                  </section>
+                </article>
+              </li>
+            {% endfor %}
+          </ol>
+        </form>
       {% else %}
         <div class="audit-empty-state">
           <span aria-hidden="true">&#10003;</span>
@@ -232,4 +298,8 @@
       </a>
     </div>
   </section>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', filename='js/exception-export.js') }}" defer></script>
 {% endblock %}

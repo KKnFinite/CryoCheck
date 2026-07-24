@@ -1,6 +1,6 @@
 # CryoCheck
 
-CryoCheck is a standalone deice log audit application. This repository contains the production-ready Flask application, Neon PostgreSQL integration, an in-memory CSV audit workflow, optional local accounts with private Personal Settings, and the approved audit-rule registry. All fourteen approved rules now execute and produce reviewable Results; Excel export will be added in a later development phase.
+CryoCheck is a standalone deice log audit application. This repository contains the production-ready Flask application, Neon PostgreSQL integration, an in-memory CSV audit workflow, optional local accounts with private Personal Settings, the approved audit-rule registry, and in-memory Excel exception export. All fourteen approved rules execute and produce reviewable Results.
 
 ## Purpose
 
@@ -57,7 +57,7 @@ The command runs `SELECT 1` and prints a success message. Connection failures re
 
 The landing page accepts one `.csv` file through file browsing or drag and drop. CryoCheck validates its structure, keeps the complete source dataset in memory with original column order, row order, source strings, and physical CSV row numbers, then immediately audits every row. Results show audit metrics, ordered exceptions, any non-exception unable-to-evaluate warnings, and the first 10 source rows.
 
-Uploaded content, audit results, and exceptions are request-scoped. They are not written to disk, stored in the browser session, persisted to Neon, retained as audit history, or logged. Source values are never normalized or corrected.
+Uploaded content, audit results, and exceptions are not written to disk, stored in the browser session, persisted to Neon, retained as audit history, or logged. Source values are never normalized or corrected. A Results page with exceptions carries a signed, time-limited export snapshot back to CryoCheck only when the user explicitly requests an export; the server retains no export state between requests.
 
 The current pipeline executes:
 
@@ -92,11 +92,19 @@ Type IV fluid profiles are also version-controlled, read-only reference data. Th
 
 `CC-RULE-014` applies to AircraftType 1 and 2 rows with positive Type IV usage and blank or nonpositive Type I usage. Notes must deterministically contain a Type I reference (`Type I`, `Type 1`, or `T1`), approved application wording, and a whole-number identifier associated with `truck`. The documented truck must differ numerically from the current whole-number `TruckNumber`; leading zeros are ignored, while any different identifier passes when several trucks are documented. Matching normalizes case, whitespace, and punctuation only and never uses AI, fuzzy interpretation, web lookups, or external validation.
 
+## Excel exception export
+
+Results with exceptions provide a checkbox for every finding, Select All and Clear All controls, and Export Selected and Export All actions. Exports include exceptions only; unable-to-evaluate warnings are never included.
+
+CryoCheck validates every selected identifier against the signed snapshot for that Results page, preserves CSV-row then Rule-ID ordering, and rejects expired, malformed, duplicate, or unrelated selections. Snapshots expire after `EXPORT_TOKEN_MAX_AGE_SECONDS`, which defaults to 1800 seconds.
+
+Each download is generated entirely in memory as `CryoCheck_Exceptions_YYYYMMDD_HHMMSS.xlsx`. Its `Exceptions` sheet contains the source-identification fields shown in Results, active settings profile, rule metadata, individual rule-detail columns, and combined details text. The header is frozen, filtered, styled, and wrapped with readable column widths. Text beginning with `=`, `+`, `-`, or `@` is escaped before being written to prevent Excel formula injection. Workbooks and export state are never saved to disk or Neon.
+
 The upload limit is configured with `MAX_UPLOAD_MB` and defaults to 10 MB. Oversized requests receive a branded HTTP 413 response.
 
 ## Optional accounts
 
-Accounts are optional. Anonymous users can continue to import and audit CSV files, review Results, view the Rules catalog, and view the built-in Default settings.
+Accounts are optional. Anonymous users can continue to import and audit CSV files, review and export exception Results, view the Rules catalog, and view the built-in Default settings.
 
 - Create an account at `/register`.
 - Sign in at `/login`.
