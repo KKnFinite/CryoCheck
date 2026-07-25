@@ -119,6 +119,13 @@ def test_mobile_import_auto_runs_once_and_retains_no_javascript_fallback():
     assert "data-replace-file" in template
     assert "data-submit-button" in template
     assert "Run Validation" in template
+    assert (
+        '<span class="upload-dropzone__title mobile-upload-copy">'
+        "Upload deice log</span>"
+    ) in template
+    assert "Select from Files or Downloads" in template
+    assert "Maximum allowed file size: {{ max_upload_mb }} MB" in template
+    assert "Choose a CSV" not in template
 
 
 def test_results_have_mobile_cards_and_sticky_selection_controls(client):

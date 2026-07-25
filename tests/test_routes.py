@@ -150,6 +150,8 @@ def test_import_drop_area_uses_configured_limit_and_updated_copy(app, client):
     assert app.config["MAX_CONTENT_LENGTH"] == 15 * 1024 * 1024
     assert b"Drop your deice log here" in response.data
     assert b"or click to browse" in response.data
+    assert b"Upload deice log" in response.data
+    assert b"Select from Files or Downloads" in response.data
     assert b"Maximum allowed file size: 15 MB" in response.data
     assert b"Drop your CSV here" not in response.data
     assert b"One .csv file" not in response.data
