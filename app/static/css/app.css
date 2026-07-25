@@ -128,17 +128,10 @@ select:focus-visible {
 }
 
 .brand__mark {
-  display: grid;
+  display: block;
   width: 2.5rem;
   height: 2.5rem;
-  place-items: center;
-  border: 1px solid rgb(255 255 255 / 75%);
-  border-radius: 0.8rem;
-  color: var(--color-white);
-  background: linear-gradient(145deg, var(--color-blue-500), var(--color-navy-800));
-  box-shadow: 0 8px 20px rgb(16 84 119 / 25%);
-  font-size: 1.35rem;
-  line-height: 1;
+  object-fit: contain;
 }
 
 .brand__name {
@@ -332,10 +325,10 @@ select:focus-visible {
 }
 
 .landing-brand__mark {
+  display: block;
   width: clamp(4.75rem, 9vw, 6.5rem);
   height: auto;
-  border-radius: clamp(1rem, 2vw, 1.4rem);
-  filter: drop-shadow(0 16px 24px rgb(6 40 70 / 20%));
+  object-fit: contain;
 }
 
 .landing-brand__name {
@@ -2258,10 +2251,10 @@ h1 {
   }
 
   .mobile-brand img {
+    display: block;
     width: 2.1rem;
     height: 2.1rem;
-    border-radius: 0.55rem;
-    box-shadow: 0 4px 12px rgb(0 0 0 / 20%);
+    object-fit: contain;
   }
 
   .mobile-menu-button {

@@ -216,8 +216,12 @@ def test_manifest_has_standalone_icons_and_csv_share_target(client):
         },
     }
     icon_sizes = {icon["sizes"] for icon in manifest["icons"]}
-    assert {"180x180", "192x192", "512x512"} <= icon_sizes
-    assert any(icon.get("purpose") == "maskable" for icon in manifest["icons"])
+    assert {"192x192", "512x512", "1024x1024"} <= icon_sizes
+    assert any(
+        icon.get("purpose") == "maskable"
+        and icon["sizes"] == "512x512"
+        for icon in manifest["icons"]
+    )
 
 
 def test_pwa_icons_are_served_at_declared_dimensions(client):
@@ -226,6 +230,7 @@ def test_pwa_icons_are_served_at_declared_dimensions(client):
         "/static/img/icon-192.png": (192, 192),
         "/static/img/icon-512.png": (512, 512),
         "/static/img/icon-maskable-512.png": (512, 512),
+        "/static/img/logo_blue.png": (1024, 1024),
     }
 
     for path, dimensions in expected.items():

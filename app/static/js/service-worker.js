@@ -1,13 +1,18 @@
-const CACHE_NAME = "cryocheck-static-shell-v1";
+const CACHE_NAME = "cryocheck-static-shell-v2";
 const APP_SHELL_ASSETS = [
   "/static/css/app.css",
   "/static/fonts/neofont/NeoFont.ttf",
   "/static/fonts/neofont/NeoFont.woff2",
-  "/static/img/favicon.svg",
+  "/static/img/favicon.ico",
+  "/static/img/favicon-16x16.png",
+  "/static/img/favicon-32x32.png",
   "/static/img/icon-180.png",
   "/static/img/icon-192.png",
   "/static/img/icon-512.png",
   "/static/img/icon-maskable-512.png",
+  "/static/img/logo_blue.png",
+  "/static/img/logo_silver.png",
+  "/static/img/mstile-150x150.png",
   "/static/js/exception-export.js",
   "/static/js/mobile-shell.js",
   "/static/js/pwa-install.js",

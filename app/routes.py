@@ -445,8 +445,8 @@ def health():
 
 @main.get("/favicon.ico")
 def favicon():
-    """Serve the CryoCheck SVG favicon at the conventional browser path."""
-    return current_app.send_static_file("img/favicon.svg")
+    """Serve the CryoCheck multi-size favicon at the conventional path."""
+    return current_app.send_static_file("img/favicon.ico")
 
 
 @main.get("/service-worker.js")

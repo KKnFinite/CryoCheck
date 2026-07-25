@@ -8,11 +8,28 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="CryoCheck">
+    <meta name="msapplication-TileColor" content="#071b33">
+    <meta
+      name="msapplication-TileImage"
+      content="{{ url_for('static', filename='img/mstile-150x150.png') }}"
+    >
     <title>{% block title %}CryoCheck{% endblock %}</title>
     <link
       rel="icon"
-      type="image/svg+xml"
+      type="image/x-icon"
       href="{{ url_for('main.favicon') }}"
+    >
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="32x32"
+      href="{{ url_for('static', filename='img/favicon-32x32.png') }}"
+    >
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="16x16"
+      href="{{ url_for('static', filename='img/favicon-16x16.png') }}"
     >
     <link
       rel="apple-touch-icon"
@@ -25,7 +42,7 @@
     >
     <link
       rel="stylesheet"
-      href="{{ url_for('static', filename='css/app.css', v='mobile-pwa-1') }}"
+      href="{{ url_for('static', filename='css/app.css', v='final-branding-1') }}"
     >
   </head>
   <body>
@@ -34,7 +51,13 @@
     <div class="site-shell">
       <header class="site-header">
         <a class="brand" href="{{ url_for('main.index') }}" aria-label="CryoCheck home">
-          <span class="brand__mark" aria-hidden="true">&#10052;</span>
+          <img
+            class="brand__mark"
+            src="{{ url_for('static', filename='img/logo_blue.png') }}"
+            alt=""
+            width="40"
+            height="40"
+          >
           <span class="brand__name">CryoCheck</span>
         </a>
         <div class="header-actions">
@@ -104,7 +127,7 @@
       <header class="mobile-header" data-mobile-header>
         <a class="mobile-brand" href="{{ url_for('main.index') }}" aria-label="CryoCheck home">
           <img
-            src="{{ url_for('static', filename='img/favicon.svg') }}"
+            src="{{ url_for('static', filename='img/logo_silver.png') }}"
             alt=""
             width="34"
             height="34"

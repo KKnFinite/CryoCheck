@@ -13,6 +13,7 @@ def test_landing_page_returns_200(client):
     assert response.status_code == 200
     assert b'class="landing-brand__lockup"' in response.data
     assert b'class="landing-brand__mark"' in response.data
+    assert b'src="/static/img/logo_blue.png"' in response.data
     assert b'class="landing-brand__name">CryoCheck</h1>' in response.data
     assert b"Run Validation" in response.data
     assert b"Settings:" in response.data

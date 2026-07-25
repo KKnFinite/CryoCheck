@@ -63,9 +63,8 @@ def test_favicon_is_linked_and_served_from_conventional_path(client):
     assert landing.status_code == 200
     assert b'href="/favicon.ico"' in landing.data
     assert favicon.status_code == 200
-    assert favicon.mimetype == "image/svg+xml"
-    assert favicon.data.startswith(b"<svg")
-    assert b"CryoCheck snowflake" in favicon.data
+    assert favicon.mimetype == "image/x-icon"
+    assert favicon.data.startswith(b"\x00\x00\x01\x00\x02\x00")
 
 
 def test_generic_400_and_403_are_branded_and_hide_descriptions(app, client):
