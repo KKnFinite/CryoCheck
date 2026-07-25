@@ -6,6 +6,21 @@ from pathlib import Path
 from sqlalchemy import event
 
 from app.extensions import db
+from app.models import User
+from app.services.settings import create_default_user_settings
+
+
+_VALID_PASSWORD = "SyntheticPassphrase-42"
+
+
+def _desktop_navigation(html: str) -> str:
+    match = re.search(
+        r'<nav class="site-nav".*?</nav>',
+        html,
+        flags=re.DOTALL,
+    )
+    assert match is not None
+    return match.group(0)
 
 
 def test_landing_page_returns_200(client):
@@ -31,11 +46,7 @@ def test_landing_page_returns_200(client):
 def test_landing_navigation_has_primary_destinations(client):
     response = client.get("/")
     html = response.get_data(as_text=True)
-    desktop_nav_match = re.search(
-        r'<nav class="site-nav".*?</nav>',
-        html,
-        flags=re.DOTALL,
-    )
+    desktop_nav = _desktop_navigation(html)
 
     assert response.status_code == 200
     assert re.search(rb'href="/"[^>]*>\s*Import\s*</a>', response.data)
@@ -47,11 +58,43 @@ def test_landing_navigation_has_primary_destinations(client):
     assert response.data.count(b'aria-label="Primary navigation"') == 1
     assert "Reports" not in html
     assert 'class="brand"' not in html
-    assert desktop_nav_match is not None
     assert re.findall(
-        r">\s*(Import|Rules|Reports|Settings)\s*<",
-        desktop_nav_match.group(0),
-    ) == ["Import", "Rules", "Settings"]
+        r">\s*(Import|Rules|Reports|Settings|Sign In|Create Account)\s*<",
+        desktop_nav,
+    ) == ["Import", "Rules", "Settings", "Sign In", "Create Account"]
+    assert 'class="account-nav"' not in html
+
+
+def test_signed_in_controls_share_the_centered_desktop_navigation(app, client):
+    with app.app_context():
+        user = User(
+            username="UnifiedNavUser",
+            username_normalized="unifiednavuser",
+        )
+        user.set_password(_VALID_PASSWORD)
+        create_default_user_settings(user)
+        db.session.add(user)
+        db.session.commit()
+
+    client.post(
+        "/login",
+        data={
+            "username": "UnifiedNavUser",
+            "password": _VALID_PASSWORD,
+        },
+    )
+    html = client.get("/").get_data(as_text=True)
+    desktop_nav = _desktop_navigation(html)
+
+    assert re.findall(
+        r">\s*(Import|Rules|Reports|Settings|UnifiedNavUser|Logout)\s*<",
+        desktop_nav,
+    ) == ["Import", "Rules", "Settings", "UnifiedNavUser", "Logout"]
+    assert 'action="/logout"' in desktop_nav
+    assert 'name="csrf_token"' in desktop_nav
+    assert "Sign In" not in desktop_nav
+    assert "Create Account" not in desktop_nav
+    assert 'class="account-nav"' not in html
 
 
 def test_desktop_header_hero_and_footer_css_use_desktop_only_polish():
@@ -65,10 +108,6 @@ def test_desktop_header_hero_and_footer_css_use_desktop_only_polish():
         r"\.site-nav\s*\{(?P<rules>[^}]+)\}",
         stylesheet,
     )
-    account_nav = re.search(
-        r"\.account-nav\s*\{(?P<rules>[^}]+)\}",
-        stylesheet,
-    )
     desktop_footer = re.search(
         r"@media \(min-width: 48rem\).*?"
         r"\.site-footer\s*\{(?P<rules>[^}]+)\}",
@@ -77,15 +116,11 @@ def test_desktop_header_hero_and_footer_css_use_desktop_only_polish():
     )
 
     assert header_actions is not None
-    assert "grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr)" in (
-        header_actions.group("rules")
-    )
+    assert "display: flex" in header_actions.group("rules")
+    assert "justify-content: center" in header_actions.group("rules")
     assert site_nav is not None
-    assert "grid-column: 2" in site_nav.group("rules")
-    assert "justify-self: center" in site_nav.group("rules")
-    assert account_nav is not None
-    assert "grid-column: 3" in account_nav.group("rules")
-    assert "justify-self: end" in account_nav.group("rules")
+    assert "grid-column" not in site_nav.group("rules")
+    assert ".account-nav" not in stylesheet
     assert desktop_footer is not None
     assert "display: none" in desktop_footer.group("rules")
 
@@ -106,6 +141,18 @@ def test_desktop_header_hero_and_footer_css_use_desktop_only_polish():
     assert "font-size: clamp(2.6rem, 6.5vw, 4.75rem)" in (
         hero_title.group("rules")
     )
+
+
+def test_import_drop_area_uses_configured_limit_and_updated_copy(app, client):
+    response = client.get("/")
+
+    assert app.config["MAX_UPLOAD_MB"] == 15
+    assert app.config["MAX_CONTENT_LENGTH"] == 15 * 1024 * 1024
+    assert b"Drop your deice log here" in response.data
+    assert b"or click to browse" in response.data
+    assert b"Maximum allowed file size: 15 MB" in response.data
+    assert b"Drop your CSV here" not in response.data
+    assert b"One .csv file" not in response.data
 
 
 def test_neofont_is_loaded_from_local_cryocheck_assets(client):

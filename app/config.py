@@ -46,7 +46,7 @@ class Config:
     SECRET_KEY = os.getenv("SECRET_KEY")
     DEBUG = False
     TESTING = False
-    MAX_UPLOAD_MB = _positive_integer_setting("MAX_UPLOAD_MB", 10)
+    MAX_UPLOAD_MB = _positive_integer_setting("MAX_UPLOAD_MB", 15)
     MAX_CONTENT_LENGTH = MAX_UPLOAD_MB * 1024 * 1024
     EXPORT_TOKEN_MAX_AGE_SECONDS = _positive_integer_setting(
         "EXPORT_TOKEN_MAX_AGE_SECONDS",

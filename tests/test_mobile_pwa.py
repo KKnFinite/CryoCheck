@@ -100,6 +100,9 @@ def test_mobile_header_navigation_branding_and_footer_markup_are_preserved(
     assert ">Rules</a>" in mobile_menu
     assert ">Settings</a>" in mobile_menu
     assert "Reports" not in mobile_menu
+    assert 'class="mobile-menu__account"' in mobile_menu
+    assert ">Sign In</a>" in mobile_menu
+    assert ">Create Account</a>" in mobile_menu
     assert '<footer class="site-footer">' in landing
     assert "Standalone Deice Log Audit System" in landing
 

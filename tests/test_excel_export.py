@@ -198,6 +198,23 @@ def test_results_show_one_checkbox_per_exception_and_export_controls(client):
     assert b"Export Exceptions" not in response.data
     assert b'href="#audit-results"' in response.data
     assert b'id="audit-results"' in response.data
+    desktop_nav = re.search(
+        rb'<nav class="site-nav".*?</nav>',
+        response.data,
+        flags=re.DOTALL,
+    )
+    assert desktop_nav is not None
+    assert re.findall(
+        rb">\s*(Import|Rules|Reports|Settings|Sign In|Create Account)\s*<",
+        desktop_nav.group(0),
+    ) == [
+        b"Import",
+        b"Rules",
+        b"Reports",
+        b"Settings",
+        b"Sign In",
+        b"Create Account",
+    ]
     assert re.search(
         rb'class="site-nav__link site-nav__link--active"'
         rb'[^>]+href="#audit-results"[^>]+aria-current="page"',

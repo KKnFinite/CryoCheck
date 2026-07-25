@@ -107,7 +107,6 @@ a {
 }
 
 .site-nav__link:focus-visible,
-.account-nav__action:focus-visible,
 .active-settings:focus-visible,
 .button:focus-visible,
 .table-scroll:focus-visible,
@@ -118,19 +117,17 @@ select:focus-visible {
 }
 
 .header-actions {
-  display: grid;
+  display: flex;
   width: 100%;
   min-width: 0;
   align-items: center;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  justify-content: center;
 }
 
 .site-nav {
   display: flex;
-  grid-column: 2;
   gap: 0.3rem;
   align-items: center;
-  justify-self: center;
   padding: 0.3rem;
   border: 1px solid rgb(25 118 168 / 12%);
   border-radius: 0.85rem;
@@ -172,63 +169,41 @@ select:focus-visible {
   background: linear-gradient(135deg, var(--color-blue-600), var(--color-navy-800));
 }
 
-.account-nav {
+.site-nav form {
   display: flex;
-  grid-column: 3;
-  gap: 0.5rem;
-  align-items: center;
-  justify-self: end;
-}
-
-.account-nav form {
   margin: 0;
 }
 
-.account-nav__action,
-.account-nav__name {
+.site-nav__identity {
   display: inline-flex;
+  max-width: 11rem;
   min-height: 2.6rem;
   align-items: center;
   justify-content: center;
   padding: 0.6rem 0.8rem;
   border-radius: 0.65rem;
+  color: var(--color-navy-900);
+  background: var(--color-glacier-100);
   font-size: 0.78rem;
   font-weight: 750;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.account-nav__action {
-  border: 1px solid rgb(25 118 168 / 20%);
-  color: var(--color-navy-800);
-  background: rgb(255 255 255 / 72%);
-  cursor: pointer;
-  font-family: inherit;
-  text-decoration: none;
-}
-
-.account-nav__action:hover,
-.account-nav__action--active {
-  border-color: rgb(25 118 168 / 40%);
-  background: var(--color-glacier-100);
-}
-
-.account-nav__action--primary {
+.site-nav__link--primary {
   color: var(--color-white);
   background: var(--color-navy-800);
 }
 
-.account-nav__action--primary:hover,
-.account-nav__action--primary.account-nav__action--active {
+.site-nav__link--primary:hover {
   color: var(--color-white);
   background: var(--color-navy-950);
 }
 
-.account-nav__name {
-  max-width: 11rem;
-  color: var(--color-navy-900);
-  background: var(--color-glacier-100);
-  overflow: hidden;
-  text-overflow: ellipsis;
+.site-nav__link--primary.site-nav__link--active {
+  color: var(--color-white);
+  background: linear-gradient(135deg, var(--color-blue-600), var(--color-navy-800));
 }
 
 .site-main {
@@ -1933,7 +1908,7 @@ h1 {
   }
 
   .header-actions {
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    justify-content: center;
   }
 
   .site-nav {
@@ -2055,8 +2030,7 @@ h1 {
     gap: 1rem;
   }
 
-  .header-actions,
-  .account-nav {
+  .header-actions {
     justify-content: center;
   }
 
@@ -2121,15 +2095,6 @@ h1 {
     flex: 1 1 calc(50% - 0.15rem);
     padding: 0.55rem 0.65rem;
     font-size: 0.78rem;
-  }
-
-  .account-nav {
-    width: 100%;
-    flex-wrap: wrap;
-  }
-
-  .account-nav__name {
-    max-width: 100%;
   }
 
   .rule-card__body {
@@ -3360,7 +3325,6 @@ h1 {
 
 @media (prefers-reduced-motion: no-preference) {
   .button,
-  .account-nav__action,
   .active-settings,
   .site-nav__link,
   .skip-link {

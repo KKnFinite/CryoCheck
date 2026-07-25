@@ -100,7 +100,7 @@ CryoCheck validates every selected identifier against the signed snapshot for th
 
 Each download is generated entirely in memory as `CryoCheck_Exceptions_YYYYMMDD_HHMMSS.xlsx`. Its `Exceptions` sheet contains the source-identification fields shown in Results, active settings profile, rule metadata, individual rule-detail columns, and combined details text. The header is frozen, filtered, styled, and wrapped with readable column widths. Text beginning with `=`, `+`, `-`, or `@` is escaped before being written to prevent Excel formula injection. Workbooks and export state are never saved to disk or Neon.
 
-The upload limit is configured with `MAX_UPLOAD_MB` and defaults to 10 MB. The same request-size protection covers signed export submissions. Oversized uploads and exports receive branded HTTP 413 responses without echoing submitted data.
+The upload limit is configured with `MAX_UPLOAD_MB` and defaults to 15 MB. The same request-size protection covers signed export submissions. Oversized uploads and exports receive branded HTTP 413 responses without echoing submitted data.
 
 ## Optional accounts
 
@@ -247,6 +247,6 @@ Configure these Render environment variables:
 - `DATABASE_URL`: the Neon production connection string, including its SSL parameters
 - `SECRET_KEY`: a secure production secret
 - `FLASK_CONFIG=production`
-- `MAX_UPLOAD_MB`: optional CSV upload limit in megabytes; defaults to `10`
+- `MAX_UPLOAD_MB`: optional CSV upload limit in megabytes; defaults to `15`
 
 The `/health` endpoint intentionally remains database-independent so Render can verify the web process during a temporary database outage. Use `flask db-check` separately when database connectivity must be confirmed. The build must fail rather than start application code against an unapplied schema migration.

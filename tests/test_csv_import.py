@@ -259,17 +259,35 @@ def test_multiple_files_reject_cleanly(client):
 
 
 def test_oversized_upload_returns_branded_413(app, client):
-    app.config["MAX_CONTENT_LENGTH"] = 512
-    app.config["MAX_UPLOAD_MB"] = 1
+    oversized_payload = b"x" * ((15 * 1024 * 1024) + 1)
 
-    response = _upload(client, b"x" * 2048, filename="oversized.csv")
+    response = _upload(client, oversized_payload, filename="oversized.csv")
 
     assert response.status_code == 413
     assert b"CryoCheck" in response.data
     assert b'class="error-panel"' in response.data
     assert b"CSV file is too large" in response.data
+    assert b"CryoCheck accepts CSV uploads up to 15 MB." in response.data
     assert b"Import Another CSV" in response.data
     assert b"oversized.csv" not in response.data
+
+
+def test_valid_csv_between_10_and_15_mib_passes_request_size_gate(client):
+    padding_columns = tuple(f"Padding{index:03d}" for index in range(90))
+    columns = (*EXPECTED_COLUMNS, *padding_columns)
+    padding = {column: "x" * 120_000 for column in padding_columns}
+    payload = _synthetic_csv(
+        columns=columns,
+        overrides={0: padding},
+    )
+
+    assert 10 * 1024 * 1024 < len(payload) < 15 * 1024 * 1024
+
+    response = _upload(client, payload, filename="large-valid-deice.csv")
+
+    assert response.status_code == 200
+    assert b"Audit Results" in response.data
+    assert b"large-valid-deice.csv" in response.data
 
 
 def test_preview_is_limited_to_first_10_rows(client):
