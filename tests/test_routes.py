@@ -1,6 +1,7 @@
 """Route-level tests for the CryoCheck application shell."""
 
 import re
+from pathlib import Path
 
 from sqlalchemy import event
 
@@ -29,6 +30,12 @@ def test_landing_page_returns_200(client):
 
 def test_landing_navigation_has_primary_destinations(client):
     response = client.get("/")
+    html = response.get_data(as_text=True)
+    desktop_nav_match = re.search(
+        r'<nav class="site-nav".*?</nav>',
+        html,
+        flags=re.DOTALL,
+    )
 
     assert response.status_code == 200
     assert re.search(rb'href="/"[^>]*>\s*Import\s*</a>', response.data)
@@ -38,6 +45,67 @@ def test_landing_navigation_has_primary_destinations(client):
         response.data,
     )
     assert response.data.count(b'aria-label="Primary navigation"') == 1
+    assert "Reports" not in html
+    assert 'class="brand"' not in html
+    assert desktop_nav_match is not None
+    assert re.findall(
+        r">\s*(Import|Rules|Reports|Settings)\s*<",
+        desktop_nav_match.group(0),
+    ) == ["Import", "Rules", "Settings"]
+
+
+def test_desktop_header_hero_and_footer_css_use_desktop_only_polish():
+    stylesheet = Path("app/static/css/app.css").read_text(encoding="utf-8")
+
+    header_actions = re.search(
+        r"\.header-actions\s*\{(?P<rules>[^}]+)\}",
+        stylesheet,
+    )
+    site_nav = re.search(
+        r"\.site-nav\s*\{(?P<rules>[^}]+)\}",
+        stylesheet,
+    )
+    account_nav = re.search(
+        r"\.account-nav\s*\{(?P<rules>[^}]+)\}",
+        stylesheet,
+    )
+    desktop_footer = re.search(
+        r"@media \(min-width: 48rem\).*?"
+        r"\.site-footer\s*\{(?P<rules>[^}]+)\}",
+        stylesheet,
+        flags=re.DOTALL,
+    )
+
+    assert header_actions is not None
+    assert "grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr)" in (
+        header_actions.group("rules")
+    )
+    assert site_nav is not None
+    assert "grid-column: 2" in site_nav.group("rules")
+    assert "justify-self: center" in site_nav.group("rules")
+    assert account_nav is not None
+    assert "grid-column: 3" in account_nav.group("rules")
+    assert "justify-self: end" in account_nav.group("rules")
+    assert desktop_footer is not None
+    assert "display: none" in desktop_footer.group("rules")
+
+    hero_logo = re.search(
+        r"\.landing-brand__mark\s*\{(?P<rules>[^}]+)\}",
+        stylesheet,
+    )
+    hero_title = re.search(
+        r"\.landing-brand__name\s*\{(?P<rules>[^}]+)\}",
+        stylesheet,
+    )
+    assert hero_logo is not None
+    assert "width: clamp(5.75rem, 10vw, 7.75rem)" in (
+        hero_logo.group("rules")
+    )
+    assert hero_title is not None
+    assert "color: var(--color-brand-navy)" in hero_title.group("rules")
+    assert "font-size: clamp(2.6rem, 6.5vw, 4.75rem)" in (
+        hero_title.group("rules")
+    )
 
 
 def test_neofont_is_loaded_from_local_cryocheck_assets(client):

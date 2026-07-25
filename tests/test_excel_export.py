@@ -194,10 +194,17 @@ def test_results_show_one_checkbox_per_exception_and_export_controls(client):
     assert b"Select All" in response.data
     assert b"Clear All" in response.data
     assert b"Export Selected" in response.data
-    assert b"Export Exceptions" in response.data
+    assert b"Export All" in response.data
+    assert b"Export Exceptions" not in response.data
+    assert b'href="#audit-results"' in response.data
+    assert b'id="audit-results"' in response.data
     assert re.search(
-        rb'<button[^>]+form="exception-export-form"[^>]+'
-        rb'value="all"[^>]+data-export-all',
+        rb'class="site-nav__link site-nav__link--active"'
+        rb'[^>]+href="#audit-results"[^>]+aria-current="page"',
+        response.data,
+    )
+    assert re.search(
+        rb'<button[^>]+name="scope"[^>]+value="all"[^>]+data-export-all',
         response.data,
     )
     assert re.search(
@@ -214,6 +221,8 @@ def test_export_navigation_is_hidden_when_audit_has_no_exceptions(client):
 
     assert response.status_code == 200
     assert b"No exceptions found" in response.data
+    assert b'href="#audit-results"' in response.data
+    assert re.search(rb">\s*Reports\s*</a>", response.data)
     assert b"Export Exceptions" not in response.data
     assert b"data-export-all" not in response.data
 

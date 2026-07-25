@@ -126,15 +126,13 @@ def test_approved_logo_sources_are_unchanged_rgba_pngs_with_transparency():
         assert transparent_pixels > 0
 
 
-def test_light_and_dark_headers_use_the_approved_logo_variants(client):
+def test_desktop_hero_and_mobile_header_use_approved_logo_variants(client):
     landing = client.get("/").get_data(as_text=True)
 
-    assert landing.count('src="/static/img/logo_blue.png"') == 2
+    assert landing.count('src="/static/img/logo_blue.png"') == 1
     assert landing.count('src="/static/img/logo_silver.png"') == 1
-    assert (
-        '<span class="brand__name">CryoCheck</span>'
-        in landing
-    )
+    assert 'class="brand"' not in landing
+    assert 'class="brand__name"' not in landing
     assert (
         '<h1 id="page-title" class="landing-brand__name">CryoCheck</h1>'
         in landing
@@ -146,7 +144,6 @@ def test_light_and_dark_headers_use_the_approved_logo_variants(client):
 def test_logo_css_preserves_artwork_without_boxes_filters_or_clipping():
     stylesheet = Path("app/static/css/app.css").read_text(encoding="utf-8")
     selectors = (
-        ".brand__mark",
         ".landing-brand__mark",
         ".mobile-brand img",
     )

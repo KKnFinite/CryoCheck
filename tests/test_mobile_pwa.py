@@ -79,6 +79,29 @@ def test_desktop_shell_remains_and_mobile_shell_is_separate(client):
     assert 'data-mobile-menu-toggle' in landing
     assert 'data-mobile-menu' in landing
     assert 'data-install-action' in landing
+    assert 'class="site-footer"' in landing
+
+
+def test_mobile_header_navigation_branding_and_footer_markup_are_preserved(
+    client,
+):
+    landing = client.get("/").get_data(as_text=True)
+    mobile_menu_match = re.search(
+        r'<nav\s+id="mobile-menu".*?</nav>',
+        landing,
+        flags=re.DOTALL,
+    )
+
+    assert mobile_menu_match is not None
+    mobile_menu = mobile_menu_match.group(0)
+    assert 'class="mobile-brand"' in landing
+    assert 'src="/static/img/logo_silver.png"' in landing
+    assert ">Import CSV</a>" in mobile_menu
+    assert ">Rules</a>" in mobile_menu
+    assert ">Settings</a>" in mobile_menu
+    assert "Reports" not in mobile_menu
+    assert '<footer class="site-footer">' in landing
+    assert "Standalone Deice Log Audit System" in landing
 
 
 def test_mobile_import_auto_runs_once_and_retains_no_javascript_fallback():

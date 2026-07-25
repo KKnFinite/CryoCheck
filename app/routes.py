@@ -133,10 +133,11 @@ def _audit_uploaded_csv():
         prepared_export = None
     return render_template(
         "results.html",
-        active_page="import",
+        active_page="reports",
         audit=audit_result,
         import_result=result,
         preview_columns=PREVIEW_DISPLAY_COLUMNS,
+        report_available=True,
         export_available=prepared_export is not None,
         export_token=(
             prepared_export.token if prepared_export is not None else None

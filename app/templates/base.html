@@ -42,7 +42,7 @@
     >
     <link
       rel="stylesheet"
-      href="{{ url_for('static', filename='css/app.css', v='final-branding-1') }}"
+      href="{{ url_for('static', filename='css/app.css', v='desktop-polish-1') }}"
     >
   </head>
   <body>
@@ -50,16 +50,6 @@
 
     <div class="site-shell">
       <header class="site-header">
-        <a class="brand" href="{{ url_for('main.index') }}" aria-label="CryoCheck home">
-          <img
-            class="brand__mark"
-            src="{{ url_for('static', filename='img/logo_blue.png') }}"
-            alt=""
-            width="40"
-            height="40"
-          >
-          <span class="brand__name">CryoCheck</span>
-        </a>
         <div class="header-actions">
           <nav class="site-nav" aria-label="Primary navigation">
             <a
@@ -76,6 +66,15 @@
             >
               Rules
             </a>
+            {% if report_available %}
+              <a
+                class="site-nav__link{% if active_page == 'reports' %} site-nav__link--active{% endif %}"
+                href="#audit-results"
+                {% if active_page == "reports" %}aria-current="page"{% endif %}
+              >
+                Reports
+              </a>
+            {% endif %}
             <a
               class="site-nav__link{% if active_page == 'settings' %} site-nav__link--active{% endif %}"
               href="{{ url_for('main.settings') }}"
@@ -83,18 +82,6 @@
             >
               Settings
             </a>
-            {% if export_available %}
-              <button
-                class="site-nav__link site-nav__link--export"
-                type="submit"
-                form="exception-export-form"
-                name="scope"
-                value="all"
-                data-export-all
-              >
-                Export Exceptions
-              </button>
-            {% endif %}
           </nav>
 
           <nav class="account-nav" aria-label="Account navigation">
