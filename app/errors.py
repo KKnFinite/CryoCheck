@@ -5,7 +5,12 @@ from __future__ import annotations
 from flask import Flask, current_app, render_template, request
 from flask_limiter.errors import RateLimitExceeded
 from flask_wtf.csrf import CSRFError
-from werkzeug.exceptions import BadRequest, Forbidden, RequestEntityTooLarge
+from werkzeug.exceptions import (
+    BadRequest,
+    Forbidden,
+    MethodNotAllowed,
+    RequestEntityTooLarge,
+)
 
 
 def register_error_handlers(app: Flask) -> None:
@@ -25,6 +30,11 @@ def register_error_handlers(app: Flask) -> None:
     def not_found(error):
         del error
         return render_template("errors/404.html"), 404
+
+    @app.errorhandler(MethodNotAllowed)
+    def method_not_allowed(error):
+        del error
+        return render_template("errors/405.html"), 405
 
     @app.errorhandler(500)
     def internal_server_error(error):

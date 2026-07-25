@@ -115,6 +115,12 @@ def test_mobile_import_auto_runs_once_and_retains_no_javascript_fallback():
     assert "form.requestSubmit(submitButton)" in upload_script
     assert "if (isSubmitting)" in upload_script
     assert "event.preventDefault()" in upload_script
+    assert ".method =" not in upload_script
+    assert "window.location" not in upload_script
+    assert "location.href" not in upload_script
+    assert 'action="{{ url_for(\'main.import_csv\') }}"' in template
+    assert 'method="post"' in template
+    assert 'enctype="multipart/form-data"' in template
     assert "Validating securely" in template
     assert "data-replace-file" in template
     assert "data-submit-button" in template
@@ -126,6 +132,27 @@ def test_mobile_import_auto_runs_once_and_retains_no_javascript_fallback():
     assert "Select from Files or Downloads" in template
     assert "Maximum allowed file size: {{ max_upload_mb }} MB" in template
     assert "Choose a CSV" not in template
+
+
+def test_get_share_target_uses_branded_405_without_running_validation(
+    client,
+    monkeypatch,
+):
+    def fail_if_audit_runs():
+        raise AssertionError("GET /share/csv must not run validation")
+
+    monkeypatch.setattr("app.routes._audit_uploaded_csv", fail_if_audit_runs)
+
+    response = client.get("/share/csv")
+
+    assert response.status_code == 405
+    assert b"Action Not Available | CryoCheck" in response.data
+    assert b'class="error-panel"' in response.data
+    assert b"That action is not available" in response.data
+    assert b"Return to Import" in response.data
+    assert b"The method is not allowed for the requested URL." not in response.data
+    assert "private" in response.headers["Cache-Control"]
+    assert "no-store" in response.headers["Cache-Control"]
 
 
 def test_results_have_mobile_cards_and_sticky_selection_controls(client):
@@ -319,6 +346,8 @@ def test_service_worker_only_caches_explicit_static_shell_assets(client):
         assert sensitive_path not in assets
     assert 'event.request.method === "GET"' in script
     assert "APP_SHELL_PATHS.has(requestUrl.pathname)" in script
+    assert '"/import"' not in script
+    assert '"/share/csv"' not in script
 
 
 def test_android_share_target_runs_existing_validation_without_csrf(app, client):

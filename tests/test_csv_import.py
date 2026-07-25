@@ -104,6 +104,8 @@ def test_valid_baseline_csv_imports_successfully(client):
     response = _upload(client, payload)
 
     assert response.status_code == 200
+    assert "private" in response.headers["Cache-Control"]
+    assert "no-store" in response.headers["Cache-Control"]
     assert b"Audit Results" in response.data
     assert b"No exceptions found" in response.data
     assert b"synthetic-deice.csv" in response.data
@@ -111,6 +113,33 @@ def test_valid_baseline_csv_imports_successfully(client):
     assert b"GATEWAY-B" in response.data
     assert b"2026-01-02" in response.data
     assert b"2026-01-05" in response.data
+
+
+def test_get_import_redirects_to_fresh_landing_without_running_audit(
+    client,
+    monkeypatch,
+):
+    def fail_if_audit_runs():
+        raise AssertionError("GET /import must not run validation")
+
+    monkeypatch.setattr("app.routes._audit_uploaded_csv", fail_if_audit_runs)
+    with client.session_transaction() as browser_session:
+        browser_session["export_context_id"] = "previous-report-context"
+
+    response = client.get("/import")
+
+    assert response.status_code == 302
+    assert response.headers["Location"] == "/"
+    assert "private" in response.headers["Cache-Control"]
+    assert "no-store" in response.headers["Cache-Control"]
+    with client.session_transaction() as browser_session:
+        assert "export_context_id" not in browser_session
+
+    landing = client.get(response.headers["Location"])
+    assert landing.status_code == 200
+    assert b"Audit Results" not in landing.data
+    assert b"Reports" not in landing.data
+    assert b"previous-report-context" not in landing.data
 
 
 def test_complete_source_dataset_is_available_unchanged_after_parsing():

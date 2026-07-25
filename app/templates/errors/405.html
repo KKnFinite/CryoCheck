@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}Action Not Available | CryoCheck{% endblock %}
+
+{% block content %}
+  <section class="error-panel" aria-labelledby="error-title">
+    <p class="error-panel__code">405</p>
+    <h1 id="error-title">That action is not available</h1>
+    <p>
+      CryoCheck could not use that request. Return to Import to choose a
+      deice log and start a new validation.
+    </p>
+    <a class="button button--secondary" href="{{ url_for('main.index') }}">
+      Return to Import
+    </a>
+  </section>
+{% endblock %}

@@ -91,6 +91,21 @@ def test_generic_400_and_403_are_branded_and_hide_descriptions(app, client):
         assert internal_marker.encode() not in response.data
 
 
+def test_unsupported_methods_use_branded_405_shell(client):
+    response = client.put("/rules")
+
+    assert response.status_code == 405
+    assert b"Action Not Available | CryoCheck" in response.data
+    assert b'class="site-header"' in response.data
+    assert b'class="mobile-header"' in response.data
+    assert b'class="error-panel"' in response.data
+    assert b"That action is not available" in response.data
+    assert b"Return to Import" in response.data
+    assert b"The method is not allowed for the requested URL." not in response.data
+    assert "private" in response.headers["Cache-Control"]
+    assert "no-store" in response.headers["Cache-Control"]
+
+
 def test_export_request_size_limit_fails_cleanly_without_echoing_data(
     app,
     client,

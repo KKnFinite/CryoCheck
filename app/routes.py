@@ -64,7 +64,8 @@ def prevent_sensitive_response_caching(response):
         "main.favicon",
         "main.service_worker",
     }
-    account_endpoints = {
+    no_store_endpoints = {
+        "main.import_landing",
         "main.login",
         "main.logout",
         "main.register",
@@ -74,7 +75,8 @@ def prevent_sensitive_response_caching(response):
     endpoint = request.endpoint or ""
     should_disable_cache = (
         request.method != "GET"
-        or endpoint in account_endpoints
+        or response.status_code == 405
+        or endpoint in no_store_endpoints
         or (
             bool(session.get("_user_id"))
             and endpoint not in public_asset_endpoints
@@ -153,6 +155,13 @@ def _audit_uploaded_csv():
             else ()
         ),
     )
+
+
+@main.get("/import")
+def import_landing():
+    """Return restored upload navigations to a fresh Import page."""
+    session.pop("export_context_id", None)
+    return redirect(url_for("main.index"))
 
 
 @main.post("/import")
