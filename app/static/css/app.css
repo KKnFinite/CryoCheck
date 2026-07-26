@@ -2874,6 +2874,16 @@ h1 {
     overflow-wrap: anywhere;
   }
 
+  .mobile-exception-card__row {
+    display: inline-block;
+    margin-left: 0.3rem;
+    color: var(--color-muted);
+    font-size: 0.55rem;
+    font-weight: 700;
+    line-height: inherit;
+    white-space: nowrap;
+  }
+
   .mobile-exception-card__message {
     margin: 0;
     color: var(--color-navy-950);

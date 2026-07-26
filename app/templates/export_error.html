@@ -6,7 +6,7 @@
   <section class="error-panel" aria-labelledby="error-title">
     <p class="error-panel__code">Export unavailable</p>
     <h1 id="error-title">The exception export could not be created</h1>
-    <p>{{ error }}</p>
+    <p data-export-error-message>{{ error }}</p>
     <a class="button button--secondary" href="{{ url_for('main.index') }}">
       Import CSV Again
     </a>

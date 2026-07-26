@@ -200,6 +200,14 @@ def export_exceptions():
             selected_identifiers=request.form.getlist("exception_id"),
         )
     except ExportRequestError as error:
+        if request.form.get("delivery") == "validate":
+            response = jsonify(
+                ok=False,
+                error=str(error),
+            )
+            response.status_code = 400
+            response.headers["Cache-Control"] = "no-store"
+            return response
         return (
             render_template(
                 "export_error.html",
@@ -208,6 +216,14 @@ def export_exceptions():
             ),
             400,
         )
+
+    if request.form.get("delivery") == "validate":
+        response = jsonify(
+            ok=True,
+            selected_count=len(selected_rows),
+        )
+        response.headers["Cache-Control"] = "no-store"
+        return response
 
     workbook, filename = build_exception_workbook(selected_rows)
     response = send_file(

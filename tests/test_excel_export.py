@@ -335,6 +335,93 @@ def test_export_selected_ignores_submission_order_and_keeps_audit_order(client):
     workbook.close()
 
 
+def test_ios_validation_accepts_selected_and_all_without_building_workbook(
+    client,
+    monkeypatch,
+):
+    results = _upload_for_export(
+        client,
+        {
+            "DateCreated": "2026-01-15 07:59",
+            "TailNumber": "N121UP",
+        },
+        {
+            "DateCreated": "2026-01-15 07:58",
+        },
+    )
+    token, identifiers = _export_form(results)
+
+    def fail_if_workbook_is_built(_selected_rows):
+        raise AssertionError("Validation must not build or persist a workbook")
+
+    monkeypatch.setattr(
+        "app.routes.build_exception_workbook",
+        fail_if_workbook_is_built,
+    )
+    selected = client.post(
+        "/export",
+        data=MultiDict(
+            (
+                ("export_token", token),
+                ("scope", "selected"),
+                ("exception_id", identifiers[2]),
+                ("exception_id", identifiers[0]),
+                ("delivery", "validate"),
+            )
+        ),
+    )
+    all_rows = client.post(
+        "/export",
+        data={
+            "export_token": token,
+            "scope": "all",
+            "delivery": "validate",
+        },
+    )
+
+    assert selected.status_code == 200
+    assert selected.get_json() == {"ok": True, "selected_count": 2}
+    assert selected.headers["Cache-Control"] == "no-store"
+    assert all_rows.status_code == 200
+    assert all_rows.get_json() == {"ok": True, "selected_count": 3}
+    assert all_rows.headers["Cache-Control"] == "no-store"
+
+
+def test_ios_native_delivery_streams_the_existing_complete_workbook(client):
+    results = _upload_for_export(
+        client,
+        {
+            "DateCreated": "2026-01-15 07:59",
+            "TailNumber": "N121UP",
+        },
+    )
+    token, identifiers = _export_form(results)
+
+    response = client.post(
+        "/export",
+        data={
+            "export_token": token,
+            "scope": "selected",
+            "exception_id": identifiers[0],
+            "delivery": "native",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.mimetype == (
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    assert response.headers["Cache-Control"] == "no-store"
+    workbook = _workbook_from_response(response)
+    worksheet = workbook["Exceptions"]
+    headers = _header_positions(worksheet)
+    assert worksheet.cell(row=2, column=headers["CSV source row"]).value == 2
+    assert worksheet.cell(row=2, column=headers["Rule ID"]).value == (
+        "CC-RULE-001"
+    )
+    workbook.close()
+
+
 def test_export_selected_requires_at_least_one_selection(client):
     results = _upload_for_export(
         client,
@@ -350,6 +437,56 @@ def test_export_selected_requires_at_least_one_selection(client):
     assert response.status_code == 400
     assert b"The exception export could not be created" in response.data
     assert b"Select at least one exception" in response.data
+
+
+def test_ios_validation_returns_specific_json_for_selection_and_token_errors(
+    app,
+    client,
+):
+    results = _upload_for_export(
+        client,
+        {"DateCreated": "2026-01-15 07:59"},
+    )
+    token, identifiers = _export_form(results)
+
+    missing_selection = client.post(
+        "/export",
+        data={
+            "export_token": token,
+            "scope": "selected",
+            "delivery": "validate",
+        },
+    )
+    malformed = client.post(
+        "/export",
+        data={
+            "export_token": f"{token}tampered",
+            "scope": "all",
+            "delivery": "validate",
+        },
+    )
+    app.config["EXPORT_TOKEN_MAX_AGE_SECONDS"] = -1
+    expired = client.post(
+        "/export",
+        data={
+            "export_token": token,
+            "scope": "selected",
+            "exception_id": identifiers[0],
+            "delivery": "validate",
+        },
+    )
+
+    assert missing_selection.status_code == 400
+    assert missing_selection.get_json() == {
+        "ok": False,
+        "error": "Select at least one exception before exporting.",
+    }
+    assert malformed.status_code == 400
+    assert "export request is invalid" in malformed.get_json()["error"]
+    assert expired.status_code == 400
+    assert "export request expired" in expired.get_json()["error"]
+    for response in (missing_selection, malformed, expired):
+        assert response.headers["Cache-Control"] == "no-store"
 
 
 def test_export_rejects_unknown_and_duplicate_identifiers(client):
@@ -640,3 +777,61 @@ def test_production_export_route_requires_csrf():
 
     assert response.status_code == 400
     assert b"Security check failed" in response.data
+
+
+def test_ios_validation_preserves_csrf_cookie_and_signed_session_context(
+    app,
+    client,
+):
+    app.config["WTF_CSRF_ENABLED"] = True
+    landing = client.get("/", base_url="https://localhost")
+    upload_csrf = re.search(
+        rb'name="csrf_token" value="([^"]+)"',
+        landing.data,
+    )
+    assert upload_csrf is not None
+
+    results = client.post(
+        "/import",
+        base_url="https://localhost",
+        headers={"Referer": "https://localhost/"},
+        data={
+            "csrf_token": upload_csrf.group(1).decode(),
+            "csv_file": (
+                io.BytesIO(
+                    _synthetic_export_csv(
+                        {"DateCreated": "2026-01-15 07:59"}
+                    )
+                ),
+                "ios-export.csv",
+            ),
+        },
+        content_type="multipart/form-data",
+    )
+    export_html = results.get_data(as_text=True)
+    export_csrf = re.search(
+        r'id="exception-export-form".*?'
+        r'name="csrf_token" value="([^"]+)"',
+        export_html,
+        flags=re.DOTALL,
+    )
+    export_token, identifiers = _export_form(results)
+
+    assert results.status_code == 200
+    assert export_csrf is not None
+    validation = client.post(
+        "/export",
+        base_url="https://localhost",
+        headers={"Referer": "https://localhost/import"},
+        data={
+            "csrf_token": export_csrf.group(1),
+            "export_token": export_token,
+            "scope": "selected",
+            "exception_id": identifiers[0],
+            "delivery": "validate",
+        },
+    )
+
+    assert validation.status_code == 200
+    assert validation.get_json() == {"ok": True, "selected_count": 1}
+    assert validation.headers["Cache-Control"] == "no-store"

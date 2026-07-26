@@ -153,6 +153,17 @@
           normalizedText(field.querySelector("strong")),
         );
       }
+      const sourceRow = normalizedText(fields[0].querySelector("small"));
+      const recordValue = identity.querySelector("dd");
+      if (sourceRow && recordValue) {
+        recordValue.append(
+          createElement(
+            "small",
+            "mobile-exception-card__row",
+            sourceRow,
+          ),
+        );
+      }
 
       const message = createElement(
         "h3",

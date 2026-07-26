@@ -196,6 +196,8 @@ def test_mobile_exception_hydrator_omits_rule_id_and_duplicate_detail_boxes():
 
     assert "for (const fieldIndex of [0, 1, 2])" in script
     assert "for (const fieldIndex of [0, 3])" not in script
+    assert 'normalizedText(fields[0].querySelector("small"))' in script
+    assert '"mobile-exception-card__row"' in script
     assert "target.replaceChildren(identity, message, summary)" in script
     assert '"mobile-exception-card__summary"' in script
     assert '"mobile-exception-card__meta"' not in script
@@ -318,6 +320,8 @@ def test_phone_css_prevents_page_horizontal_overflow_and_preserves_breakpoint():
         assert declaration in bottom_bar_rule.group()
     assert "grid-template-columns: 1.65rem minmax(0, 1fr);" in stylesheet
     assert ".mobile-exception-card__summary" in stylesheet
+    assert ".mobile-exception-card__row" in stylesheet
+    assert "white-space: nowrap;" in stylesheet
 
 
 def test_export_script_preserves_results_and_manages_async_download_state():
@@ -339,10 +343,26 @@ def test_export_script_preserves_results_and_manages_async_download_state():
     assert "control.disabled = exportInProgress" in script
     assert "window.open(\"\", \"_blank\")" in script
     assert "downloadContext === false" in script
+    assert 'requestData.set("delivery", "validate")' in script
+    assert 'formData.set("delivery", "native")' in script
+    assert 'nativeForm.method = "post"' in script
+    assert "nativeForm.target = downloadContext.name" in script
+    assert "nativeForm.submit()" in script
+    assert "startNativeDownload(" in script
+    assert "serverErrorMessage(response)" in script
+    assert "response.status >= 500" in script
+    assert "fallbackMessages[response.status]" in script
+    assert "400:" in script
+    assert "403:" in script
+    assert script.index("if (iosDownload) {") < script.index(
+        "workbook = await response.blob()"
+    )
     assert "URL.createObjectURL(blob)" in script
     assert "downloadLink.download = filename" in script
     assert 'finishExport("success", "Excel export ready.");' in script
-    assert "Excel could not be prepared." in script
+    assert "Excel could not be prepared." not in script
+    assert "CryoCheck could not reach the export service." in script
+    assert "Safari could not open the secure Excel download." in script
     assert "window.location" not in script
     assert "location.href" not in script
 
