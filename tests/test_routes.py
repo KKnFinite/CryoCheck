@@ -97,7 +97,7 @@ def test_signed_in_controls_share_the_centered_desktop_navigation(app, client):
     assert 'class="account-nav"' not in html
 
 
-def test_desktop_header_hero_and_footer_css_use_desktop_only_polish():
+def test_desktop_header_and_hero_css_use_desktop_only_polish():
     stylesheet = Path("app/static/css/app.css").read_text(encoding="utf-8")
 
     header_actions = re.search(
@@ -108,21 +108,13 @@ def test_desktop_header_hero_and_footer_css_use_desktop_only_polish():
         r"\.site-nav\s*\{(?P<rules>[^}]+)\}",
         stylesheet,
     )
-    desktop_footer = re.search(
-        r"@media \(min-width: 48rem\).*?"
-        r"\.site-footer\s*\{(?P<rules>[^}]+)\}",
-        stylesheet,
-        flags=re.DOTALL,
-    )
-
     assert header_actions is not None
     assert "display: flex" in header_actions.group("rules")
     assert "justify-content: center" in header_actions.group("rules")
     assert site_nav is not None
     assert "grid-column" not in site_nav.group("rules")
     assert ".account-nav" not in stylesheet
-    assert desktop_footer is not None
-    assert "display: none" in desktop_footer.group("rules")
+    assert ".site-footer" not in stylesheet
 
     hero_logo = re.search(
         r"\.landing-brand__mark\s*\{(?P<rules>[^}]+)\}",
@@ -150,7 +142,8 @@ def test_import_drop_area_uses_configured_limit_and_updated_copy(app, client):
     assert app.config["MAX_CONTENT_LENGTH"] == 15 * 1024 * 1024
     assert b"Drop your deice log here" in response.data
     assert b"or click to browse" in response.data
-    assert b"Upload deice log" in response.data
+    assert b"Upload Deice Log" in response.data
+    assert b"Import deicing log" in response.data
     assert b"Select from Files or Downloads" in response.data
     assert b"Maximum allowed file size: 15 MB" in response.data
     assert b"Drop your CSV here" not in response.data

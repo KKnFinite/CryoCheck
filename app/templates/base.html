@@ -42,7 +42,7 @@
     >
     <link
       rel="stylesheet"
-      href="{{ url_for('static', filename='css/app.css', v='mobile-export-row-1') }}"
+      href="{{ url_for('static', filename='css/app.css', v='mobile-import-polish-1') }}"
     >
   </head>
   <body>
@@ -198,7 +198,7 @@
         </nav>
       </header>
 
-      <main id="main-content" class="site-main">
+      <main id="main-content" class="site-main{% block main_class %}{% endblock %}">
         {% with messages = get_flashed_messages(with_categories=true) %}
           {% if messages %}
             <div class="flash-stack" aria-live="polite">
@@ -210,11 +210,6 @@
         {% endwith %}
         {% block content %}{% endblock %}
       </main>
-
-      <footer class="site-footer">
-        <p class="site-footer__brand">CryoCheck</p>
-        <p>Standalone Deice Log Audit System</p>
-      </footer>
     </div>
     <section
       class="ios-install-sheet"

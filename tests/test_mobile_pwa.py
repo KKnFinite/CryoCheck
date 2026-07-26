@@ -79,10 +79,10 @@ def test_desktop_shell_remains_and_mobile_shell_is_separate(client):
     assert 'data-mobile-menu-toggle' in landing
     assert 'data-mobile-menu' in landing
     assert 'data-install-action' in landing
-    assert 'class="site-footer"' in landing
+    assert 'class="site-footer"' not in landing
 
 
-def test_mobile_header_navigation_branding_and_footer_markup_are_preserved(
+def test_mobile_header_navigation_branding_are_preserved_and_footer_is_removed(
     client,
 ):
     landing = client.get("/").get_data(as_text=True)
@@ -103,8 +103,22 @@ def test_mobile_header_navigation_branding_and_footer_markup_are_preserved(
     assert 'class="mobile-menu__account"' in mobile_menu
     assert ">Sign In</a>" in mobile_menu
     assert ">Create Account</a>" in mobile_menu
-    assert '<footer class="site-footer">' in landing
-    assert "Standalone Deice Log Audit System" in landing
+    assert "<footer" not in landing
+    assert "Standalone Deice Log Audit System" not in landing
+
+
+def test_footer_is_absent_from_every_shared_desktop_and_mobile_shell(client):
+    for path in (
+        "/",
+        "/rules",
+        "/settings",
+        "/login",
+        "/register",
+        "/not-a-real-page",
+    ):
+        page = client.get(path).get_data(as_text=True)
+        assert "<footer" not in page
+        assert "Standalone Deice Log Audit System" not in page
 
 
 def test_mobile_import_auto_runs_once_and_retains_no_javascript_fallback():
@@ -135,8 +149,9 @@ def test_mobile_import_auto_runs_once_and_retains_no_javascript_fallback():
     assert "Run Validation" in template
     assert (
         '<span class="upload-dropzone__title mobile-upload-copy">'
-        "Upload deice log</span>"
+        "Upload Deice Log</span>"
     ) in template
+    assert "Import deicing log" in template
     assert "Select from Files or Downloads" in template
     assert "Maximum allowed file size: {{ max_upload_mb }} MB" in template
     assert "Choose a CSV" not in template
@@ -322,6 +337,16 @@ def test_phone_css_prevents_page_horizontal_overflow_and_preserves_breakpoint():
     assert ".mobile-exception-card__summary" in stylesheet
     assert ".mobile-exception-card__row" in stylesheet
     assert "white-space: nowrap;" in stylesheet
+    assert re.search(
+        r"\.site-main--import\s*\{[^}]*padding-top:\s*0;",
+        stylesheet,
+        flags=re.DOTALL,
+    )
+    assert re.search(
+        r"\.launch-control__label\s*\{[^}]*display:\s*none;",
+        stylesheet,
+        flags=re.DOTALL,
+    )
 
 
 def test_export_script_preserves_results_and_manages_async_download_state():
