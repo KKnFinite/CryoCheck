@@ -121,7 +121,15 @@ def test_mobile_import_auto_runs_once_and_retains_no_javascript_fallback():
     assert 'action="{{ url_for(\'main.import_csv\') }}"' in template
     assert 'method="post"' in template
     assert 'enctype="multipart/form-data"' in template
-    assert "Validating securely" in template
+    assert "CryoCheck Activated" in template
+    assert (
+        '<span class="desktop-validation-copy">'
+        "Validating securely&hellip;</span>"
+    ) in template
+    assert (
+        '<span class="mobile-validation-copy">'
+        "CryoCheck Activated</span>"
+    ) in template
     assert "data-replace-file" in template
     assert "data-submit-button" in template
     assert "Run Validation" in template
@@ -183,6 +191,27 @@ def test_results_have_mobile_cards_and_sticky_selection_controls(client):
     assert "Exception" in page
 
 
+def test_mobile_exception_hydrator_omits_rule_id_and_duplicate_detail_boxes():
+    script = Path("app/static/js/mobile-shell.js").read_text(encoding="utf-8")
+
+    assert "for (const fieldIndex of [0, 1, 2])" in script
+    assert "for (const fieldIndex of [0, 3])" not in script
+    assert "target.replaceChildren(identity, message, summary)" in script
+    assert '"mobile-exception-card__summary"' in script
+    assert '"mobile-exception-card__meta"' not in script
+    assert '"mobile-exception-card__details"' not in script
+    assert '"Comparison", "Explanation"' in script
+    for rule_id in (
+        "CC-RULE-001",
+        "CC-RULE-002",
+        "CC-RULE-004",
+        "CC-RULE-007",
+        "CC-RULE-012",
+        "CC-RULE-014",
+    ):
+        assert f'case "{rule_id}"' in script
+
+
 def test_mobile_warnings_preview_rules_settings_auth_and_errors_are_dedicated(
     client,
 ):
@@ -239,16 +268,29 @@ def test_phone_css_prevents_page_horizontal_overflow_and_preserves_breakpoint():
 
     assert "@media (max-width: 47.99rem)" in stylesheet
     assert re.search(
-        r"html,\s*body\s*\{[^}]*max-width:\s*100%;[^}]*overflow-x:\s*hidden;",
+        r"html,\s*body\s*\{[^}]*max-width:\s*100%;",
         stylesheet,
         flags=re.DOTALL,
     )
-    assert "grid-template-columns: 2rem minmax(0, 1fr);" in stylesheet
     assert ".mobile-layout-ready .mobile-rules-list" in stylesheet
     assert ".mobile-layout-ready .mobile-export-bar.mobile-results-only" in (
         stylesheet
     )
-    assert "bottom: calc(0.55rem + env(safe-area-inset-bottom));" in stylesheet
+    assert re.search(
+        r"\.mobile-header\s*\{[^}]*position:\s*sticky;"
+        r"[^}]*top:\s*0;[^}]*z-index:\s*65;",
+        stylesheet,
+        flags=re.DOTALL,
+    )
+    assert re.search(
+        r"\.site-shell\s*\{[^}]*display:\s*flex;"
+        r"[^}]*flex-direction:\s*column;",
+        stylesheet,
+        flags=re.DOTALL,
+    )
+    assert "scroll-padding-top: calc(3.75rem + env(safe-area-inset-top));" in (
+        stylesheet
+    )
     assert (
         "padding-bottom: calc(11.5rem + env(safe-area-inset-bottom));"
         in stylesheet
@@ -258,7 +300,24 @@ def test_phone_css_prevents_page_horizontal_overflow_and_preserves_breakpoint():
         "calc(11.5rem + env(safe-area-inset-bottom));"
         in stylesheet
     )
-    assert "max-width: calc(100% - 1rem);" in stylesheet
+    bottom_bar_rule = re.search(
+        r"\.mobile-export-bar\s*\{[^}]*\}",
+        stylesheet,
+        flags=re.DOTALL,
+    )
+    assert bottom_bar_rule is not None
+    for declaration in (
+        "right: 0;",
+        "bottom: 0;",
+        "left: 0;",
+        "width: 100%;",
+        "max-width: none;",
+        "padding: 0.55rem 0.65rem calc(0.55rem + env(safe-area-inset-bottom));",
+        "border-radius: 0;",
+    ):
+        assert declaration in bottom_bar_rule.group()
+    assert "grid-template-columns: 1.65rem minmax(0, 1fr);" in stylesheet
+    assert ".mobile-exception-card__summary" in stylesheet
 
 
 def test_export_script_preserves_results_and_manages_async_download_state():

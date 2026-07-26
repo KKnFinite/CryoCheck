@@ -70,8 +70,9 @@
             >Replace</button>
           </div>
           <p class="validation-state" aria-live="polite" data-validation-state hidden>
-            <span aria-hidden="true"></span>
-            Validating securely&hellip;
+            <span class="validation-state__spinner" aria-hidden="true"></span>
+            <span class="desktop-validation-copy">Validating securely&hellip;</span>
+            <span class="mobile-validation-copy">CryoCheck Activated</span>
           </p>
           <button
             class="button button--primary"
@@ -88,7 +89,7 @@
 
 {% block scripts %}
   <script
-    src="{{ url_for('static', filename='js/upload.js', v='mobile-pwa-1') }}"
+    src="{{ url_for('static', filename='js/upload.js', v='mobile-results-3') }}"
     defer
   ></script>
 {% endblock %}

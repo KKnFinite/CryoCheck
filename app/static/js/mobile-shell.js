@@ -23,6 +23,104 @@
     list.append(group);
   };
 
+  const mobileExceptionSummary = (ruleId, desktopDetails) => {
+    const details = Array.from(desktopDetails.children).map((detail) => ({
+      label: normalizedText(detail.querySelector("dt")),
+      value: normalizedText(detail.querySelector("dd")),
+    }));
+    const detailsByLabel = new Map(
+      details.map((detail) => [detail.label, detail.value]),
+    );
+    const value = (label) => detailsByLabel.get(label) || "";
+    const suppliedSummary = details.find(
+      (detail) => ["Comparison", "Explanation"].includes(detail.label),
+    );
+    if (suppliedSummary) {
+      return suppliedSummary;
+    }
+
+    switch (ruleId) {
+      case "CC-RULE-001":
+        return {
+          label: "Explanation",
+          value: (
+            `Application event ${value("Application date/time")}; `
+            + `entry created ${value(
+              "How far before the application event the entry was created",
+            )} early.`
+          ),
+        };
+      case "CC-RULE-002":
+        return {
+          label: "Comparison",
+          value: (
+            `Application event ${value("Application date/time")}; `
+            + `actual delay ${value("Actual delay")}, threshold `
+            + `${value("Configured threshold")}, over by `
+            + `${value("Amount beyond the threshold")}.`
+          ),
+        };
+      case "CC-RULE-004":
+        return {
+          label: "Comparison",
+          value: (
+            `At ${value("Recorded concentration")}, outside air `
+            + `${value("Outside air temperature")} and chart freeze point `
+            + `${value(
+              "Authoritative manufacturer-chart freeze point",
+            )} produced a ${value("Actual calculated buffer")} buffer; `
+            + `${value("Required buffer")} required, short by `
+            + `${value("Amount short")}.`
+          ),
+        };
+      case "CC-RULE-007":
+        return {
+          label: "Explanation",
+          value: (
+            `${value("Recorded precipitation")} precipitation; Type IV `
+            + `recorded: ${value("Type IV amount recorded")}.`
+          ),
+        };
+      case "CC-RULE-012": {
+        const sources = [
+          `Aircraft type ${value("Original AircraftType") || "not reported"}`,
+          `tail ${value("Original TailNumber") || "blank"}`,
+        ];
+        if (detailsByLabel.has("Original Notes")) {
+          sources.push(`notes ${value("Original Notes") || "blank"}`);
+        }
+        return {
+          label: "Explanation",
+          value: (
+            `${sources.join("; ")}. ${value("Failure reason")}. `
+            + `Expected: ${value("Required format")}`
+          ),
+        };
+      }
+      case "CC-RULE-014": {
+        const documentedTruck = value("Documented truck number");
+        return {
+          label: "Explanation",
+          value: (
+            `${value("Missing or failed requirement")}`
+            + (
+              documentedTruck
+                ? `; documented truck ${documentedTruck}.`
+                : "."
+            )
+          ),
+        };
+      }
+      default:
+        return {
+          label: "Explanation",
+          value: details
+            .map((detail) => `${detail.label}: ${detail.value}`)
+            .join("; "),
+        };
+    }
+  };
+
   const hydrateMobileExceptions = () => {
     for (const card of document.querySelectorAll("[data-exception-card]")) {
       const target = card.querySelector("[data-mobile-exception-content]");
@@ -44,66 +142,36 @@
       }
 
       const identity = createElement(
-        "div",
+        "dl",
         "mobile-exception-card__identity",
       );
-      for (const fieldIndex of [0, 3]) {
-        const field = fields[fieldIndex];
-        const group = createElement("div");
-        group.append(
-          createElement("span", "", normalizedText(field.querySelector("span"))),
-          createElement("strong", "", normalizedText(field.querySelector(":scope > strong"))),
-        );
-        const small = field.querySelector("small");
-        if (small) {
-          group.append(createElement("small", "", normalizedText(small)));
-        }
-        identity.append(group);
-      }
-
-      const metadata = createElement(
-        "dl",
-        "mobile-exception-card__meta",
-      );
-      for (const fieldIndex of [1, 2]) {
+      for (const fieldIndex of [0, 1, 2]) {
         const field = fields[fieldIndex];
         appendDefinition(
-          metadata,
+          identity,
           normalizedText(field.querySelector("span")),
           normalizedText(field.querySelector("strong")),
         );
       }
 
       const message = createElement(
-        "div",
+        "h3",
         "mobile-exception-card__message",
+        normalizedText(desktopMessage.querySelector("h3")),
       );
-      message.append(
-        createElement(
-          "span",
-          "",
-          normalizedText(desktopMessage.querySelector("span")),
-        ),
-        createElement(
-          "h3",
-          "",
-          normalizedText(desktopMessage.querySelector("h3")),
-        ),
+      const summaryDetail = mobileExceptionSummary(
+        normalizedText(fields[3].querySelector("strong")),
+        desktopDetails,
       );
-
-      const details = createElement(
-        "dl",
-        "mobile-exception-card__details",
+      const summary = createElement(
+        "p",
+        "mobile-exception-card__summary",
       );
-      details.setAttribute("aria-label", "Mobile rule-relevant details");
-      for (const sourceDetail of desktopDetails.children) {
-        appendDefinition(
-          details,
-          normalizedText(sourceDetail.querySelector("dt")),
-          normalizedText(sourceDetail.querySelector("dd")),
-        );
-      }
-      target.replaceChildren(identity, metadata, message, details);
+      summary.append(
+        createElement("strong", "", summaryDetail.label),
+        createElement("span", "", summaryDetail.value),
+      );
+      target.replaceChildren(identity, message, summary);
     }
   };
 
