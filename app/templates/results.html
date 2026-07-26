@@ -27,7 +27,7 @@
         </div>
       </div>
 
-      <dl class="audit-metrics">
+      <dl class="audit-metrics{% if audit.unable_to_evaluate_count %} audit-metrics--with-warning{% endif %}">
         <div class="summary-metric summary-metric--profile">
           <dt>Settings profile</dt>
           <dd>{{ audit.active_settings_profile_name }}</dd>
@@ -39,10 +39,6 @@
         <div class="summary-metric">
           <dt>Total exceptions</dt>
           <dd>{{ audit.exception_count }}</dd>
-        </div>
-        <div class="summary-metric">
-          <dt>Rules executed</dt>
-          <dd>{{ audit.rules_executed }}</dd>
         </div>
         {% if audit.unable_to_evaluate_count %}
           <div class="summary-metric summary-metric--warning">
@@ -134,6 +130,7 @@
           class="exception-export"
           action="{{ url_for('main.export_exceptions') }}"
           method="post"
+          target="_blank"
           data-export-form
         >
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -172,6 +169,7 @@
                 value="selected"
                 disabled
                 data-export-selected
+                formtarget="_blank"
               >
                 Export Selected
               </button>
@@ -181,14 +179,25 @@
                 name="scope"
                 value="all"
                 data-export-all
+                formtarget="_blank"
               >
                 Export All
               </button>
             </div>
+            <div
+              class="export-feedback export-feedback--desktop"
+              role="status"
+              aria-live="polite"
+              data-export-feedback
+              hidden
+            >
+              <span class="export-feedback__spinner" aria-hidden="true"></span>
+              <span data-export-feedback-message></span>
+            </div>
           </div>
 
           <ol class="exception-list">
-            {% for identifier, exception in export_entries %}
+            {% for identifier, exception, display_details in export_entries %}
               <li>
                 <article
                   class="exception-card"
@@ -241,7 +250,7 @@
                   </div>
 
                   <dl class="exception-details" aria-label="Rule-relevant details">
-                    {% for detail in exception.details %}
+                    {% for detail in display_details %}
                       <div>
                         <dt>{{ detail.label }}</dt>
                         <dd>{{ detail.value }}</dd>
@@ -275,13 +284,25 @@
                 value="selected"
                 disabled
                 data-export-selected
+                formtarget="_blank"
               >Export Selected</button>
               <button
                 type="submit"
                 name="scope"
                 value="all"
                 data-export-all
+                formtarget="_blank"
               >Export All</button>
+            </div>
+            <div
+              class="export-feedback export-feedback--mobile"
+              role="status"
+              aria-live="polite"
+              data-export-feedback
+              hidden
+            >
+              <span class="export-feedback__spinner" aria-hidden="true"></span>
+              <span data-export-feedback-message></span>
             </div>
           </div>
         </form>
@@ -362,7 +383,7 @@
 
 {% block scripts %}
   <script
-    src="{{ url_for('static', filename='js/exception-export.js', v='mobile-pwa-1') }}"
+    src="{{ url_for('static', filename='js/exception-export.js', v='results-export-2') }}"
     defer
   ></script>
 {% endblock %}

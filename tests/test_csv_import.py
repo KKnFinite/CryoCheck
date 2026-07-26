@@ -396,8 +396,9 @@ def test_rule_003_exception_is_rendered_on_results_screen(client):
     assert response.status_code == 200
     assert b"CC-RULE-003" in response.data
     assert b"Incorrect freeze point." in response.data
-    assert b"Cryotech Polar Plus LT" in response.data
+    assert b"Selected Type I fluid" not in response.data
     assert b"Expected -50.0" in response.data
+    assert b"at 65% concentration. Entered -20" in response.data
     assert b"CC-RULE-004" not in response.data
 
 
@@ -556,8 +557,7 @@ def test_rule_006_default_five_minute_gap_passes_on_results_screen(client):
     assert response.status_code == 200
     assert b"CC-RULE-006" not in response.data
     assert b"No exceptions found" in response.data
-    assert b"Rules executed</dt>" in response.data
-    assert b"<dd>14</dd>" in response.data
+    assert b"Rules executed</dt>" not in response.data
 
 
 def test_rule_006_default_six_minute_gap_renders_required_details(client):
@@ -578,11 +578,11 @@ def test_rule_006_default_six_minute_gap_renders_required_details(client):
     assert response.status_code == 200
     assert b"CC-RULE-006" in response.data
     assert b"Excessive gap between steps." in response.data
-    assert b"Actual calculated gap" in response.data
-    assert b"6 minutes" in response.data
-    assert b"Configured Allowed Gap" in response.data
-    assert b"5 minutes" in response.data
+    assert b"Actual gap: 6 minutes." in response.data
+    assert b"Allowed gap: 5 minutes." in response.data
     assert b"Exceeded by 1 minute." in response.data
+    assert b"Actual calculated gap" not in response.data
+    assert b"Configured Allowed Gap" not in response.data
 
 
 @pytest.mark.parametrize(
@@ -745,10 +745,7 @@ def test_rule_007_exception_is_rendered_on_results_screen(
     assert precipitation.encode() in response.data
     assert b"Type IV amount recorded" in response.data
     assert displayed_type4 in response.data
-    assert (
-        b"No Type IV fluid was recorded during active precipitation."
-        in response.data
-    )
+    assert b">Finding</dt>" not in response.data
 
 
 @pytest.mark.parametrize(
@@ -1212,8 +1209,8 @@ def test_rule_010_combined_event_ignores_clocks_when_gap_is_off(client):
     assert response.data.count(b"CC-RULE-010") == 1
     assert b"Include Gap setting" in response.data
     assert b">Off</dd>" in response.data
-    assert b"Calculated event time" in response.data
-    assert b">31 minutes</dd>" in response.data
+    assert b"Calculated event time 31 minutes exceeds" in response.data
+    assert b">Calculated event time</dt>" not in response.data
 
 
 @pytest.mark.parametrize(
@@ -1288,8 +1285,7 @@ def test_rule_010_personal_include_gap_adds_same_day_and_overnight_gaps(
     assert b"Include Gap setting" in response.data
     assert b">On</dd>" in response.data
     assert expected in response.data
-    assert b"Calculated event time" in response.data
-    assert b">31 minutes</dd>" in response.data
+    assert b"Calculated event time 31 minutes exceeds" in response.data
 
 
 def test_rule_010_overlap_uses_zero_gap_while_rule_013_reports_overlap(
@@ -1351,7 +1347,7 @@ def test_rule_010_overlap_uses_zero_gap_while_rule_013_reports_overlap(
     assert b"CC-RULE-010 used a 0-minute gap" in response.data
     assert response.data.count(b"CC-RULE-013") == 1
     assert b"Pass overlap." in response.data
-    assert b">6 minutes</dd>" in response.data
+    assert b"6 minutes before Type I ended" in response.data
 
 
 def test_personal_event_time_settings_affect_next_upload_and_reset(app, client):
@@ -1408,10 +1404,13 @@ def test_personal_event_time_settings_affect_next_upload_and_reset(app, client):
 
     assert personal_response.status_code == 200
     assert personal_response.data.count(b"CC-RULE-010") == 1
-    assert b"Calculated event time" in personal_response.data
-    assert b">21 minutes</dd>" in personal_response.data
-    assert b"Configured maximum event time" in personal_response.data
-    assert b">20 minutes</dd>" in personal_response.data
+    assert (
+        b"Calculated event time 21 minutes exceeds the configured maximum "
+        b"of 20 minutes by 1 minute."
+        in personal_response.data
+    )
+    assert b">Calculated event time</dt>" not in personal_response.data
+    assert b">Configured maximum event time</dt>" not in personal_response.data
     assert reset_response.status_code == 302
     assert reset_audit_response.status_code == 200
     assert b"CC-RULE-010" not in reset_audit_response.data
@@ -1460,12 +1459,13 @@ def test_rule_011_exception_renders_required_results_details(client):
     assert response.status_code == 200
     assert response.data.count(b"CC-RULE-011") == 1
     assert b"Incorrect Type IV concentration." in response.data
-    assert b"Cryotech Polar Guard Xtend" in response.data
-    assert b"Entered Type IV concentration" in response.data
-    assert b">99.9</dd>" in response.data
-    assert b"Required Type IV concentration" in response.data
-    assert b">100%</dd>" in response.data
-    assert b"does not match the required 100%" in response.data
+    assert b"Selected Type IV fluid" not in response.data
+    assert (
+        b"Entered concentration 99.9 does not match the required 100%."
+        in response.data
+    )
+    assert b">Entered Type IV concentration</dt>" not in response.data
+    assert b">Required Type IV concentration</dt>" not in response.data
 
 
 def test_rule_011_malformed_concentration_renders_warning(client):
@@ -1677,17 +1677,10 @@ def test_rule_013_same_day_overlap_renders_required_results_details(client):
     assert response.status_code == 200
     assert response.data.count(b"CC-RULE-013") == 1
     assert b"Pass overlap." in response.data
-    assert b"Overall StartTime" in response.data
-    assert b">20:00</dd>" in response.data
-    assert b"Overall EndTime" in response.data
-    assert b">20:30</dd>" in response.data
-    assert b"Type I EndTime1" in response.data
-    assert b">20:20</dd>" in response.data
-    assert b"Type IV StartTime4" in response.data
-    assert b">20:15</dd>" in response.data
-    assert b"Calculated overlap" in response.data
-    assert b">5 minutes</dd>" in response.data
+    assert b"Type IV began at 20:15, 5 minutes before" in response.data
+    assert b"Type I ended at 20:20" in response.data
     assert b"the overall event did not cross midnight" in response.data
+    assert b">Calculated overlap</dt>" not in response.data
 
 
 @pytest.mark.parametrize(
@@ -1841,12 +1834,9 @@ def test_rule_014_invalid_explanation_renders_specific_failure(
         response.data
     )
     assert expected_reason in response.data
-    assert b"AircraftType" in response.data
-    assert b"Type1Used" in response.data
-    assert b"Type4Used" in response.data
-    assert b"Current TruckNumber" in response.data
-    assert b"Original Notes" in response.data
     assert b"Missing or failed requirement" in response.data
+    assert b">Current TruckNumber</dt>" not in response.data
+    assert b">Original Notes</dt>" not in response.data
 
 
 def test_rule_014_invalid_current_truck_number_renders_warning(client):

@@ -44,6 +44,7 @@ from app.services.excel_export import (
     select_export_rows,
 )
 from app.services.rules import RULES
+from app.services.results_display import concise_exception_details
 from app.services.settings import (
     DEFAULT_SETTINGS,
     create_default_user_settings,
@@ -149,6 +150,10 @@ def _audit_uploaded_csv():
                 zip(
                     prepared_export.identifiers,
                     audit_result.exceptions,
+                    (
+                        concise_exception_details(exception)
+                        for exception in audit_result.exceptions
+                    ),
                 )
             )
             if prepared_export is not None

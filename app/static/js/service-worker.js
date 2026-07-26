@@ -1,4 +1,4 @@
-const CACHE_NAME = "cryocheck-static-shell-v2";
+const CACHE_NAME = "cryocheck-static-shell-v3";
 const APP_SHELL_ASSETS = [
   "/static/css/app.css",
   "/static/fonts/neofont/NeoFont.ttf",

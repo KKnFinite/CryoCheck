@@ -173,6 +173,8 @@ def test_results_have_mobile_cards_and_sticky_selection_controls(client):
     assert page.count("data-select-all") == 2
     assert page.count("data-clear-all") == 2
     assert page.count("data-export-selected") == 2
+    assert page.count("data-export-feedback\n") == 2
+    assert page.count('formtarget="_blank"') == 4
     assert "Export All" in page
     assert "Record ID" in page
     assert "Entry Date" in page
@@ -246,6 +248,44 @@ def test_phone_css_prevents_page_horizontal_overflow_and_preserves_breakpoint():
     assert ".mobile-layout-ready .mobile-export-bar.mobile-results-only" in (
         stylesheet
     )
+    assert "bottom: calc(0.55rem + env(safe-area-inset-bottom));" in stylesheet
+    assert (
+        "padding-bottom: calc(11.5rem + env(safe-area-inset-bottom));"
+        in stylesheet
+    )
+    assert (
+        "scroll-padding-bottom: "
+        "calc(11.5rem + env(safe-area-inset-bottom));"
+        in stylesheet
+    )
+    assert "max-width: calc(100% - 1rem);" in stylesheet
+
+
+def test_export_script_preserves_results_and_manages_async_download_state():
+    script = Path("app/static/js/exception-export.js").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'event.preventDefault();' in script
+    assert 'method: "POST"' in script
+    assert "new FormData(form)" in script
+    assert script.index("new FormData(form)") < script.index(
+        "exportInProgress = true"
+    )
+    assert 'credentials: "same-origin"' in script
+    assert 'cache: "no-store"' in script
+    assert 'showFeedback("loading", "Preparing Excel\\u2026");' in script
+    assert "if (exportInProgress)" in script
+    assert "checkbox.disabled = exportInProgress" in script
+    assert "control.disabled = exportInProgress" in script
+    assert "window.open(\"\", \"_blank\")" in script
+    assert "downloadContext === false" in script
+    assert "URL.createObjectURL(blob)" in script
+    assert "downloadLink.download = filename" in script
+    assert 'finishExport("success", "Excel export ready.");' in script
+    assert "Excel could not be prepared." in script
+    assert "window.location" not in script
+    assert "location.href" not in script
 
 
 def test_manifest_has_standalone_icons_and_csv_share_target(client):

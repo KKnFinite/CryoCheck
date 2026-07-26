@@ -127,6 +127,69 @@ _DETAIL_LABELS_BY_RULE = {
     ),
 }
 
+_DISPLAY_DETAIL_LABELS_BY_RULE = {
+    "CC-RULE-001": (
+        "Application date/time",
+        "How far before the application event the entry was created",
+    ),
+    "CC-RULE-002": (
+        "Application date/time",
+        "Configured threshold",
+        "Actual delay",
+        "Amount beyond the threshold",
+    ),
+    "CC-RULE-003": ("Comparison",),
+    "CC-RULE-004": (
+        "Recorded concentration",
+        "Outside air temperature",
+        "Authoritative manufacturer-chart freeze point",
+        "Actual calculated buffer",
+        "Required buffer",
+        "Amount short",
+    ),
+    "CC-RULE-005": ("Comparison",),
+    "CC-RULE-006": ("Comparison",),
+    "CC-RULE-007": (
+        "Recorded precipitation",
+        "Type IV amount recorded",
+    ),
+    "CC-RULE-008": (
+        "Type I gallons used",
+        "Recorded ProcessTime1",
+        "Adjusted calculation time",
+        "Comparison",
+    ),
+    "CC-RULE-009": (
+        "Type IV gallons used",
+        "Recorded ProcessTime4",
+        "Adjusted calculation time",
+        "Comparison",
+    ),
+    "CC-RULE-010": (
+        "Type I usage status",
+        "Type IV usage status",
+        "ProcessTime1",
+        "ProcessTime4",
+        "Include Gap setting",
+        "Included gap",
+        "Overlap handling",
+        "Comparison",
+    ),
+    "CC-RULE-011": ("Comparison",),
+    "CC-RULE-012": (
+        "Original AircraftType",
+        "Original TailNumber",
+        "Original Notes",
+        "Required format",
+        "Failure reason",
+    ),
+    "CC-RULE-013": ("Explanation",),
+    "CC-RULE-014": (
+        "Missing or failed requirement",
+        "Documented truck number",
+    ),
+}
+
 
 def _exception(rule_id: str, index: int) -> AuditException:
     details = tuple(
@@ -174,8 +237,14 @@ def _render_results(
         unexpected_columns=(),
         preview_records=(),
     )
+    from app.services.results_display import concise_exception_details
+
     export_entries = tuple(
-        (f"exception-{index}", exception)
+        (
+            f"exception-{index}",
+            exception,
+            concise_exception_details(exception),
+        )
         for index, exception in enumerate(exceptions, start=1)
     )
 
@@ -245,12 +314,16 @@ def test_all_fourteen_rules_render_compact_identity_and_relevant_details(app):
         assert f"EXCEPTION-MESSAGE-{index:02d}" in card_text
         assert f"CSV row {index + 1}" in card_text
 
-        for detail_index, label in enumerate(
-            _DETAIL_LABELS_BY_RULE[rule_id],
-            start=1,
-        ):
-            assert label in card_text
-            assert f"DETAIL-{index:02d}-{detail_index:02d}" in card_text
+        detail_labels = _DETAIL_LABELS_BY_RULE[rule_id]
+        displayed_labels = _DISPLAY_DETAIL_LABELS_BY_RULE[rule_id]
+        for detail_index, label in enumerate(detail_labels, start=1):
+            detail_value = f"DETAIL-{index:02d}-{detail_index:02d}"
+            if label in displayed_labels:
+                assert label in card_text
+                assert detail_value in card_text
+            else:
+                assert label not in card_text
+                assert detail_value not in card_text
 
         for omitted_value in (
             f"OMIT-RULE-NAME-{index:02d}",
@@ -269,6 +342,20 @@ def test_all_fourteen_rules_render_compact_identity_and_relevant_details(app):
     assert "Clear All" in html
     assert "Export Selected" in html
     assert "data-export-all" in html
+    assert "Rules executed" not in html
+    assert "Selected Type I fluid" not in html
+    assert "Selected Type IV fluid" not in html
+
+
+def test_export_form_keeps_results_open_and_exposes_progress_feedback(app):
+    html = _render_results(app, (_exception("CC-RULE-003", 3),))
+
+    assert 'method="post"' in html
+    assert 'target="_blank"' in html
+    assert html.count('formtarget="_blank"') == 4
+    assert html.count("data-export-feedback\n") == 2
+    assert html.count("data-export-feedback-message") == 2
+    assert "Preparing Excel" not in html
 
 
 def test_unable_to_evaluate_warnings_remain_separate_and_compact(app):

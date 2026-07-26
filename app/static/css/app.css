@@ -777,9 +777,13 @@ h1 {
 
 .audit-metrics {
   display: grid;
-  grid-template-columns: 1.4fr repeat(4, minmax(0, 1fr));
+  grid-template-columns: 1.4fr repeat(2, minmax(0, 1fr));
   gap: 0.85rem;
   margin: 0;
+}
+
+.audit-metrics--with-warning {
+  grid-template-columns: 1.4fr repeat(3, minmax(0, 1fr));
 }
 
 .summary-metric--profile dd {
@@ -965,6 +969,50 @@ h1 {
   min-height: 2.6rem;
   margin-top: 0;
   padding-block: 0.65rem;
+}
+
+.export-feedback {
+  min-width: 0;
+  gap: 0.5rem;
+  align-items: center;
+  color: var(--color-navy-800);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.export-feedback:not([hidden]) {
+  display: flex;
+}
+
+.export-feedback[hidden] {
+  display: none;
+}
+
+.export-feedback[data-state="error"] {
+  color: #8b2f25;
+}
+
+.export-feedback[data-state="success"] {
+  color: #16613c;
+}
+
+.export-feedback__spinner {
+  width: 0.9rem;
+  height: 0.9rem;
+  flex: 0 0 auto;
+  border: 2px solid var(--color-glacier-300);
+  border-top-color: var(--color-blue-600);
+  border-radius: 50%;
+  animation: export-preparing-spin 700ms linear infinite;
+}
+
+.export-feedback:not([data-state="loading"]) .export-feedback__spinner {
+  display: none;
+}
+
+.exception-export button:disabled,
+.exception-card__selection input:disabled {
+  cursor: wait;
 }
 
 .exception-list {
@@ -2520,7 +2568,8 @@ h1 {
 
   .results-page {
     gap: 0.8rem;
-    padding-bottom: 6.5rem;
+    padding-bottom: calc(11.5rem + env(safe-area-inset-bottom));
+    scroll-padding-bottom: calc(11.5rem + env(safe-area-inset-bottom));
   }
 
   .results-heading {
@@ -2849,14 +2898,17 @@ h1 {
 
   .mobile-export-bar {
     position: fixed;
-    right: 0;
-    bottom: 0;
-    left: 0;
+    right: 0.5rem;
+    bottom: calc(0.55rem + env(safe-area-inset-bottom));
+    left: 0.5rem;
     z-index: 60;
+    width: auto;
+    max-width: calc(100% - 1rem);
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 0.45rem 0.65rem;
-    padding: 0.55rem 0.65rem calc(0.55rem + env(safe-area-inset-bottom));
-    border-top: 1px solid rgb(255 255 255 / 20%);
+    padding: 0.55rem 0.65rem;
+    border: 1px solid rgb(255 255 255 / 20%);
+    border-radius: 0.8rem;
     color: var(--color-white);
     background: rgb(7 27 51 / 97%);
     box-shadow: 0 -10px 30px rgb(6 22 40 / 22%);
@@ -2868,9 +2920,11 @@ h1 {
   }
 
   .mobile-export-bar__count {
+    min-width: 0;
     align-self: center;
     font-size: 0.68rem;
     font-weight: 750;
+    overflow-wrap: anywhere;
   }
 
   .mobile-export-bar__selection {
@@ -2879,7 +2933,8 @@ h1 {
   }
 
   .mobile-export-bar__selection button {
-    min-height: 2rem;
+    min-width: 0;
+    min-height: 2.75rem;
     padding: 0.35rem 0.45rem;
     border: 0;
     border-radius: 0.4rem;
@@ -2899,7 +2954,7 @@ h1 {
 
   .mobile-export-bar__actions button {
     min-width: 0;
-    min-height: 2.65rem;
+    min-height: 2.75rem;
     padding: 0.55rem;
     border: 1px solid rgb(157 221 239 / 38%);
     border-radius: 0.55rem;
@@ -2917,6 +2972,27 @@ h1 {
 
   .mobile-export-bar__actions button:disabled {
     opacity: 0.5;
+  }
+
+  .mobile-export-bar .export-feedback {
+    grid-column: 1 / -1;
+    padding: 0.45rem 0.55rem;
+    border-radius: 0.45rem;
+    color: var(--color-navy-950);
+    background: var(--color-glacier-100);
+    font-size: 0.7rem;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+  }
+
+  .mobile-export-bar .export-feedback[data-state="error"] {
+    color: #70251d;
+    background: #fff0ed;
+  }
+
+  .mobile-export-bar .export-feedback[data-state="success"] {
+    color: #105131;
+    background: #eaf8f0;
   }
 
   .results-actions {
@@ -3314,6 +3390,12 @@ h1 {
 }
 
 @keyframes mobile-validation-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes export-preparing-spin {
   to {
     transform: rotate(360deg);
   }
