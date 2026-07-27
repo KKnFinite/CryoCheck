@@ -96,7 +96,7 @@ def test_mobile_header_navigation_branding_are_preserved_and_footer_is_removed(
     mobile_menu = mobile_menu_match.group(0)
     assert 'class="mobile-brand"' in landing
     assert 'src="/static/img/logo_silver.png"' in landing
-    assert ">Import CSV</a>" in mobile_menu
+    assert ">Import Deice Log</a>" in mobile_menu
     assert ">Rules</a>" in mobile_menu
     assert ">Settings</a>" in mobile_menu
     assert "Reports" not in mobile_menu
@@ -155,6 +155,10 @@ def test_mobile_import_auto_runs_once_and_retains_no_javascript_fallback():
     assert "Select from Files or Downloads" in template
     assert "Maximum allowed file size: {{ max_upload_mb }} MB" in template
     assert "Choose a CSV" not in template
+    assert (
+        '{% block body_attributes %} class="mobile-import-page"{% endblock %}'
+        in template
+    )
 
 
 def test_get_share_target_uses_branded_405_without_running_validation(
@@ -250,6 +254,10 @@ def test_mobile_warnings_preview_rules_settings_auth_and_errors_are_dedicated(
     assert 'class="rules-list rules-list--desktop"' in rules_page
     assert 'data-mobile-rules-list' in rules_page
     assert rules_page.count(">CC-RULE-001<") == 1
+    assert "rule-card__status" not in rules_page
+    assert "mobile-rule__status" not in Path(
+        "app/static/js/mobile-shell.js"
+    ).read_text(encoding="utf-8")
     assert 'class="settings-page"' in settings_page
     assert 'class="auth-page"' in login_page
     assert 'class="error-panel"' in error_page
@@ -342,6 +350,34 @@ def test_phone_css_prevents_page_horizontal_overflow_and_preserves_breakpoint():
         stylesheet,
         flags=re.DOTALL,
     )
+    import_body_rule = re.search(
+        r"body\.mobile-import-page\s*\{[^}]*\}",
+        stylesheet,
+        flags=re.DOTALL,
+    )
+    assert import_body_rule is not None
+    for declaration in (
+        "height: 100dvh;",
+        "min-height: 100svh;",
+        "max-height: 100dvh;",
+        "overflow: hidden;",
+        "overscroll-behavior: none;",
+    ):
+        assert declaration in import_body_rule.group()
+    import_main_rule = re.search(
+        r"\.mobile-import-page \.site-main--import\s*\{[^}]*\}",
+        stylesheet,
+        flags=re.DOTALL,
+    )
+    assert import_main_rule is not None
+    for declaration in (
+        "min-height: 0;",
+        "flex: 1 1 0;",
+        "padding-bottom: max(0.75rem, env(safe-area-inset-bottom));",
+        "overflow: hidden;",
+    ):
+        assert declaration in import_main_rule.group()
+    assert ".mobile-rule__status" not in stylesheet
     assert re.search(
         r"\.launch-control__label\s*\{[^}]*display:\s*none;",
         stylesheet,

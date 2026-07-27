@@ -108,7 +108,8 @@ def test_all_fourteen_rules_are_implemented(
         IMPLEMENTED_STATUS,
         IMPLEMENTED_STATUS,
     )
-    assert page.count(IMPLEMENTED_STATUS) == 14
+    assert page.count(IMPLEMENTED_STATUS) == 0
+    assert "rule-card__status" not in page
     assert page.count(IMPLEMENTATION_PENDING_STATUS) == 0
     assert "implementation pending" not in page
 

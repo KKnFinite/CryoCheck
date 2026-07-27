@@ -279,14 +279,7 @@
           normalizedText(card.querySelector(".rule-card__identity h2")),
         ),
       );
-      summary.append(
-        identity,
-        createElement(
-          "span",
-          "mobile-rule__status",
-          normalizedText(card.querySelector(".rule-card__status")),
-        ),
-      );
+      summary.append(identity);
 
       const body = createElement("div", "mobile-rule__body");
       body.append(

@@ -30,10 +30,6 @@
                 <h2 id="rule-{{ loop.index }}-title">{{ rule.name }}</h2>
                 <p class="rule-card__description">{{ rule.description }}</p>
               </div>
-              <p class="rule-card__status{% if rule.is_implemented %} rule-card__status--implemented{% endif %}">
-                <span aria-hidden="true"></span>
-                {{ rule.implementation_status }}
-              </p>
             </header>
 
             <div class="rule-card__body">

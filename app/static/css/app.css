@@ -1348,10 +1348,6 @@ h1 {
 }
 
 .rule-card__header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 2rem;
-  align-items: start;
   padding: clamp(1.4rem, 3vw, 2rem);
   border-bottom: 1px solid rgb(9 34 62 / 8%);
   background:
@@ -1380,40 +1376,6 @@ h1 {
   margin-bottom: 0;
   color: var(--color-muted);
   line-height: 1.6;
-}
-
-.rule-card__status {
-  display: inline-flex;
-  gap: 0.55rem;
-  align-items: center;
-  padding: 0.55rem 0.75rem;
-  border: 1px solid rgb(25 118 168 / 18%);
-  border-radius: 999px;
-  margin-bottom: 0;
-  color: var(--color-navy-800);
-  background: var(--color-glacier-100);
-  font-size: 0.72rem;
-  font-weight: 750;
-  white-space: nowrap;
-}
-
-.rule-card__status span {
-  width: 0.5rem;
-  height: 0.5rem;
-  border: 2px solid var(--color-blue-600);
-  border-radius: 50%;
-  background: var(--color-white);
-}
-
-.rule-card__status--implemented {
-  border-color: rgb(25 118 168 / 28%);
-  color: var(--color-white);
-  background: linear-gradient(135deg, var(--color-blue-600), var(--color-navy-800));
-}
-
-.rule-card__status--implemented span {
-  border-color: var(--color-white);
-  background: var(--color-glacier-300);
 }
 
 .rule-card__body {
@@ -2005,19 +1967,13 @@ h1 {
     text-align: left;
   }
 
-  .rules-page__heading,
-  .rule-card__header {
+  .rules-page__heading {
     grid-template-columns: 1fr;
     gap: 1.25rem;
   }
 
   .rule-count {
     justify-self: start;
-  }
-
-  .rule-card__status {
-    justify-self: start;
-    white-space: normal;
   }
 
   .settings-heading,
@@ -2370,6 +2326,49 @@ h1 {
 
   .site-main--import {
     padding-top: 0;
+  }
+
+  body.mobile-import-page {
+    width: 100%;
+    height: 100dvh;
+    min-height: 100svh;
+    max-height: 100dvh;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  .mobile-import-page .site-shell {
+    height: 100dvh;
+    min-height: 100svh;
+    max-height: 100dvh;
+    overflow: hidden;
+  }
+
+  .mobile-import-page .mobile-header {
+    flex: 0 0 auto;
+  }
+
+  .mobile-import-page .site-main--import {
+    min-height: 0;
+    flex: 1 1 0;
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+    overflow: hidden;
+  }
+
+  .mobile-import-page .landing-hero,
+  .mobile-import-page .landing-panel,
+  .mobile-import-page .launch-control,
+  .mobile-import-page .upload-form {
+    min-height: 0;
+  }
+
+  .mobile-import-page .upload-form {
+    gap: clamp(0.45rem, 1.5dvh, 0.75rem);
+  }
+
+  .mobile-import-page .upload-dropzone {
+    min-height: clamp(9.5rem, 31dvh, 12.5rem);
+    padding-block: clamp(0.75rem, 2dvh, 1.25rem);
   }
 
   .flash-stack {
@@ -3033,11 +3032,7 @@ h1 {
   }
 
   .mobile-rule > summary {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 0.6rem;
-    align-items: center;
-    min-height: 4.2rem;
+    display: block;
     padding: 0.75rem;
     cursor: pointer;
     list-style: none;
@@ -3064,17 +3059,6 @@ h1 {
     color: var(--color-navy-950);
     font-size: 0.86rem;
     line-height: 1.25;
-  }
-
-  .mobile-rule__status {
-    max-width: 5.5rem;
-    padding: 0.35rem 0.45rem;
-    border-radius: 999px;
-    color: var(--color-white);
-    background: var(--color-navy-800);
-    font-size: 0.56rem;
-    font-weight: 800;
-    text-align: center;
   }
 
   .mobile-rule[open] > summary {

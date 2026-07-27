@@ -42,10 +42,10 @@
     >
     <link
       rel="stylesheet"
-      href="{{ url_for('static', filename='css/app.css', v='mobile-import-polish-1') }}"
+      href="{{ url_for('static', filename='css/app.css', v='mobile-import-fit-1') }}"
     >
   </head>
-  <body>
+  <body{% block body_attributes %}{% endblock %}>
     <a class="skip-link" href="#main-content">Skip to main content</a>
 
     <div class="site-shell">
@@ -150,7 +150,7 @@
             class="mobile-menu__link{% if active_page == 'import' %} mobile-menu__link--active{% endif %}"
             href="{{ url_for('main.index') }}"
             {% if active_page == "import" %}aria-current="page"{% endif %}
-          >Import CSV</a>
+          >Import Deice Log</a>
           <a
             class="mobile-menu__link{% if active_page == 'rules' %} mobile-menu__link--active{% endif %}"
             href="{{ url_for('main.rules') }}"
@@ -242,7 +242,7 @@
       </div>
     </section>
     <script
-      src="{{ url_for('static', filename='js/mobile-shell.js', v='mobile-export-row-1') }}"
+      src="{{ url_for('static', filename='js/mobile-shell.js', v='rules-status-polish-1') }}"
       defer
     ></script>
     <script
