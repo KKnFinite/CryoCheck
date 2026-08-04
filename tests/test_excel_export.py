@@ -831,6 +831,107 @@ def test_rate_and_concentration_details_remain_complete_in_excel():
     workbook.close()
 
 
+def test_final_simplified_details_remain_complete_in_excel():
+    audit = _audit_result(
+        _audit_exception(
+            source_row_number=2,
+            rule_id="CC-RULE-001",
+            rule_name="Application Entry Proceeds Event",
+            details=(
+                RuleDetail("Application date/time", "2026-01-15 08:00"),
+                RuleDetail("Entry date/time", "2026-01-15 07:59"),
+                RuleDetail(
+                    "How far before the application event the entry was created",
+                    "1 minute",
+                ),
+            ),
+        ),
+        _audit_exception(
+            source_row_number=3,
+            rule_id="CC-RULE-003",
+            rule_name="Incorrect Freeze Point",
+            details=(
+                RuleDetail("Selected Type I fluid", "Synthetic Type I"),
+                RuleDetail("Recorded concentration", "65%"),
+                RuleDetail("Entered freeze point", "-20 F"),
+                RuleDetail(
+                    "Expected manufacturer-chart freeze point",
+                    "-50.0 F",
+                ),
+                RuleDetail(
+                    "Comparison",
+                    "Expected -50.0 F; entered -20 F.",
+                ),
+            ),
+        ),
+        _audit_exception(
+            source_row_number=4,
+            rule_id="CC-RULE-014",
+            rule_name="Type IV Without Type I Explanation Required",
+            details=(
+                RuleDetail("AircraftType", "2"),
+                RuleDetail("Type1Used", ""),
+                RuleDetail("Type4Used", "1"),
+                RuleDetail("Current TruckNumber", "1"),
+                RuleDetail("Original Notes", "Type I applied by truck 1"),
+                RuleDetail(
+                    "Missing or failed requirement",
+                    "Documented truck number matches current TruckNumber",
+                ),
+                RuleDetail("Documented truck number", "1"),
+            ),
+        ),
+    )
+    prepared = prepare_export(
+        audit,
+        secret_key="final-details-secret",
+        context_id="final-details-context",
+    )
+    snapshot = load_export_snapshot(
+        prepared.token,
+        secret_key="final-details-secret",
+        max_age_seconds=60,
+        expected_context_id="final-details-context",
+    )
+    selected = select_export_rows(
+        snapshot,
+        scope="all",
+        selected_identifiers=(),
+    )
+    stream, _filename = build_exception_workbook(selected)
+    workbook = load_workbook(stream)
+    worksheet = workbook["Exceptions"]
+    positions = _header_positions(worksheet)
+
+    assert worksheet.cell(
+        row=2,
+        column=positions["Detail \N{EM DASH} Entry date/time"],
+    ).value == "2026-01-15 07:59"
+    assert worksheet.cell(
+        row=3,
+        column=positions["Detail \N{EM DASH} Selected Type I fluid"],
+    ).value == "Synthetic Type I"
+    assert worksheet.cell(
+        row=3,
+        column=positions["Detail \N{EM DASH} Comparison"],
+    ).value == "Expected -50.0 F; entered -20 F."
+    assert worksheet.cell(
+        row=4,
+        column=positions[
+            "Detail \N{EM DASH} Missing or failed requirement"
+        ],
+    ).value == "Documented truck number matches current TruckNumber"
+    assert worksheet.cell(
+        row=4,
+        column=positions["Detail \N{EM DASH} Current TruckNumber"],
+    ).value == "1"
+    assert "Missing or failed requirement" in worksheet.cell(
+        row=4,
+        column=positions["Combined details"],
+    ).value
+    workbook.close()
+
+
 def test_rule_guidance_details_remain_complete_in_excel():
     audit = _audit_result(
         _audit_exception(

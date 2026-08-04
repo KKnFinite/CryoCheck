@@ -142,7 +142,6 @@ _EXPECTED_LABELS_BY_RULE = {
     "CC-RULE-003": (
         "Entered Freeze Point",
         "Recorded Concentration",
-        "Type I Fluid",
         "Correct Freeze Point",
     ),
     "CC-RULE-004": (
@@ -205,8 +204,8 @@ _EXPECTED_LABELS_BY_RULE = {
     ),
     "CC-RULE-014": (
         "Entered Notes",
-        "Explanation Requirement",
         "Documented Truck Number",
+        "Expected",
     ),
 }
 
@@ -464,6 +463,39 @@ def test_rule_002_uses_entry_date_as_bad_value_and_one_threshold_sentence(app):
     )
 
 
+def test_rule_001_uses_entry_date_as_bad_value_and_two_details(app):
+    exception = replace(
+        _exception("CC-RULE-001", 1),
+        exception_message="Application entry proceeds event.",
+        application_number="APP-1001",
+        date_created="1/1/2026 7:59",
+        details=(
+            RuleDetail("Application date/time", "1/1/2026 8:00"),
+            RuleDetail("Entry date/time", "1/1/2026 7:59"),
+            RuleDetail(
+                "How far before the application event the entry was created",
+                "1 minute",
+            ),
+        ),
+    )
+    card = _exception_cards(_render_results(app, (exception,)))[0]
+    visible = _visible_text(card)
+
+    assert visible == (
+        "Application entry proceeds event. Application Number APP-1001 "
+        "Entry Date 1/1/2026 7:59 Application Date/Time 1/1/2026 8:00 "
+        "Entered Early By 1 minute"
+    )
+    assert visible.count("1/1/2026 7:59") == 1
+    assert "Entry date/time" not in visible
+    assert re.search(
+        r'class="exception-card__field result-detail--invalid".*?'
+        r'<dt>Entry Date</dt>',
+        card,
+        flags=re.DOTALL,
+    )
+
+
 def test_rule_003_outside_chart_uses_entered_concentration_as_bad_value(app):
     exception = replace(
         _exception("CC-RULE-003", 3),
@@ -479,7 +511,8 @@ def test_rule_003_outside_chart_uses_entered_concentration_as_bad_value(app):
     visible = _visible_text(card)
 
     assert "Entered Concentration 90%" in visible
-    assert "Type I Fluid Cryotech Polar Plus LT" in visible
+    assert "Type I Fluid" not in visible
+    assert "Cryotech Polar Plus LT" not in visible
     assert "Supported Chart Range 0–70%" in visible
     assert "OMIT-DUPLICATE-COMPARISON" not in visible
     assert re.search(
@@ -488,6 +521,112 @@ def test_rule_003_outside_chart_uses_entered_concentration_as_bad_value(app):
         card,
         flags=re.DOTALL,
     )
+
+
+def test_rule_003_incorrect_freeze_point_uses_only_approved_details(app):
+    exception = replace(
+        _exception("CC-RULE-003", 3),
+        exception_message="Incorrect freeze point.",
+        details=(
+            RuleDetail("Selected Type I fluid", "Cryotech Polar Plus LT"),
+            RuleDetail("Recorded concentration", "65%"),
+            RuleDetail("Entered freeze point", "-20 F"),
+            RuleDetail(
+                "Expected manufacturer-chart freeze point",
+                "-50.0 F",
+            ),
+            RuleDetail("Comparison", "OMIT-DUPLICATE-COMPARISON"),
+        ),
+    )
+    card = _exception_cards(_render_results(app, (exception,)))[0]
+    visible = _visible_text(card)
+
+    assert visible.endswith(
+        "Entered Freeze Point -20 F Recorded Concentration 65% "
+        "Correct Freeze Point -50.0 F"
+    )
+    assert "Type I Fluid" not in visible
+    assert "Cryotech Polar Plus LT" not in visible
+    assert "OMIT-DUPLICATE-COMPARISON" not in visible
+    assert re.search(
+        r'data-display-kind="invalid".*?'
+        r'<dt>Entered Freeze Point</dt>.*?<dd>-20 F</dd>',
+        card,
+        flags=re.DOTALL,
+    )
+
+
+def test_rule_014_conditionally_shows_and_emphasizes_documented_truck(app):
+    base = replace(
+        _exception("CC-RULE-014", 14),
+        exception_message=(
+            "Type IV applied without documented Type I truck."
+        ),
+    )
+    missing_truck = replace(
+        base,
+        details=(
+            RuleDetail("Original Notes", "Type I applied by another truck"),
+            RuleDetail(
+                "Missing or failed requirement",
+                "Missing documented truck number",
+            ),
+        ),
+    )
+    matching_truck = replace(
+        base,
+        details=(
+            RuleDetail("Original Notes", "Type I applied by truck 1"),
+            RuleDetail(
+                "Missing or failed requirement",
+                "Documented truck number matches current TruckNumber",
+            ),
+            RuleDetail("Documented truck number", "1"),
+        ),
+    )
+    other_truck_with_missing_phrase = replace(
+        base,
+        details=(
+            RuleDetail("Original Notes", "Truck 2 applied the fluid"),
+            RuleDetail(
+                "Missing or failed requirement",
+                "Missing Type I reference",
+            ),
+            RuleDetail("Documented truck number", "2"),
+        ),
+    )
+
+    missing_card, matching_card, other_card = _exception_cards(
+        _render_results(
+            app,
+            (missing_truck, matching_truck, other_truck_with_missing_phrase),
+        )
+    )
+    expected = (
+        "Expected Notes must state that Type I was applied by a different "
+        "truck and include that truck number."
+    )
+
+    assert _visible_text(missing_card).endswith(
+        "Entered Notes Type I applied by another truck " + expected
+    )
+    assert "Documented Truck Number" not in _visible_text(missing_card)
+    assert missing_card.count('data-display-kind="invalid"') == 1
+
+    assert _visible_text(matching_card).endswith(
+        "Entered Notes Type I applied by truck 1 Documented Truck Number 1 "
+        + expected
+    )
+    assert matching_card.count('data-display-kind="invalid"') == 2
+
+    assert _visible_text(other_card).endswith(
+        "Entered Notes Truck 2 applied the fluid Documented Truck Number 2 "
+        + expected
+    )
+    assert other_card.count('data-display-kind="invalid"') == 1
+    assert "Missing documented truck number" not in _visible_text(missing_card)
+    assert "matches current TruckNumber" not in _visible_text(matching_card)
+    assert "Missing Type I reference" not in _visible_text(other_card)
 
 
 def test_rule_012_marks_only_failed_source_fields_as_invalid(app):

@@ -402,13 +402,18 @@ def test_rule_exception_is_rendered_on_results_screen(client):
         ),
     )
 
+    card_text = _visible_exception_card_text(response)
+
     assert response.status_code == 200
     assert b"Audit Results" in response.data
     assert b"CC-RULE-001" in response.data
-    assert b"Application entry proceeds event." in response.data
     assert b'data-source-row-number="2"' in response.data
-    assert "CSV row" not in _visible_exception_card_text(response)
-    assert b"1 minute" in response.data
+    assert card_text == (
+        "Application entry proceeds event. Application Number "
+        "application-000 Entry Date 2026-01-01 07:59 "
+        "Application Date/Time 2026-01-01 08:00 Entered Early By 1 minute"
+    )
+    assert card_text.count("2026-01-01 07:59") == 1
 
 
 def test_rule_002_results_use_the_approved_timeline_presentation(client):
@@ -449,6 +454,8 @@ def test_rule_003_exception_is_rendered_on_results_screen(client):
         ),
     )
 
+    card_text = _visible_exception_card_text(response)
+
     assert response.status_code == 200
     assert b"CC-RULE-003" in response.data
     assert b"Incorrect freeze point." in response.data
@@ -458,6 +465,8 @@ def test_rule_003_exception_is_rendered_on_results_screen(client):
     assert b">65%</dd>" in response.data
     assert b"Correct Freeze Point" in response.data
     assert b">-50.0" in response.data
+    assert "Type I Fluid" not in card_text
+    assert "Comparison" not in card_text
     assert b"CC-RULE-004" not in response.data
 
 
@@ -482,8 +491,7 @@ def test_outside_chart_concentration_renders_one_rule_003_exception(client):
     assert "Type I concentration outside manufacturer chart." in page
     assert "Entered Concentration" in page
     assert "90%" in page
-    assert "Type I Fluid" in page
-    assert "Cryotech Polar Plus LT" in page
+    assert "Type I Fluid" not in _visible_exception_card_text(response)
     assert "Supported Chart Range" in page
     assert "0\N{EN DASH}70%" in page
     assert "Comparison" not in _visible_exception_card_text(response)
@@ -1952,16 +1960,27 @@ def test_rule_014_invalid_explanation_renders_specific_failure(
         ),
     )
 
+    card_text = _visible_exception_card_text(response)
+    expected_guidance = (
+        "Notes must state that Type I was applied by a different truck and "
+        "include that truck number."
+    )
+
     assert response.status_code == 200
     assert response.data.count(b"CC-RULE-014") == 1
-    assert b"Type IV applied without documented Type I truck." in (
-        response.data
+    assert card_text.startswith(
+        "Type IV applied without documented Type I truck. "
     )
-    assert expected_reason in response.data
-    assert b"Explanation Requirement" in response.data
-    assert b"Entered Notes" in response.data
+    assert f"Entered Notes {notes}" in card_text
+    assert card_text.endswith("Expected " + expected_guidance)
+    assert expected_reason.decode() not in card_text
+    assert "Explanation Requirement" not in card_text
     assert b">Current TruckNumber</dt>" not in response.data
     assert b">Original Notes</dt>" not in response.data
+    if notes == "Type I applied by another truck":
+        assert "Documented Truck Number" not in card_text
+    else:
+        assert "Documented Truck Number" in card_text
 
 
 def test_rule_014_invalid_current_truck_number_renders_warning(client):

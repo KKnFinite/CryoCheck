@@ -203,7 +203,6 @@ def _rule_003_presentation(
                     ),
                     INVALID_VALUE,
                 ),
-                ResultDetail("Type I Fluid", details["Selected Type I fluid"]),
                 ResultDetail(
                     "Supported Chart Range",
                     details["Supported chart range"],
@@ -221,7 +220,6 @@ def _rule_003_presentation(
                 "Recorded Concentration",
                 details["Recorded concentration"],
             ),
-            ResultDetail("Type I Fluid", details["Selected Type I fluid"]),
             ResultDetail(
                 "Correct Freeze Point",
                 details["Expected manufacturer-chart freeze point"],
@@ -365,8 +363,14 @@ def _rule_014_presentation(
     return ExceptionPresentation(
         details=(
             *invalid_details,
-            ResultDetail("Explanation Requirement", failure),
             *reference_details,
+            ResultDetail(
+                "Expected",
+                (
+                    "Notes must state that Type I was applied by a different "
+                    "truck and include that truck number."
+                ),
+            ),
         ),
     )
 
