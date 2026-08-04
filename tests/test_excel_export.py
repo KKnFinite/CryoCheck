@@ -651,7 +651,8 @@ def test_results_and_export_preserve_non_padded_start_time_text(client):
     )
 
     assert results.status_code == 200
-    assert b"1/1/2026 5:11" in results.data
+    assert b"Application Date" in results.data
+    assert b"1/1/2026" in results.data
     assert b"Unable to evaluate" not in results.data
     token, _identifiers = _export_form(results)
     response = client.post(

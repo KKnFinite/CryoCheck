@@ -206,26 +206,27 @@ def test_results_have_mobile_cards_and_sticky_selection_controls(client):
     assert "Record ID" in page
     assert "Entry Date" in page
     assert "Truck Number" in page
-    assert "Rule ID" in page
-    assert "Exception" in page
+    assert ">Rule ID<" not in page
+    assert "CSV row <strong>" not in page
+    assert 'data-rule-id="CC-RULE-003"' in page
+    assert 'data-source-row-number="2"' in page
 
 
 def test_mobile_exception_hydrator_omits_rule_id_and_duplicate_detail_boxes():
     script = Path("app/static/js/mobile-shell.js").read_text(encoding="utf-8")
 
-    assert "for (const fieldIndex of [0, 1, 2])" in script
-    assert "for (const fieldIndex of [0, 3])" not in script
-    assert 'normalizedText(fields[0].querySelector("small"))' in script
-    assert '"mobile-exception-card__row"' in script
-    assert "target.replaceChildren(identity, message, summary)" in script
+    assert "for (const field of fields)" in script
+    assert ".exception-card__identity .exception-card__field" in script
+    assert "card.dataset.ruleId" in script
+    assert 'normalizedText(fields[0].querySelector("small"))' not in script
+    assert '"mobile-exception-card__row"' not in script
+    assert "target.replaceChildren(message, identity, ruleDetails)" in script
     assert '"mobile-exception-card__summary"' in script
+    assert '"mobile-exception-card__details"' in script
     assert '"mobile-exception-card__meta"' not in script
-    assert '"mobile-exception-card__details"' not in script
     assert '"Comparison", "Explanation"' in script
     for rule_id in (
         "CC-RULE-001",
-        "CC-RULE-002",
-        "CC-RULE-004",
         "CC-RULE-007",
         "CC-RULE-012",
         "CC-RULE-014",
@@ -343,8 +344,8 @@ def test_phone_css_prevents_page_horizontal_overflow_and_preserves_breakpoint():
         assert declaration in bottom_bar_rule.group()
     assert "grid-template-columns: 1.65rem minmax(0, 1fr);" in stylesheet
     assert ".mobile-exception-card__summary" in stylesheet
-    assert ".mobile-exception-card__row" in stylesheet
-    assert "white-space: nowrap;" in stylesheet
+    assert ".mobile-exception-card__details" in stylesheet
+    assert ".mobile-exception-card__row" not in stylesheet
     assert re.search(
         r"\.site-main--import\s*\{[^}]*padding-top:\s*0;",
         stylesheet,

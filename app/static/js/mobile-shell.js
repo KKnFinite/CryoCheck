@@ -32,6 +32,12 @@
       details.map((detail) => [detail.label, detail.value]),
     );
     const value = (label) => detailsByLabel.get(label) || "";
+    if (ruleId === "CC-RULE-002") {
+      return {
+        label: "",
+        value: details[0]?.value || "",
+      };
+    }
     const suppliedSummary = details.find(
       (detail) => ["Comparison", "Explanation"].includes(detail.label),
     );
@@ -48,29 +54,6 @@
             + `entry created ${value(
               "How far before the application event the entry was created",
             )} early.`
-          ),
-        };
-      case "CC-RULE-002":
-        return {
-          label: "Comparison",
-          value: (
-            `Application event ${value("Application date/time")}; `
-            + `actual delay ${value("Actual delay")}, threshold `
-            + `${value("Configured threshold")}, over by `
-            + `${value("Amount beyond the threshold")}.`
-          ),
-        };
-      case "CC-RULE-004":
-        return {
-          label: "Comparison",
-          value: (
-            `At ${value("Recorded concentration")}, outside air `
-            + `${value("Outside air temperature")} and chart freeze point `
-            + `${value(
-              "Authoritative manufacturer-chart freeze point",
-            )} produced a ${value("Actual calculated buffer")} buffer; `
-            + `${value("Required buffer")} required, short by `
-            + `${value("Amount short")}.`
           ),
         };
       case "CC-RULE-007":
@@ -131,13 +114,15 @@
         continue;
       }
       const fields = Array.from(
-        desktopSummary.querySelectorAll(".exception-card__field"),
+        desktopSummary.querySelectorAll(
+          ".exception-card__identity .exception-card__field",
+        ),
       );
       const desktopMessage = desktopSummary.querySelector(
         ".exception-card__message",
       );
       const desktopDetails = card.querySelector(":scope > .exception-details");
-      if (fields.length < 4 || !desktopMessage || !desktopDetails) {
+      if (fields.length < 3 || !desktopMessage || !desktopDetails) {
         continue;
       }
 
@@ -145,23 +130,11 @@
         "dl",
         "mobile-exception-card__identity",
       );
-      for (const fieldIndex of [0, 1, 2]) {
-        const field = fields[fieldIndex];
+      for (const field of fields) {
         appendDefinition(
           identity,
-          normalizedText(field.querySelector("span")),
-          normalizedText(field.querySelector("strong")),
-        );
-      }
-      const sourceRow = normalizedText(fields[0].querySelector("small"));
-      const recordValue = identity.querySelector("dd");
-      if (sourceRow && recordValue) {
-        recordValue.append(
-          createElement(
-            "small",
-            "mobile-exception-card__row",
-            sourceRow,
-          ),
+          normalizedText(field.querySelector("dt")),
+          normalizedText(field.querySelector("dd")),
         );
       }
 
@@ -170,19 +143,34 @@
         "mobile-exception-card__message",
         normalizedText(desktopMessage.querySelector("h3")),
       );
-      const summaryDetail = mobileExceptionSummary(
-        normalizedText(fields[3].querySelector("strong")),
-        desktopDetails,
-      );
-      const summary = createElement(
-        "p",
-        "mobile-exception-card__summary",
-      );
-      summary.append(
-        createElement("strong", "", summaryDetail.label),
-        createElement("span", "", summaryDetail.value),
-      );
-      target.replaceChildren(identity, message, summary);
+      const ruleId = card.dataset.ruleId || "";
+      let ruleDetails;
+      if (ruleId === "CC-RULE-004") {
+        ruleDetails = createElement(
+          "dl",
+          "mobile-exception-card__details",
+        );
+        for (const detail of desktopDetails.children) {
+          appendDefinition(
+            ruleDetails,
+            normalizedText(detail.querySelector("dt")),
+            normalizedText(detail.querySelector("dd")),
+          );
+        }
+      } else {
+        const summaryDetail = mobileExceptionSummary(ruleId, desktopDetails);
+        ruleDetails = createElement(
+          "p",
+          "mobile-exception-card__summary",
+        );
+        if (summaryDetail.label) {
+          ruleDetails.append(
+            createElement("strong", "", summaryDetail.label),
+          );
+        }
+        ruleDetails.append(createElement("span", "", summaryDetail.value));
+      }
+      target.replaceChildren(message, identity, ruleDetails);
     }
   };
 
@@ -196,7 +184,7 @@
         warning.querySelectorAll(".audit-warning-card__field"),
       );
       const message = warning.querySelector(".audit-warning-card__message");
-      if (fields.length < 3 || !message) {
+      if (fields.length < 2 || !message) {
         continue;
       }
       const item = createElement("li");
@@ -208,21 +196,8 @@
       );
       appendDefinition(
         definitions,
-        "CSV row",
-        normalizedText(fields[0].querySelector("small")).replace(
-          /^CSV row\s*/i,
-          "",
-        ),
-      );
-      appendDefinition(
-        definitions,
         normalizedText(fields[1].querySelector("span")),
         normalizedText(fields[1].querySelector("strong")),
-      );
-      appendDefinition(
-        definitions,
-        normalizedText(fields[2].querySelector("span")),
-        normalizedText(fields[2].querySelector("strong")),
       );
       item.append(
         definitions,

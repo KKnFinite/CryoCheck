@@ -16,21 +16,7 @@ _MINIMUM_LABELS_BY_RULE = {
         "Application date/time",
         "How far before the application event the entry was created",
     ),
-    "CC-RULE-002": (
-        "Application date/time",
-        "Configured threshold",
-        "Actual delay",
-        "Amount beyond the threshold",
-    ),
     "CC-RULE-003": ("Comparison",),
-    "CC-RULE-004": (
-        "Recorded concentration",
-        "Outside air temperature",
-        "Authoritative manufacturer-chart freeze point",
-        "Actual calculated buffer",
-        "Required buffer",
-        "Amount short",
-    ),
     "CC-RULE-005": ("Comparison",),
     "CC-RULE-006": ("Comparison",),
     "CC-RULE-007": (
@@ -74,6 +60,16 @@ _MINIMUM_LABELS_BY_RULE = {
     ),
 }
 
+_RULE_004_DISPLAY_LABELS = (
+    ("Recorded concentration", "Recorded Concentration"),
+    ("Outside air temperature", "OAT"),
+    (
+        "Authoritative manufacturer-chart freeze point",
+        "Correct Freeze Point",
+    ),
+    ("Actual calculated buffer", "Calculated Buffer"),
+)
+
 
 def _details_with_labels(
     details: Iterable[RuleDetail],
@@ -91,10 +87,43 @@ def _details_with_labels(
     )
 
 
+def _details_by_label(exception: AuditException) -> dict[str, RuleDetail]:
+    return {detail.label: detail for detail in exception.details}
+
+
+def _late_entry_details(exception: AuditException) -> tuple[RuleDetail, ...]:
+    details = _details_by_label(exception)
+    threshold = details["Configured threshold"].value
+    overage = details["Amount beyond the threshold"].value
+    threshold_parts = threshold.split(maxsplit=1)
+    threshold_adjective = threshold
+    if len(threshold_parts) == 2:
+        quantity, unit = threshold_parts
+        threshold_adjective = f"{quantity}-{unit.removesuffix('s')}"
+    return (
+        RuleDetail(
+            "",
+            f"{overage} past the {threshold_adjective} threshold.",
+        ),
+    )
+
+
+def _buffer_details(exception: AuditException) -> tuple[RuleDetail, ...]:
+    details = _details_by_label(exception)
+    return tuple(
+        RuleDetail(display_label, details[source_label].value)
+        for source_label, display_label in _RULE_004_DISPLAY_LABELS
+    )
+
+
 def concise_exception_details(
     exception: AuditException,
 ) -> tuple[RuleDetail, ...]:
     """Return only nonduplicated details needed to understand an exception."""
+    if exception.rule_id == "CC-RULE-002":
+        return _late_entry_details(exception)
+    if exception.rule_id == "CC-RULE-004":
+        return _buffer_details(exception)
     if (
         exception.rule_id == "CC-RULE-003"
         and any(

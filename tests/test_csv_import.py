@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import csv
 import io
+import re
+from html import unescape
 
 import pytest
 from sqlalchemy import event
@@ -81,6 +83,24 @@ def _upload(client, payload: bytes, filename: str = "synthetic-deice.csv"):
         "/import",
         data={"csv_file": (io.BytesIO(payload), filename)},
         content_type="multipart/form-data",
+    )
+
+
+def _visible_exception_card_text(response) -> str:
+    card = re.search(
+        r'<article\s+class="exception-card".*?</article>',
+        response.get_data(as_text=True),
+        flags=re.DOTALL,
+    )
+    assert card is not None
+    without_hidden_text = re.sub(
+        r'<span class="visually-hidden">.*?</span>',
+        " ",
+        card.group(),
+        flags=re.DOTALL,
+    )
+    return " ".join(
+        unescape(re.sub(r"<[^>]+>", " ", without_hidden_text)).split()
     )
 
 
@@ -375,8 +395,32 @@ def test_rule_exception_is_rendered_on_results_screen(client):
     assert b"Audit Results" in response.data
     assert b"CC-RULE-001" in response.data
     assert b"Application entry proceeds event." in response.data
-    assert b"CSV row <strong>2</strong>" in response.data
+    assert b'data-source-row-number="2"' in response.data
+    assert "CSV row" not in _visible_exception_card_text(response)
     assert b"1 minute" in response.data
+
+
+def test_rule_002_results_use_the_approved_timeline_presentation(client):
+    response = _upload(
+        client,
+        _synthetic_csv(
+            overrides={
+                0: {
+                    "ApplicationDate": "1/1/2026",
+                    "StartTime": "5:11",
+                    "DateCreated": "1/2/2026 8:08",
+                }
+            }
+        ),
+    )
+    card_text = _visible_exception_card_text(response)
+
+    assert response.status_code == 200
+    assert card_text == (
+        "Late entry. Record ID record-000 Application Date 1/1/2026 "
+        "Entry Date 1/2/2026 8:08 Truck Number 1 "
+        "2 hours, 57 minutes past the 24-hour threshold."
+    )
 
 
 def test_rule_003_exception_is_rendered_on_results_screen(client):
@@ -447,12 +491,17 @@ def test_rule_004_exception_is_rendered_on_results_screen(client):
         ),
     )
 
+    card_text = _visible_exception_card_text(response)
+
     assert response.status_code == 200
     assert b"CC-RULE-003" not in response.data
     assert b"CC-RULE-004" in response.data
-    assert b"18 degree buffer not met." in response.data
-    assert b"17.0" in response.data
-    assert b"1.0" in response.data
+    assert card_text == (
+        "18 degree buffer not met. Record ID record-000 "
+        "Entry Date 2026-01-01 08:00 Truck Number 1 "
+        "Recorded Concentration 65% OAT -33°F "
+        "Correct Freeze Point -50.0°F Calculated Buffer 17.0°F"
+    )
 
 
 def test_rule_003_and_rule_004_render_together_in_rule_order(client):

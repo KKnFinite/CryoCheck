@@ -75,15 +75,14 @@
         </div>
         <ul class="audit-warning-list">
           {% for warning in audit.unable_to_evaluate %}
-            <li class="audit-warning-card">
+            <li
+              class="audit-warning-card"
+              data-rule-id="{{ warning.rule_id }}"
+              data-source-row-number="{{ warning.source_row_number }}"
+            >
               <div class="audit-warning-card__field">
                 <span>Record ID</span>
                 <strong>{{ warning.record_id or "Not reported" }}</strong>
-                <small>CSV row {{ warning.source_row_number }}</small>
-              </div>
-              <div class="audit-warning-card__field">
-                <span>Rule ID</span>
-                <strong>{{ warning.rule_id }}</strong>
               </div>
               <div class="audit-warning-card__field">
                 <span>Unable to evaluate</span>
@@ -120,7 +119,7 @@
           <h2 id="exceptions-heading">Exceptions</h2>
         </div>
         <p>
-          Ordered by source CSV row, then rule ID.
+          Findings remain in deterministic audit order.
         </p>
       </div>
 
@@ -202,6 +201,8 @@
                 <article
                   class="exception-card"
                   data-exception-card
+                  data-rule-id="{{ exception.rule_id }}"
+                  data-source-row-number="{{ exception.source_row_number }}"
                   aria-labelledby="exception-{{ loop.index }}-title"
                 >
                   <label class="exception-card__selection">
@@ -218,41 +219,41 @@
                   </label>
 
                   <div class="exception-card__desktop-summary">
-                    <div class="exception-card__field">
-                      <span>Record ID</span>
-                      <strong>{{ exception.record_id or "Not reported" }}</strong>
-                      <small>
-                        CSV row <strong>{{ exception.source_row_number }}</strong>
-                      </small>
-                    </div>
-
-                    <div class="exception-card__field">
-                      <span>Entry Date</span>
-                      <strong>{{ exception.date_created or "Not reported" }}</strong>
-                    </div>
-
-                    <div class="exception-card__field">
-                      <span>Truck Number</span>
-                      <strong>{{ exception.truck_number or "Not reported" }}</strong>
-                    </div>
-
-                    <div class="exception-card__field exception-card__field--rule">
-                      <span>Rule ID</span>
-                      <strong>{{ exception.rule_id }}</strong>
-                    </div>
-
                     <div class="exception-card__message">
-                      <span>Exception</span>
                       <h3 id="exception-{{ loop.index }}-title">
                         {{ exception.exception_message }}
                       </h3>
                     </div>
+
+                    <dl class="exception-card__identity">
+                      <div class="exception-card__field">
+                        <dt>Record ID</dt>
+                        <dd>{{ exception.record_id or "Not reported" }}</dd>
+                      </div>
+
+                      {% if exception.rule_id == "CC-RULE-002" %}
+                        <div class="exception-card__field">
+                          <dt>Application Date</dt>
+                          <dd>{{ exception.application_date or "Not reported" }}</dd>
+                        </div>
+                      {% endif %}
+
+                      <div class="exception-card__field">
+                        <dt>Entry Date</dt>
+                        <dd>{{ exception.date_created or "Not reported" }}</dd>
+                      </div>
+
+                      <div class="exception-card__field">
+                        <dt>Truck Number</dt>
+                        <dd>{{ exception.truck_number or "Not reported" }}</dd>
+                      </div>
+                    </dl>
                   </div>
 
                   <dl class="exception-details" aria-label="Rule-relevant details">
                     {% for detail in display_details %}
-                      <div>
-                        <dt>{{ detail.label }}</dt>
+                      <div{% if not detail.label %} class="exception-details__sentence"{% endif %}>
+                        {% if detail.label %}<dt>{{ detail.label }}</dt>{% endif %}
                         <dd>{{ detail.value }}</dd>
                       </div>
                     {% endfor %}
