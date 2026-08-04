@@ -168,18 +168,16 @@ _EXPECTED_LABELS_BY_RULE = {
         "Expected",
     ),
     "CC-RULE-008": (
+        "Adjusted Type I Rate",
         "Type I Used",
         "Process Time 1",
-        "Adjusted Time",
-        "Calculated Rate",
-        "Maximum Rate",
+        "Maximum Type I Rate",
     ),
     "CC-RULE-009": (
+        "Adjusted Type IV Rate",
         "Type IV Used",
         "Process Time 4",
-        "Adjusted Time",
-        "Calculated Rate",
-        "Maximum Rate",
+        "Maximum Type IV Rate",
     ),
     "CC-RULE-010": (
         "Process Time 1",
@@ -192,7 +190,6 @@ _EXPECTED_LABELS_BY_RULE = {
     ),
     "CC-RULE-011": (
         "Entered Concentration",
-        "Type IV Fluid",
         "Required Concentration",
     ),
     "CC-RULE-012": (
@@ -221,8 +218,8 @@ _INVALID_LABELS_BY_RULE = {
     "CC-RULE-005": ("Entered BRIX",),
     "CC-RULE-006": ("Type I End Time", "Type IV Start Time"),
     "CC-RULE-007": ("Type IV Used",),
-    "CC-RULE-008": ("Type I Used", "Process Time 1"),
-    "CC-RULE-009": ("Type IV Used", "Process Time 4"),
+    "CC-RULE-008": ("Adjusted Type I Rate",),
+    "CC-RULE-009": ("Adjusted Type IV Rate",),
     "CC-RULE-010": ("Process Time 1", "Process Time 4"),
     "CC-RULE-011": ("Entered Concentration",),
     "CC-RULE-012": ("Entered Tail Number",),

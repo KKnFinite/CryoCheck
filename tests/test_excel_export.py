@@ -724,6 +724,113 @@ def test_simplified_result_fields_remain_complete_in_excel():
     workbook.close()
 
 
+def test_rate_and_concentration_details_remain_complete_in_excel():
+    audit = _audit_result(
+        _audit_exception(
+            source_row_number=2,
+            rule_id="CC-RULE-008",
+            rule_name="Excessive Type I",
+            details=(
+                RuleDetail("Type I gallons used", "121.00 gallons"),
+                RuleDetail("Recorded ProcessTime1", "1.0 minute"),
+                RuleDetail("Adjusted calculation time", "2 minutes"),
+                RuleDetail(
+                    "Adjusted Type I rate",
+                    "60.5 gallons per minute",
+                ),
+                RuleDetail(
+                    "Configured maximum Type I rate",
+                    "60 gallons per minute",
+                ),
+                RuleDetail("Comparison", "Rate exceeds maximum."),
+            ),
+        ),
+        _audit_exception(
+            source_row_number=3,
+            rule_id="CC-RULE-009",
+            rule_name="Excessive Type IV",
+            details=(
+                RuleDetail("Type IV gallons used", "61.00 gallons"),
+                RuleDetail("Recorded ProcessTime4", "1.0 minute"),
+                RuleDetail("Adjusted calculation time", "2 minutes"),
+                RuleDetail(
+                    "Adjusted Type IV rate",
+                    "30.5 gallons per minute",
+                ),
+                RuleDetail(
+                    "Configured maximum Type IV rate",
+                    "30 gallons per minute",
+                ),
+                RuleDetail("Comparison", "Rate exceeds maximum."),
+            ),
+        ),
+        _audit_exception(
+            source_row_number=4,
+            rule_id="CC-RULE-011",
+            rule_name="Incorrect Type IV Concentration",
+            details=(
+                RuleDetail("Selected Type IV fluid", "Synthetic Fluid"),
+                RuleDetail("Entered Type IV concentration", "99.9"),
+                RuleDetail("Required Type IV concentration", "100%"),
+                RuleDetail(
+                    "Comparison",
+                    "Entered concentration must equal 100%.",
+                ),
+            ),
+        ),
+    )
+    prepared = prepare_export(
+        audit,
+        secret_key="rate-details-secret",
+        context_id="rate-details-context",
+    )
+    snapshot = load_export_snapshot(
+        prepared.token,
+        secret_key="rate-details-secret",
+        max_age_seconds=60,
+        expected_context_id="rate-details-context",
+    )
+    selected = select_export_rows(
+        snapshot,
+        scope="all",
+        selected_identifiers=(),
+    )
+    stream, _filename = build_exception_workbook(selected)
+    workbook = load_workbook(stream)
+    worksheet = workbook["Exceptions"]
+    positions = _header_positions(worksheet)
+
+    assert worksheet.cell(
+        row=2,
+        column=positions["Detail \N{EM DASH} Adjusted calculation time"],
+    ).value == "2 minutes"
+    assert worksheet.cell(
+        row=2,
+        column=positions["Detail \N{EM DASH} Comparison"],
+    ).value == "Rate exceeds maximum."
+    assert worksheet.cell(
+        row=3,
+        column=positions["Detail \N{EM DASH} Adjusted calculation time"],
+    ).value == "2 minutes"
+    assert worksheet.cell(
+        row=3,
+        column=positions["Detail \N{EM DASH} Comparison"],
+    ).value == "Rate exceeds maximum."
+    assert worksheet.cell(
+        row=4,
+        column=positions["Detail \N{EM DASH} Selected Type IV fluid"],
+    ).value == "Synthetic Fluid"
+    assert worksheet.cell(
+        row=4,
+        column=positions["Detail \N{EM DASH} Comparison"],
+    ).value == "Entered concentration must equal 100%."
+    assert "Selected Type IV fluid: Synthetic Fluid" in worksheet.cell(
+        row=4,
+        column=positions["Combined details"],
+    ).value
+    workbook.close()
+
+
 def test_rule_guidance_details_remain_complete_in_excel():
     audit = _audit_result(
         _audit_exception(

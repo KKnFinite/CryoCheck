@@ -950,11 +950,16 @@ def test_rule_008_exception_renders_required_results_details(client):
     assert response.status_code == 200
     assert b"CC-RULE-008" in response.data
     assert b"Excessive Type I." in response.data
+    assert b"Adjusted Type I Rate" in response.data
+    assert b"Type I Used" in response.data
+    assert b"Process Time 1" in response.data
+    assert b"Maximum Type I Rate" in response.data
     assert b"121.00 gallons" in response.data
     assert b"1.0 minute" in response.data
-    assert b"2 minutes" in response.data
     assert b"60.5 gallons per minute" in response.data
     assert b"60 gallons per minute" in response.data
+    assert b"Adjusted Time" not in response.data
+    assert b"Calculated Rate" not in response.data
 
 
 def test_rule_008_invalid_process_time_renders_warning_not_exception(client):
@@ -1092,11 +1097,16 @@ def test_rule_009_exception_renders_required_results_details(client):
     assert response.status_code == 200
     assert b"CC-RULE-009" in response.data
     assert b"Excessive Type IV." in response.data
+    assert b"Adjusted Type IV Rate" in response.data
+    assert b"Type IV Used" in response.data
+    assert b"Process Time 4" in response.data
+    assert b"Maximum Type IV Rate" in response.data
     assert b"61.00 gallons" in response.data
     assert b"1.0 minute" in response.data
-    assert b"2 minutes" in response.data
     assert b"30.5 gallons per minute" in response.data
     assert b"30 gallons per minute" in response.data
+    assert b"Adjusted Time" not in response.data
+    assert b"Calculated Rate" not in response.data
 
 
 def test_rule_009_invalid_process_time_renders_warning_not_exception(client):
@@ -1557,7 +1567,7 @@ def test_rule_011_exception_renders_required_results_details(client):
     assert b"Incorrect Type IV concentration." in response.data
     assert b"Entered Concentration" in response.data
     assert b">99.9</dd>" in response.data
-    assert b"Type IV Fluid" in response.data
+    assert b"Type IV Fluid" not in response.data
     assert b"Required Concentration" in response.data
     assert b">100%</dd>" in response.data
 

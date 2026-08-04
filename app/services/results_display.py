@@ -76,26 +76,36 @@ _STANDARD_SPECS: dict[str, tuple[_DetailSpec, ...]] = {
         _DetailSpec("Configured Allowed Gap", "Allowed Gap"),
     ),
     "CC-RULE-008": (
-        _DetailSpec("Type I gallons used", "Type I Used", INVALID_VALUE),
+        _DetailSpec(
+            "Adjusted Type I rate",
+            "Adjusted Type I Rate",
+            INVALID_VALUE,
+        ),
+        _DetailSpec("Type I gallons used", "Type I Used"),
         _DetailSpec(
             "Recorded ProcessTime1",
             "Process Time 1",
-            INVALID_VALUE,
         ),
-        _DetailSpec("Adjusted calculation time", "Adjusted Time"),
-        _DetailSpec("Adjusted Type I rate", "Calculated Rate"),
-        _DetailSpec("Configured maximum Type I rate", "Maximum Rate"),
+        _DetailSpec(
+            "Configured maximum Type I rate",
+            "Maximum Type I Rate",
+        ),
     ),
     "CC-RULE-009": (
-        _DetailSpec("Type IV gallons used", "Type IV Used", INVALID_VALUE),
+        _DetailSpec(
+            "Adjusted Type IV rate",
+            "Adjusted Type IV Rate",
+            INVALID_VALUE,
+        ),
+        _DetailSpec("Type IV gallons used", "Type IV Used"),
         _DetailSpec(
             "Recorded ProcessTime4",
             "Process Time 4",
-            INVALID_VALUE,
         ),
-        _DetailSpec("Adjusted calculation time", "Adjusted Time"),
-        _DetailSpec("Adjusted Type IV rate", "Calculated Rate"),
-        _DetailSpec("Configured maximum Type IV rate", "Maximum Rate"),
+        _DetailSpec(
+            "Configured maximum Type IV rate",
+            "Maximum Type IV Rate",
+        ),
     ),
     "CC-RULE-010": (
         _DetailSpec("ProcessTime1", "Process Time 1", INVALID_VALUE),
@@ -115,7 +125,6 @@ _STANDARD_SPECS: dict[str, tuple[_DetailSpec, ...]] = {
             "Entered Concentration",
             INVALID_VALUE,
         ),
-        _DetailSpec("Selected Type IV fluid", "Type IV Fluid"),
         _DetailSpec(
             "Required Type IV concentration",
             "Required Concentration",
