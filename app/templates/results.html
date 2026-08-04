@@ -198,20 +198,20 @@
                   data-source-row-number="{{ exception.source_row_number }}"
                   aria-labelledby="exception-{{ loop.index }}-title"
                 >
-                  <label class="exception-card__selection">
-                    <input
-                      type="checkbox"
-                      name="exception_id"
-                      value="{{ identifier }}"
-                      data-exception-checkbox
-                    >
-                    <span class="visually-hidden">
-                      Select exception for
-                      {{ exception.record_id or "unreported record" }}
-                    </span>
-                  </label>
+                  <div class="exception-card__top-row">
+                    <label class="exception-card__selection">
+                      <input
+                        type="checkbox"
+                        name="exception_id"
+                        value="{{ identifier }}"
+                        data-exception-checkbox
+                      >
+                      <span class="visually-hidden">
+                        Select exception for
+                        {{ exception.record_id or "unreported record" }}
+                      </span>
+                    </label>
 
-                  <div class="exception-card__desktop-summary">
                     <div class="exception-card__message">
                       <h3 id="exception-{{ loop.index }}-title">
                         {{ exception.exception_message }}
@@ -246,10 +246,6 @@
                     {% endfor %}
                   </dl>
 
-                  <div
-                    class="mobile-exception-card__content mobile-results-only"
-                    data-mobile-exception-content
-                  ></div>
                 </article>
               </li>
             {% endfor %}

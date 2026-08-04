@@ -194,7 +194,8 @@ def test_results_have_mobile_cards_and_sticky_selection_controls(client):
 
     assert response.status_code == 200
     assert page.count("data-exception-checkbox") == 1
-    assert page.count("data-mobile-exception-content") == 1
+    assert page.count('class="exception-card__top-row"') == 1
+    assert "data-mobile-exception-content" not in page
     assert 'class="exception-export__toolbar"' in page
     assert 'class="mobile-export-bar mobile-results-only"' in page
     assert page.count("data-select-all") == 2
@@ -213,21 +214,19 @@ def test_results_have_mobile_cards_and_sticky_selection_controls(client):
     assert 'data-source-row-number="2"' in page
 
 
-def test_mobile_exception_hydrator_mirrors_server_mapped_fields_and_roles():
+def test_mobile_exception_cards_reuse_the_server_rendered_top_row():
     script = Path("app/static/js/mobile-shell.js").read_text(encoding="utf-8")
+    template = Path("app/templates/results.html").read_text(encoding="utf-8")
 
-    assert "for (const field of fields)" in script
-    assert ".exception-card__identity .exception-card__field" in script
-    assert "detail.dataset.displayKind" in script
-    assert "field.dataset.displayKind" in script
-    assert 'group.classList.add("result-detail--invalid")' in script
-    assert 'normalizedText(fields[0].querySelector("small"))' not in script
-    assert '"mobile-exception-card__row"' not in script
-    assert "target.replaceChildren(message, identity, ruleDetails)" in script
-    assert '"mobile-exception-card__details"' in script
-    assert '"mobile-exception-card__meta"' not in script
-    assert "card.dataset.ruleId" not in script
-    assert 'case "CC-RULE-' not in script
+    assert "hydrateMobileExceptions" not in script
+    assert "data-mobile-exception-content" not in template
+    assert 'class="exception-card__top-row"' in template
+    top_row = template.index('class="exception-card__top-row"')
+    checkbox = template.index('class="exception-card__selection"', top_row)
+    message = template.index('class="exception-card__message"', checkbox)
+    identity = template.index('class="exception-card__identity"', message)
+    details = template.index('class="exception-details"', identity)
+    assert top_row < checkbox < message < identity < details
 
 
 def test_mobile_warnings_preview_rules_settings_auth_and_errors_are_dedicated(
@@ -338,9 +337,10 @@ def test_phone_css_prevents_page_horizontal_overflow_and_preserves_breakpoint():
         "border-radius: 0;",
     ):
         assert declaration in bottom_bar_rule.group()
-    assert "grid-template-columns: 1.65rem minmax(0, 1fr);" in stylesheet
-    assert ".mobile-exception-card__details" in stylesheet
-    assert ".mobile-exception-card__details" in stylesheet
+    assert "minmax(5.7rem, 1.05fr)" in stylesheet
+    assert "minmax(8rem, 1.35fr)" in stylesheet
+    assert ".exception-card__top-row" in stylesheet
+    assert ".mobile-exception-card__details" not in stylesheet
     assert ".mobile-exception-card__row" not in stylesheet
     assert re.search(
         r"\.site-main--import\s*\{[^}]*padding-top:\s*0;",

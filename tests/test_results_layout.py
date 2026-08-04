@@ -387,6 +387,16 @@ def test_all_fourteen_rules_use_standard_identity_and_mapped_values(app):
         assert f'data-source-row-number="{index + 1}"' in card
         assert "data-exception-checkbox" in card
         assert 'aria-label="Rule-relevant details"' in card
+        top_row_elements = (
+            'class="exception-card__top-row"',
+            'class="exception-card__selection"',
+            'class="exception-card__message"',
+            'class="exception-card__identity"',
+            'class="exception-details"',
+        )
+        assert all(element in card for element in top_row_elements)
+        positions = tuple(card.index(element) for element in top_row_elements)
+        assert positions == tuple(sorted(positions))
 
         labels = tuple(
             re.findall(
@@ -416,6 +426,16 @@ def test_all_fourteen_rules_use_standard_identity_and_mapped_values(app):
     assert "Clear All" in html
     assert "Export Selected" in html
     assert "data-export-all" in html
+
+    stylesheet = Path("app/static/css/app.css").read_text(encoding="utf-8")
+    top_row_rule = re.search(
+        r"\.exception-card__top-row \{.*?\}",
+        stylesheet,
+        flags=re.DOTALL,
+    ).group()
+    assert "display: grid;" in top_row_rule
+    assert "minmax(15rem, 1.35fr)" in top_row_rule
+    assert "minmax(22rem, 1fr)" in top_row_rule
 
 
 def test_rule_002_uses_entry_date_as_bad_value_and_one_threshold_sentence(app):

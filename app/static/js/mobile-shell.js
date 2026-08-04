@@ -14,75 +14,13 @@
     element ? element.textContent.trim().replace(/\s+/g, " ") : ""
   );
 
-  const appendDefinition = (list, label, value, valueKind = "") => {
+  const appendDefinition = (list, label, value) => {
     const group = createElement("div");
-    if (valueKind) {
-      group.dataset.displayKind = valueKind;
-    }
-    if (valueKind === "invalid") {
-      group.classList.add("result-detail--invalid");
-    }
     group.append(
       createElement("dt", "", label),
       createElement("dd", "", value),
     );
     list.append(group);
-  };
-
-  const hydrateMobileExceptions = () => {
-    for (const card of document.querySelectorAll("[data-exception-card]")) {
-      const target = card.querySelector("[data-mobile-exception-content]");
-      const desktopSummary = card.querySelector(
-        ".exception-card__desktop-summary",
-      );
-      if (!target || !desktopSummary) {
-        continue;
-      }
-      const fields = Array.from(
-        desktopSummary.querySelectorAll(
-          ".exception-card__identity .exception-card__field",
-        ),
-      );
-      const desktopMessage = desktopSummary.querySelector(
-        ".exception-card__message",
-      );
-      const desktopDetails = card.querySelector(":scope > .exception-details");
-      if (fields.length < 2 || !desktopMessage || !desktopDetails) {
-        continue;
-      }
-
-      const identity = createElement(
-        "dl",
-        "mobile-exception-card__identity",
-      );
-      for (const field of fields) {
-        appendDefinition(
-          identity,
-          normalizedText(field.querySelector("dt")),
-          normalizedText(field.querySelector("dd")),
-          field.dataset.displayKind || "",
-        );
-      }
-
-      const message = createElement(
-        "h3",
-        "mobile-exception-card__message",
-        normalizedText(desktopMessage.querySelector("h3")),
-      );
-      const ruleDetails = createElement(
-        "dl",
-        "mobile-exception-card__details",
-      );
-      for (const detail of desktopDetails.children) {
-        appendDefinition(
-          ruleDetails,
-          normalizedText(detail.querySelector("dt")),
-          normalizedText(detail.querySelector("dd")),
-          detail.dataset.displayKind || "",
-        );
-      }
-      target.replaceChildren(message, identity, ruleDetails);
-    }
   };
 
   const hydrateMobileWarnings = () => {
@@ -204,7 +142,6 @@
     }
   };
 
-  hydrateMobileExceptions();
   hydrateMobileWarnings();
   hydrateMobilePreview();
   hydrateMobileRules();
