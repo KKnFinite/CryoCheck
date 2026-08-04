@@ -1,14 +1,16 @@
-"""Compact Results-screen rendering coverage."""
+"""Compact Results-screen presentation coverage."""
 
 from __future__ import annotations
 
 import re
 from dataclasses import replace
 from html import unescape
+from pathlib import Path
 from types import SimpleNamespace
 
 from flask import render_template
 
+from app.services.results_display import exception_presentation
 from app.services.validation_engine import (
     AuditException,
     AuditResult,
@@ -128,55 +130,109 @@ _DETAIL_LABELS_BY_RULE = {
     ),
 }
 
-_DISPLAY_DETAIL_LABELS_BY_RULE = {
+_EXPECTED_LABELS_BY_RULE = {
     "CC-RULE-001": (
-        "Application date/time",
-        "How far before the application event the entry was created",
+        "Application Date/Time",
+        "Entered Early By",
     ),
-    "CC-RULE-002": (),
-    "CC-RULE-003": ("Comparison",),
-    "CC-RULE-004": (),
-    "CC-RULE-005": ("Comparison",),
-    "CC-RULE-006": ("Comparison",),
+    "CC-RULE-002": (
+        "Application Date/Time",
+        "Threshold Overage",
+    ),
+    "CC-RULE-003": (
+        "Entered Freeze Point",
+        "Recorded Concentration",
+        "Type I Fluid",
+        "Correct Freeze Point",
+    ),
+    "CC-RULE-004": (
+        "Recorded Concentration",
+        "OAT",
+        "Correct Freeze Point",
+        "Calculated Buffer",
+    ),
+    "CC-RULE-005": (
+        "Entered BRIX",
+        "Type IV Fluid",
+        "Acceptable Range",
+        "Position",
+        "Difference",
+    ),
+    "CC-RULE-006": (
+        "Type I End Time",
+        "Type IV Start Time",
+        "Calculated Gap",
+        "Allowed Gap",
+        "Over By",
+    ),
     "CC-RULE-007": (
-        "Recorded precipitation",
-        "Type IV amount recorded",
+        "Type IV Used",
+        "Precipitation",
+        "Expected",
     ),
     "CC-RULE-008": (
-        "Type I gallons used",
-        "Recorded ProcessTime1",
-        "Adjusted calculation time",
-        "Comparison",
+        "Type I Used",
+        "Process Time 1",
+        "Adjusted Time",
+        "Calculated Rate",
+        "Maximum Rate",
     ),
     "CC-RULE-009": (
-        "Type IV gallons used",
-        "Recorded ProcessTime4",
-        "Adjusted calculation time",
-        "Comparison",
+        "Type IV Used",
+        "Process Time 4",
+        "Adjusted Time",
+        "Calculated Rate",
+        "Maximum Rate",
     ),
     "CC-RULE-010": (
-        "Type I usage status",
-        "Type IV usage status",
-        "ProcessTime1",
-        "ProcessTime4",
-        "Include Gap setting",
-        "Included gap",
-        "Overlap handling",
-        "Comparison",
+        "Process Time 1",
+        "Process Time 4",
+        "Include Gap",
+        "Included Gap",
+        "Overlap Handling",
+        "Calculated Event Time",
+        "Maximum Event Time",
+        "Over By",
     ),
-    "CC-RULE-011": ("Comparison",),
+    "CC-RULE-011": (
+        "Entered Concentration",
+        "Type IV Fluid",
+        "Required Concentration",
+    ),
     "CC-RULE-012": (
-        "Original AircraftType",
-        "Original TailNumber",
-        "Original Notes",
-        "Required format",
-        "Failure reason",
+        "Entered Tail Number",
+        "Aircraft Type",
+        "Expected Format",
+        "Explanation",
     ),
-    "CC-RULE-013": ("Explanation",),
+    "CC-RULE-013": (
+        "Type I End Time",
+        "Type IV Start Time",
+        "Calculated Overlap",
+        "Expected",
+    ),
     "CC-RULE-014": (
-        "Missing or failed requirement",
-        "Documented truck number",
+        "Entered Notes",
+        "Explanation Requirement",
+        "Documented Truck Number",
     ),
+}
+
+_INVALID_LABELS_BY_RULE = {
+    "CC-RULE-001": ("Entry Date",),
+    "CC-RULE-002": ("Entry Date",),
+    "CC-RULE-003": ("Entered Freeze Point",),
+    "CC-RULE-004": ("Recorded Concentration", "OAT"),
+    "CC-RULE-005": ("Entered BRIX",),
+    "CC-RULE-006": ("Type I End Time", "Type IV Start Time"),
+    "CC-RULE-007": ("Type IV Used",),
+    "CC-RULE-008": ("Type I Used", "Process Time 1"),
+    "CC-RULE-009": ("Type IV Used", "Process Time 4"),
+    "CC-RULE-010": ("Process Time 1", "Process Time 4"),
+    "CC-RULE-011": ("Entered Concentration",),
+    "CC-RULE-012": ("Entered Tail Number",),
+    "CC-RULE-013": ("Type I End Time", "Type IV Start Time"),
+    "CC-RULE-014": ("Entered Notes",),
 }
 
 
@@ -193,15 +249,15 @@ def _exception(rule_id: str, index: int) -> AuditException:
         rule_name=f"OMIT-RULE-NAME-{index:02d}",
         exception_message=f"EXCEPTION-MESSAGE-{index:02d}",
         source_row_number=index + 1,
-        record_id=f"RECORD-{index:02d}",
-        application_number=f"OMIT-APPLICATION-{index:02d}",
+        record_id=f"OMIT-RECORD-{index:02d}",
+        application_number=f"APPLICATION-{index:02d}",
         gateway_code=f"OMIT-GATEWAY-{index:02d}",
         aircraft_type=f"OMIT-AIRCRAFT-{index:02d}",
         tail_number=f"OMIT-TAIL-{index:02d}",
         application_date=f"OMIT-APPLICATION-DATE-{index:02d}",
         start_time=f"OMIT-START-TIME-{index:02d}",
         date_created=f"2026-07-24 10:{index:02d}",
-        truck_number=f"TRUCK-{index:02d}",
+        truck_number=f"OMIT-TRUCK-{index:02d}",
         operator=f"OMIT-OPERATOR-{index:02d}",
         driver=f"OMIT-DRIVER-{index:02d}",
         details=details,
@@ -226,13 +282,11 @@ def _render_results(
         unexpected_columns=(),
         preview_records=(),
     )
-    from app.services.results_display import concise_exception_details
-
     export_entries = tuple(
         (
             f"exception-{index}",
             exception,
-            concise_exception_details(exception),
+            exception_presentation(exception),
         )
         for index, exception in enumerate(exceptions, start=1)
     )
@@ -266,13 +320,8 @@ def _visible_text(markup: str) -> str:
     return _plain_text(without_hidden_text)
 
 
-def test_all_fourteen_rules_render_compact_identity_and_relevant_details(app):
-    exceptions = tuple(
-        _exception(rule_id, index)
-        for index, rule_id in enumerate(_DETAIL_LABELS_BY_RULE, start=1)
-    )
-    html = _render_results(app, exceptions)
-    cards = tuple(
+def _exception_cards(html: str) -> tuple[str, ...]:
+    return tuple(
         re.findall(
             r'<article\s+class="exception-card".*?</article>',
             html,
@@ -280,108 +329,100 @@ def test_all_fourteen_rules_render_compact_identity_and_relevant_details(app):
         )
     )
 
-    assert len(cards) == 14
-    rule_ids = tuple(
-        re.search(r'data-rule-id="(CC-RULE-\d{3})"', card).group(1)
-        for card in cards
-    )
-    assert rule_ids == tuple(_DETAIL_LABELS_BY_RULE)
 
+def test_results_header_is_reduced_to_neofont_title_and_import_action(app):
+    html = _render_results(app, (_exception("CC-RULE-001", 1),))
+    header = re.search(
+        r'<header class="results-heading">.*?</header>',
+        html,
+        flags=re.DOTALL,
+    ).group()
+
+    assert _visible_text(header) == "Audit Results Import Another CSV"
+    assert '<h1 id="page-title">Audit Results</h1>' in header
+    assert "Audit complete" not in html
+    assert "CryoCheck audited every imported row" not in html
+
+    stylesheet = Path("app/static/css/app.css").read_text(encoding="utf-8")
+    heading_rule = re.search(
+        r"\.results-heading h1 \{.*?\}",
+        stylesheet,
+        flags=re.DOTALL,
+    ).group()
+    assert 'font-family: "NeoFont", Arial, sans-serif;' in heading_rule
+
+
+def test_all_fourteen_rules_use_standard_identity_and_mapped_values(app):
+    exceptions = tuple(
+        _exception(rule_id, index)
+        for index, rule_id in enumerate(_DETAIL_LABELS_BY_RULE, start=1)
+    )
+    html = _render_results(app, exceptions)
+    cards = _exception_cards(html)
+
+    assert len(cards) == 14
     for index, (rule_id, card) in enumerate(
-        zip(rule_ids, cards, strict=True),
+        zip(_DETAIL_LABELS_BY_RULE, cards, strict=True),
         start=1,
     ):
-        card_text = _visible_text(card)
-        required_elements = (
-            "data-exception-checkbox",
-            f"EXCEPTION-MESSAGE-{index:02d}",
-            "Record ID",
-            "Entry Date",
-            "Truck Number",
-            'aria-label="Rule-relevant details"',
-        )
+        visible = _visible_text(card)
+        assert visible.startswith(f"EXCEPTION-MESSAGE-{index:02d}")
+        assert visible.count("Application Number") == 1
+        assert visible.count("Entry Date") == 1
+        assert f"APPLICATION-{index:02d}" in visible
+        assert f"2026-07-24 10:{index:02d}" in visible
+        assert visible.index("Application Number") < visible.index("Entry Date")
 
-        assert all(element in card for element in required_elements)
-        assert tuple(card.index(element) for element in required_elements) == (
-            *sorted(card.index(element) for element in required_elements),
-        )
-        assert f"RECORD-{index:02d}" in card_text
-        assert f"2026-07-24 10:{index:02d}" in card_text
-        assert f"TRUCK-{index:02d}" in card_text
-        assert f"EXCEPTION-MESSAGE-{index:02d}" in card_text
-        assert rule_id not in card_text
-        assert "Rule ID" not in card_text
-        assert "CSV row" not in card_text
+        for removed in (
+            "Record ID",
+            "Rule ID",
+            "CSV row",
+            f"OMIT-RECORD-{index:02d}",
+            f"OMIT-TRUCK-{index:02d}",
+        ):
+            assert removed not in visible
+        assert "<dt>Truck Number</dt>" not in card
+
         assert f'data-rule-id="{rule_id}"' in card
         assert f'data-source-row-number="{index + 1}"' in card
+        assert "data-exception-checkbox" in card
+        assert 'aria-label="Rule-relevant details"' in card
 
-        if rule_id == "CC-RULE-002":
-            assert card_text.index("Record ID") < card_text.index(
-                "Application Date"
-            ) < card_text.index("Entry Date")
-        else:
-            assert "Application Date" not in card_text
+        labels = tuple(
+            re.findall(
+                r'<dt>([^<]+)</dt>',
+                re.search(
+                    r'<dl class="exception-details".*?</dl>',
+                    card,
+                    flags=re.DOTALL,
+                ).group(),
+            )
+        )
+        assert labels == _EXPECTED_LABELS_BY_RULE[rule_id]
+        assert "Comparison" not in labels
 
-        detail_labels = _DETAIL_LABELS_BY_RULE[rule_id]
-        displayed_labels = _DISPLAY_DETAIL_LABELS_BY_RULE[rule_id]
-        for detail_index, label in enumerate(detail_labels, start=1):
-            detail_value = f"DETAIL-{index:02d}-{detail_index:02d}"
-            if rule_id == "CC-RULE-002":
-                assert label not in card_text
-                continue
-            if rule_id == "CC-RULE-004":
-                if label == "Selected Type I fluid":
-                    assert detail_value not in card_text
-                elif label in {
-                    "Recorded concentration",
-                    "Outside air temperature",
-                    "Authoritative manufacturer-chart freeze point",
-                    "Actual calculated buffer",
-                }:
-                    assert detail_value in card_text
-                else:
-                    assert detail_value not in card_text
-                assert label not in card_text
-                continue
-            if label in displayed_labels:
-                assert label in card_text
-                assert detail_value in card_text
-            else:
-                assert label not in card_text
-                assert detail_value not in card_text
-
-        for omitted_value in (
-            f"OMIT-RULE-NAME-{index:02d}",
-            f"OMIT-APPLICATION-{index:02d}",
-            f"OMIT-GATEWAY-{index:02d}",
-            f"OMIT-AIRCRAFT-{index:02d}",
-            f"OMIT-TAIL-{index:02d}",
-            f"OMIT-APPLICATION-DATE-{index:02d}",
-            f"OMIT-START-TIME-{index:02d}",
-            f"OMIT-OPERATOR-{index:02d}",
-            f"OMIT-DRIVER-{index:02d}",
-        ):
-            if (
-                rule_id == "CC-RULE-002"
-                and omitted_value == f"OMIT-APPLICATION-DATE-{index:02d}"
-            ):
-                continue
-            assert omitted_value not in card_text
+        invalid_groups = re.findall(
+            r'<(?:div)[^>]*data-display-kind="invalid"[^>]*>.*?</div>',
+            card,
+            flags=re.DOTALL,
+        )
+        invalid_labels = tuple(
+            re.search(r'<dt>([^<]+)</dt>', group).group(1)
+            for group in invalid_groups
+        )
+        assert invalid_labels == _INVALID_LABELS_BY_RULE[rule_id]
 
     assert "Select All" in html
     assert "Clear All" in html
     assert "Export Selected" in html
     assert "data-export-all" in html
-    assert "Rules executed" not in html
-    assert "Selected Type I fluid" not in html
-    assert "Selected Type IV fluid" not in html
 
 
-def test_rule_002_renders_only_concise_timeline_content(app):
+def test_rule_002_uses_entry_date_as_bad_value_and_one_threshold_sentence(app):
     exception = replace(
         _exception("CC-RULE-002", 2),
         exception_message="Late entry.",
-        application_date="1/1/2026",
+        application_number="APP-2002",
         date_created="1/2/2026 8:08",
         details=(
             RuleDetail("Application date/time", "1/1/2026 5:11"),
@@ -394,87 +435,91 @@ def test_rule_002_renders_only_concise_timeline_content(app):
             ),
         ),
     )
-    html = _render_results(app, (exception,))
-    card = re.search(
-        r'<article\s+class="exception-card".*?</article>',
-        html,
-        flags=re.DOTALL,
-    ).group()
-    visible_text = _visible_text(card)
+    card = _exception_cards(_render_results(app, (exception,)))[0]
+    visible = _visible_text(card)
 
-    assert visible_text == (
-        "Late entry. Record ID RECORD-02 Application Date 1/1/2026 "
-        "Entry Date 1/2/2026 8:08 Truck Number TRUCK-02 "
+    assert visible == (
+        "Late entry. Application Number APP-2002 Entry Date 1/2/2026 8:08 "
+        "Application Date/Time 1/1/2026 5:11 Threshold Overage "
         "2 hours, 57 minutes past the 24-hour threshold."
     )
-    assert visible_text.count("Entry Date") == 1
-    for omitted in (
-        "Rule ID",
-        "CSV row",
-        "Configured threshold",
-        "Actual delay",
-        "Amount beyond the threshold",
-    ):
-        assert omitted not in visible_text
+    assert visible.count("1/2/2026 8:08") == 1
+    assert "Actual delay" not in visible
+    assert "Amount beyond the threshold" not in visible
+    assert re.search(
+        r'class="exception-card__field result-detail--invalid".*?'
+        r'<dt>Entry Date</dt>',
+        card,
+        flags=re.DOTALL,
+    )
 
 
-def test_rule_004_renders_only_four_renamed_details(app):
+def test_rule_003_outside_chart_uses_entered_concentration_as_bad_value(app):
     exception = replace(
-        _exception("CC-RULE-004", 4),
-        exception_message="18 degree buffer not met.",
+        _exception("CC-RULE-003", 3),
+        exception_message="Type I concentration outside manufacturer chart.",
         details=(
+            RuleDetail("Entered concentration", "90%"),
             RuleDetail("Selected Type I fluid", "Cryotech Polar Plus LT"),
-            RuleDetail("Recorded concentration", "65%"),
-            RuleDetail("Outside air temperature", "-33°F"),
-            RuleDetail(
-                "Authoritative manufacturer-chart freeze point",
-                "-50.0°F",
-            ),
-            RuleDetail("Actual calculated buffer", "17.0°F"),
-            RuleDetail("Required buffer", "18.0°F"),
-            RuleDetail("Amount short", "1.0°F"),
+            RuleDetail("Supported chart range", "0–70%"),
+            RuleDetail("Comparison", "OMIT-DUPLICATE-COMPARISON"),
         ),
     )
-    html = _render_results(app, (exception,))
-    card = re.search(
-        r'<article\s+class="exception-card".*?</article>',
-        html,
+    card = _exception_cards(_render_results(app, (exception,)))[0]
+    visible = _visible_text(card)
+
+    assert "Entered Concentration 90%" in visible
+    assert "Type I Fluid Cryotech Polar Plus LT" in visible
+    assert "Supported Chart Range 0–70%" in visible
+    assert "OMIT-DUPLICATE-COMPARISON" not in visible
+    assert re.search(
+        r'data-display-kind="invalid".*?'
+        r'<dt>Entered Concentration</dt>.*?<dd>90%</dd>',
+        card,
         flags=re.DOTALL,
-    ).group()
-    visible_text = _visible_text(card)
-
-    assert visible_text == (
-        "18 degree buffer not met. Record ID RECORD-04 "
-        "Entry Date 2026-07-24 10:04 Truck Number TRUCK-04 "
-        "Recorded Concentration 65% OAT -33°F Correct Freeze Point -50.0°F "
-        "Calculated Buffer 17.0°F"
     )
-    for omitted in (
-        "Selected Type I fluid",
-        "Cryotech Polar Plus LT",
-        "Required Buffer",
-        "18.0°F",
-        "Amount Short",
-        "1.0°F",
-        "Comparison",
-        "Rule ID",
-        "CSV row",
-    ):
-        assert omitted not in visible_text
 
 
-def test_export_form_keeps_results_open_and_exposes_progress_feedback(app):
-    html = _render_results(app, (_exception("CC-RULE-003", 3),))
+def test_rule_012_marks_only_failed_source_fields_as_invalid(app):
+    base = _exception("CC-RULE-012", 12)
+    notes_failure = replace(
+        base,
+        details=(
+            RuleDetail("Original AircraftType", "0"),
+            RuleDetail("Original TailNumber", ""),
+            RuleDetail("Original Notes", ""),
+            RuleDetail("Required format", "Tail blank; Notes required"),
+            RuleDetail(
+                "Failure reason",
+                "Notes are required for AircraftType 0",
+            ),
+        ),
+    )
+    tail_failure = replace(
+        base,
+        details=(
+            RuleDetail("Original AircraftType", "1"),
+            RuleDetail("Original TailNumber", "AB-123"),
+            RuleDetail("Required format", "UPS NxxxUP format"),
+            RuleDetail(
+                "Failure reason",
+                "Does not match UPS NxxxUP format",
+            ),
+        ),
+    )
 
-    assert 'method="post"' in html
-    assert 'target="_blank"' in html
-    assert html.count('formtarget="_blank"') == 4
-    assert html.count("data-export-feedback\n") == 2
-    assert html.count("data-export-feedback-message") == 2
-    assert "Preparing Excel" not in html
+    notes_card, tail_card = _exception_cards(
+        _render_results(app, (notes_failure, tail_failure))
+    )
+    assert "Entered Notes Blank" in _visible_text(notes_card)
+    assert "Entered Tail Number" not in _visible_text(notes_card)
+    assert "Entered Tail Number AB-123" in _visible_text(tail_card)
+    assert "Entered Notes" not in _visible_text(tail_card)
+    assert notes_card.count('data-display-kind="invalid"') == 1
+    assert tail_card.count('data-display-kind="invalid"') == 1
 
 
-def test_unable_to_evaluate_warnings_remain_separate_and_compact(app):
+def test_export_form_and_warning_behavior_remain_unchanged(app):
     warning = UnableToEvaluate(
         rule_id="CC-RULE-004",
         rule_name="Type I Freeze-Point Buffer",
@@ -485,26 +530,23 @@ def test_unable_to_evaluate_warnings_remain_separate_and_compact(app):
     )
     html = _render_results(
         app,
-        (_exception("CC-RULE-001", 1),),
+        (_exception("CC-RULE-003", 3),),
         warnings=(warning,),
     )
     warning_card = re.search(
         r'<li\s+class="audit-warning-card".*?</li>',
         html,
         flags=re.DOTALL,
-    )
+    ).group()
 
-    assert warning_card is not None
-    warning_text = _visible_text(warning_card.group())
-    assert "Record ID WARNING-RECORD" in warning_text
-    assert "CSV row" not in warning_text
-    assert "Rule ID" not in warning_text
-    assert "CC-RULE-004" not in warning_text
-    assert 'data-rule-id="CC-RULE-004"' in warning_card.group()
-    assert 'data-source-row-number="8"' in warning_card.group()
-    assert "Unable to evaluate AmbientTemp, Type1Used" in warning_text
-    assert "Unable to evaluate this synthetic warning." in warning_text
-    assert html.index("audit-warning-summary") < html.index(
-        'id="exception-export-form"'
+    assert 'method="post"' in html
+    assert 'target="_blank"' in html
+    assert html.count('formtarget="_blank"') == 4
+    assert html.count("data-export-feedback\n") == 2
+    assert "Record ID WARNING-RECORD" in _visible_text(warning_card)
+    assert 'data-rule-id="CC-RULE-004"' in warning_card
+    assert 'data-source-row-number="8"' in warning_card
+    assert "Unable to evaluate AmbientTemp, Type1Used" in _visible_text(
+        warning_card
     )
-    assert "data-exception-checkbox" not in warning_card.group()
+    assert "data-exception-checkbox" not in warning_card

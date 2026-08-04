@@ -5,14 +5,7 @@
 {% block content %}
   <section id="audit-results" class="results-page" aria-labelledby="page-title">
     <header class="results-heading">
-      <div>
-        <p class="eyebrow">Audit complete</p>
-        <h1 id="page-title">Audit Results</h1>
-        <p class="hero__intro">
-          CryoCheck audited every imported row with the fourteen implemented
-          rules.
-        </p>
-      </div>
+      <h1 id="page-title">Audit Results</h1>
       <a class="button button--secondary" href="{{ url_for('main.index') }}">
         Import Another CSV
       </a>
@@ -196,7 +189,7 @@
           </div>
 
           <ol class="exception-list">
-            {% for identifier, exception, display_details in export_entries %}
+            {% for identifier, exception, presentation in export_entries %}
               <li>
                 <article
                   class="exception-card"
@@ -227,33 +220,27 @@
 
                     <dl class="exception-card__identity">
                       <div class="exception-card__field">
-                        <dt>Record ID</dt>
-                        <dd>{{ exception.record_id or "Not reported" }}</dd>
+                        <dt>Application Number</dt>
+                        <dd>{{ exception.application_number or "Not reported" }}</dd>
                       </div>
 
-                      {% if exception.rule_id == "CC-RULE-002" %}
-                        <div class="exception-card__field">
-                          <dt>Application Date</dt>
-                          <dd>{{ exception.application_date or "Not reported" }}</dd>
-                        </div>
-                      {% endif %}
-
-                      <div class="exception-card__field">
+                      <div
+                        class="exception-card__field{% if 'entry_date' in presentation.invalid_identity_fields %} result-detail--invalid{% endif %}"
+                        {% if 'entry_date' in presentation.invalid_identity_fields %}data-display-kind="invalid"{% endif %}
+                      >
                         <dt>Entry Date</dt>
                         <dd>{{ exception.date_created or "Not reported" }}</dd>
-                      </div>
-
-                      <div class="exception-card__field">
-                        <dt>Truck Number</dt>
-                        <dd>{{ exception.truck_number or "Not reported" }}</dd>
                       </div>
                     </dl>
                   </div>
 
                   <dl class="exception-details" aria-label="Rule-relevant details">
-                    {% for detail in display_details %}
-                      <div{% if not detail.label %} class="exception-details__sentence"{% endif %}>
-                        {% if detail.label %}<dt>{{ detail.label }}</dt>{% endif %}
+                    {% for detail in presentation.details %}
+                      <div
+                        class="exception-details__item{% if detail.value_kind == 'invalid' %} result-detail--invalid{% endif %}"
+                        data-display-kind="{{ detail.value_kind }}"
+                      >
+                        <dt>{{ detail.label }}</dt>
                         <dd>{{ detail.value }}</dd>
                       </div>
                     {% endfor %}

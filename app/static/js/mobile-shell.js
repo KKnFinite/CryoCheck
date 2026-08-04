@@ -14,94 +14,19 @@
     element ? element.textContent.trim().replace(/\s+/g, " ") : ""
   );
 
-  const appendDefinition = (list, label, value) => {
+  const appendDefinition = (list, label, value, valueKind = "") => {
     const group = createElement("div");
+    if (valueKind) {
+      group.dataset.displayKind = valueKind;
+    }
+    if (valueKind === "invalid") {
+      group.classList.add("result-detail--invalid");
+    }
     group.append(
       createElement("dt", "", label),
       createElement("dd", "", value),
     );
     list.append(group);
-  };
-
-  const mobileExceptionSummary = (ruleId, desktopDetails) => {
-    const details = Array.from(desktopDetails.children).map((detail) => ({
-      label: normalizedText(detail.querySelector("dt")),
-      value: normalizedText(detail.querySelector("dd")),
-    }));
-    const detailsByLabel = new Map(
-      details.map((detail) => [detail.label, detail.value]),
-    );
-    const value = (label) => detailsByLabel.get(label) || "";
-    if (ruleId === "CC-RULE-002") {
-      return {
-        label: "",
-        value: details[0]?.value || "",
-      };
-    }
-    const suppliedSummary = details.find(
-      (detail) => ["Comparison", "Explanation"].includes(detail.label),
-    );
-    if (suppliedSummary) {
-      return suppliedSummary;
-    }
-
-    switch (ruleId) {
-      case "CC-RULE-001":
-        return {
-          label: "Explanation",
-          value: (
-            `Application event ${value("Application date/time")}; `
-            + `entry created ${value(
-              "How far before the application event the entry was created",
-            )} early.`
-          ),
-        };
-      case "CC-RULE-007":
-        return {
-          label: "Explanation",
-          value: (
-            `${value("Recorded precipitation")} precipitation; Type IV `
-            + `recorded: ${value("Type IV amount recorded")}.`
-          ),
-        };
-      case "CC-RULE-012": {
-        const sources = [
-          `Aircraft type ${value("Original AircraftType") || "not reported"}`,
-          `tail ${value("Original TailNumber") || "blank"}`,
-        ];
-        if (detailsByLabel.has("Original Notes")) {
-          sources.push(`notes ${value("Original Notes") || "blank"}`);
-        }
-        return {
-          label: "Explanation",
-          value: (
-            `${sources.join("; ")}. ${value("Failure reason")}. `
-            + `Expected: ${value("Required format")}`
-          ),
-        };
-      }
-      case "CC-RULE-014": {
-        const documentedTruck = value("Documented truck number");
-        return {
-          label: "Explanation",
-          value: (
-            `${value("Missing or failed requirement")}`
-            + (
-              documentedTruck
-                ? `; documented truck ${documentedTruck}.`
-                : "."
-            )
-          ),
-        };
-      }
-      default:
-        return {
-          label: "Explanation",
-          value: details
-            .map((detail) => `${detail.label}: ${detail.value}`)
-            .join("; "),
-        };
-    }
   };
 
   const hydrateMobileExceptions = () => {
@@ -122,7 +47,7 @@
         ".exception-card__message",
       );
       const desktopDetails = card.querySelector(":scope > .exception-details");
-      if (fields.length < 3 || !desktopMessage || !desktopDetails) {
+      if (fields.length < 2 || !desktopMessage || !desktopDetails) {
         continue;
       }
 
@@ -135,6 +60,7 @@
           identity,
           normalizedText(field.querySelector("dt")),
           normalizedText(field.querySelector("dd")),
+          field.dataset.displayKind || "",
         );
       }
 
@@ -143,32 +69,17 @@
         "mobile-exception-card__message",
         normalizedText(desktopMessage.querySelector("h3")),
       );
-      const ruleId = card.dataset.ruleId || "";
-      let ruleDetails;
-      if (ruleId === "CC-RULE-004") {
-        ruleDetails = createElement(
-          "dl",
-          "mobile-exception-card__details",
+      const ruleDetails = createElement(
+        "dl",
+        "mobile-exception-card__details",
+      );
+      for (const detail of desktopDetails.children) {
+        appendDefinition(
+          ruleDetails,
+          normalizedText(detail.querySelector("dt")),
+          normalizedText(detail.querySelector("dd")),
+          detail.dataset.displayKind || "",
         );
-        for (const detail of desktopDetails.children) {
-          appendDefinition(
-            ruleDetails,
-            normalizedText(detail.querySelector("dt")),
-            normalizedText(detail.querySelector("dd")),
-          );
-        }
-      } else {
-        const summaryDetail = mobileExceptionSummary(ruleId, desktopDetails);
-        ruleDetails = createElement(
-          "p",
-          "mobile-exception-card__summary",
-        );
-        if (summaryDetail.label) {
-          ruleDetails.append(
-            createElement("strong", "", summaryDetail.label),
-          );
-        }
-        ruleDetails.append(createElement("span", "", summaryDetail.value));
       }
       target.replaceChildren(message, identity, ruleDetails);
     }

@@ -203,35 +203,31 @@ def test_results_have_mobile_cards_and_sticky_selection_controls(client):
     assert page.count("data-export-feedback\n") == 2
     assert page.count('formtarget="_blank"') == 4
     assert "Export All" in page
-    assert "Record ID" in page
+    assert "Application Number" in page
     assert "Entry Date" in page
-    assert "Truck Number" in page
+    assert "Record ID" not in page
+    assert "Truck Number" not in page
     assert ">Rule ID<" not in page
     assert "CSV row <strong>" not in page
     assert 'data-rule-id="CC-RULE-003"' in page
     assert 'data-source-row-number="2"' in page
 
 
-def test_mobile_exception_hydrator_omits_rule_id_and_duplicate_detail_boxes():
+def test_mobile_exception_hydrator_mirrors_server_mapped_fields_and_roles():
     script = Path("app/static/js/mobile-shell.js").read_text(encoding="utf-8")
 
     assert "for (const field of fields)" in script
     assert ".exception-card__identity .exception-card__field" in script
-    assert "card.dataset.ruleId" in script
+    assert "detail.dataset.displayKind" in script
+    assert "field.dataset.displayKind" in script
+    assert 'group.classList.add("result-detail--invalid")' in script
     assert 'normalizedText(fields[0].querySelector("small"))' not in script
     assert '"mobile-exception-card__row"' not in script
     assert "target.replaceChildren(message, identity, ruleDetails)" in script
-    assert '"mobile-exception-card__summary"' in script
     assert '"mobile-exception-card__details"' in script
     assert '"mobile-exception-card__meta"' not in script
-    assert '"Comparison", "Explanation"' in script
-    for rule_id in (
-        "CC-RULE-001",
-        "CC-RULE-007",
-        "CC-RULE-012",
-        "CC-RULE-014",
-    ):
-        assert f'case "{rule_id}"' in script
+    assert "card.dataset.ruleId" not in script
+    assert 'case "CC-RULE-' not in script
 
 
 def test_mobile_warnings_preview_rules_settings_auth_and_errors_are_dedicated(
@@ -343,7 +339,7 @@ def test_phone_css_prevents_page_horizontal_overflow_and_preserves_breakpoint():
     ):
         assert declaration in bottom_bar_rule.group()
     assert "grid-template-columns: 1.65rem minmax(0, 1fr);" in stylesheet
-    assert ".mobile-exception-card__summary" in stylesheet
+    assert ".mobile-exception-card__details" in stylesheet
     assert ".mobile-exception-card__details" in stylesheet
     assert ".mobile-exception-card__row" not in stylesheet
     assert re.search(
