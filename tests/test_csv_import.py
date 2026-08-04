@@ -578,18 +578,10 @@ def test_rule_005_inclusive_boundaries_pass_on_results_screen(
     assert b"No exceptions found" in response.data
 
 
-@pytest.mark.parametrize(
-    ("type4_brix", "direction", "amount"),
-    (
-        ("33.9", b"Below range", b"0.7"),
-        ("37.1", b"Above range", b"0.5"),
-    ),
-)
+@pytest.mark.parametrize("type4_brix", ("33.9", "37.1"))
 def test_rule_005_exception_is_rendered_on_results_screen(
     client,
     type4_brix,
-    direction,
-    amount,
 ):
     response = _upload(
         client,
@@ -606,10 +598,12 @@ def test_rule_005_exception_is_rendered_on_results_screen(
     assert response.status_code == 200
     assert b"CC-RULE-005" in response.data
     assert b"BRIX out of range." in response.data
+    assert b"Entered BRIX" in response.data
+    assert f">{type4_brix}</dd>".encode() in response.data
     assert b"Cryotech Polar Guard Xtend" in response.data
     assert b"34.6\xe2\x80\x9336.6" in response.data
-    assert direction in response.data
-    assert amount in response.data
+    assert b"Position" not in response.data
+    assert b"Difference" not in response.data
 
 
 def test_rule_005_no_type4_use_skips_without_warning(client):
@@ -674,8 +668,7 @@ def test_rule_006_default_six_minute_gap_renders_required_details(client):
     assert b">6 minutes</dd>" in response.data
     assert b"Allowed Gap" in response.data
     assert b">5 minutes</dd>" in response.data
-    assert b"Over By" in response.data
-    assert b">1 minute</dd>" in response.data
+    assert b"Over By" not in response.data
 
 
 @pytest.mark.parametrize(
@@ -1506,8 +1499,7 @@ def test_personal_event_time_settings_affect_next_upload_and_reset(app, client):
     assert b">21 minutes</dd>" in personal_response.data
     assert b"Maximum Event Time" in personal_response.data
     assert b">20 minutes</dd>" in personal_response.data
-    assert b"Over By" in personal_response.data
-    assert b">1 minute</dd>" in personal_response.data
+    assert b"Over By" not in personal_response.data
     assert reset_response.status_code == 302
     assert reset_audit_response.status_code == 200
     assert b"CC-RULE-010" not in reset_audit_response.data

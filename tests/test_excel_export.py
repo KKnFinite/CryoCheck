@@ -640,6 +640,90 @@ def test_export_workbook_has_required_headers_values_and_formatting():
     workbook.close()
 
 
+def test_simplified_result_fields_remain_complete_in_excel():
+    audit = _audit_result(
+        _audit_exception(
+            source_row_number=2,
+            rule_id="CC-RULE-005",
+            rule_name="BRIX Out of Range",
+            details=(
+                RuleDetail("Entered BRIX", "50"),
+                RuleDetail("Selected Type IV fluid", "Synthetic Fluid"),
+                RuleDetail("Acceptable inclusive range", "34.6\N{EN DASH}36.6"),
+                RuleDetail("Range comparison", "Above range"),
+                RuleDetail("Amount above nearest boundary", "13.4"),
+            ),
+        ),
+        _audit_exception(
+            source_row_number=3,
+            rule_id="CC-RULE-006",
+            rule_name="Excessive Gap Between Steps",
+            details=(
+                RuleDetail("Type I end time", "08:00"),
+                RuleDetail("Type IV start time", "08:06"),
+                RuleDetail("Actual calculated gap", "6 minutes"),
+                RuleDetail("Configured Allowed Gap", "5 minutes"),
+                RuleDetail("Amount over setting", "1 minute"),
+            ),
+        ),
+        _audit_exception(
+            source_row_number=4,
+            rule_id="CC-RULE-010",
+            rule_name="Excessive Event Time",
+            details=(
+                RuleDetail("ProcessTime1", "20 minutes"),
+                RuleDetail("ProcessTime4", "11 minutes"),
+                RuleDetail("Include Gap setting", "Off"),
+                RuleDetail("Calculated event time", "31 minutes"),
+                RuleDetail("Configured maximum event time", "30 minutes"),
+                RuleDetail("Minutes over the maximum", "1 minute"),
+            ),
+        ),
+    )
+    prepared = prepare_export(
+        audit,
+        secret_key="complete-details-secret",
+        context_id="complete-details-context",
+    )
+    snapshot = load_export_snapshot(
+        prepared.token,
+        secret_key="complete-details-secret",
+        max_age_seconds=60,
+        expected_context_id="complete-details-context",
+    )
+    selected = select_export_rows(
+        snapshot,
+        scope="all",
+        selected_identifiers=(),
+    )
+    stream, _filename = build_exception_workbook(selected)
+    workbook = load_workbook(stream)
+    worksheet = workbook["Exceptions"]
+    positions = _header_positions(worksheet)
+
+    assert worksheet.cell(
+        row=2,
+        column=positions["Detail \N{EM DASH} Range comparison"],
+    ).value == "Above range"
+    assert worksheet.cell(
+        row=2,
+        column=positions["Detail \N{EM DASH} Amount above nearest boundary"],
+    ).value == "13.4"
+    assert worksheet.cell(
+        row=3,
+        column=positions["Detail \N{EM DASH} Amount over setting"],
+    ).value == "1 minute"
+    assert worksheet.cell(
+        row=4,
+        column=positions["Detail \N{EM DASH} Minutes over the maximum"],
+    ).value == "1 minute"
+    assert "Minutes over the maximum: 1 minute" in worksheet.cell(
+        row=4,
+        column=positions["Combined details"],
+    ).value
+    workbook.close()
+
+
 def test_results_and_export_preserve_non_padded_start_time_text(client):
     results = _upload_for_export(
         client,

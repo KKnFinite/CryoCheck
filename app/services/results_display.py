@@ -64,9 +64,6 @@ _STANDARD_SPECS: dict[str, tuple[_DetailSpec, ...]] = {
         _DetailSpec("Entered BRIX", "Entered BRIX", INVALID_VALUE),
         _DetailSpec("Selected Type IV fluid", "Type IV Fluid"),
         _DetailSpec("Acceptable inclusive range", "Acceptable Range"),
-        _DetailSpec("Range comparison", "Position"),
-        _DetailSpec("Amount above nearest boundary", "Difference"),
-        _DetailSpec("Amount below nearest boundary", "Difference"),
     ),
     "CC-RULE-006": (
         _DetailSpec("Type I end time", "Type I End Time", INVALID_VALUE),
@@ -77,7 +74,6 @@ _STANDARD_SPECS: dict[str, tuple[_DetailSpec, ...]] = {
         ),
         _DetailSpec("Actual calculated gap", "Calculated Gap"),
         _DetailSpec("Configured Allowed Gap", "Allowed Gap"),
-        _DetailSpec("Amount over setting", "Over By"),
     ),
     "CC-RULE-008": (
         _DetailSpec("Type I gallons used", "Type I Used", INVALID_VALUE),
@@ -112,7 +108,6 @@ _STANDARD_SPECS: dict[str, tuple[_DetailSpec, ...]] = {
             "Configured maximum event time",
             "Maximum Event Time",
         ),
-        _DetailSpec("Minutes over the maximum", "Over By"),
     ),
     "CC-RULE-011": (
         _DetailSpec(

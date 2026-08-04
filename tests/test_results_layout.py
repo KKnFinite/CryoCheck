@@ -155,15 +155,12 @@ _EXPECTED_LABELS_BY_RULE = {
         "Entered BRIX",
         "Type IV Fluid",
         "Acceptable Range",
-        "Position",
-        "Difference",
     ),
     "CC-RULE-006": (
         "Type I End Time",
         "Type IV Start Time",
         "Calculated Gap",
         "Allowed Gap",
-        "Over By",
     ),
     "CC-RULE-007": (
         "Type IV Used",
@@ -192,7 +189,6 @@ _EXPECTED_LABELS_BY_RULE = {
         "Overlap Handling",
         "Calculated Event Time",
         "Maximum Event Time",
-        "Over By",
     ),
     "CC-RULE-011": (
         "Entered Concentration",
