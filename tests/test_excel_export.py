@@ -640,6 +640,38 @@ def test_export_workbook_has_required_headers_values_and_formatting():
     workbook.close()
 
 
+def test_results_and_export_preserve_non_padded_start_time_text(client):
+    results = _upload_for_export(
+        client,
+        {
+            "ApplicationDate": "1/1/2026",
+            "StartTime": "5:11",
+            "DateCreated": "1/2/2026 8:08",
+        },
+    )
+
+    assert results.status_code == 200
+    assert b"1/1/2026 5:11" in results.data
+    assert b"Unable to evaluate" not in results.data
+    token, _identifiers = _export_form(results)
+    response = client.post(
+        "/export",
+        data={"export_token": token, "scope": "all"},
+    )
+    workbook = _workbook_from_response(response)
+    worksheet = workbook["Exceptions"]
+    positions = _header_positions(worksheet)
+
+    assert response.status_code == 200
+    assert worksheet.cell(row=2, column=positions["Rule ID"]).value == (
+        "CC-RULE-002"
+    )
+    assert worksheet.cell(row=2, column=positions["StartTime"]).value == (
+        "5:11"
+    )
+    workbook.close()
+
+
 def test_export_escapes_formula_like_text_in_source_and_detail_fields():
     audit = _audit_result(
         _audit_exception(

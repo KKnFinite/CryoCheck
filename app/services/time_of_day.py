@@ -9,12 +9,12 @@ from typing import Final
 
 MINUTES_PER_DAY: Final = 24 * 60
 _MILITARY_TIME_PATTERN: Final = re.compile(
-    r"^(?P<hour>[01]\d|2[0-3]):(?P<minute>[0-5]\d)$"
+    r"^(?P<hour>[01]?\d|2[0-3]):(?P<minute>[0-5]\d)$"
 )
 
 
 def parse_military_time(source_value: str) -> time | None:
-    """Parse exact whole-minute HH:MM text without changing the source value."""
+    """Parse exact whole-minute H:MM or HH:MM without changing source text."""
     match = _MILITARY_TIME_PATTERN.fullmatch(source_value.strip())
     if match is None:
         return None

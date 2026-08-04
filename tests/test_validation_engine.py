@@ -284,6 +284,22 @@ def test_rule_001_entry_after_event_passes():
     assert result.exception_count == 0
 
 
+@pytest.mark.parametrize("start_time", ("5:11", "05:11"))
+def test_rule_001_accepts_padded_and_non_padded_overall_start_time(start_time):
+    result = _audit_one(
+        application_date="1/2/2026",
+        start_time=start_time,
+        date_created="1/2/2026 5:10",
+    )
+
+    assert result.unable_to_evaluate_count == 0
+    assert tuple(
+        exception.rule_id for exception in result.exceptions
+    ) == ("CC-RULE-001",)
+    assert result.exceptions[0].start_time == start_time
+    assert result.exceptions[0].details[0].value == f"1/2/2026 {start_time}"
+
+
 def test_utc_fields_do_not_influence_rule_001_or_rule_002():
     result = _audit_one(
         date_created="2026-01-15 08:00",
@@ -329,6 +345,51 @@ def test_rule_002_more_than_24_hours_fails():
     assert result.exception_count == 1
     assert result.exceptions[0].rule_id == "CC-RULE-002"
     assert result.exceptions[0].details[-1].value == "1 hour, 1 minute"
+
+
+@pytest.mark.parametrize("start_time", ("5:11", "05:11"))
+def test_rule_002_accepts_padded_and_non_padded_overall_start_time(start_time):
+    result = _audit_one(
+        application_date="1/1/2026",
+        start_time=start_time,
+        date_created="1/2/2026 8:08",
+    )
+
+    assert result.unable_to_evaluate_count == 0
+    assert tuple(
+        exception.rule_id for exception in result.exceptions
+    ) == ("CC-RULE-002",)
+    exception = result.exceptions[0]
+    assert exception.start_time == start_time
+    assert exception.details[0].value == f"1/1/2026 {start_time}"
+    assert exception.details[3].value == "1 day, 2 hours, 57 minutes"
+    assert exception.details[4].value == "2 hours, 57 minutes"
+
+
+@pytest.mark.parametrize(
+    ("application_date", "start_time", "date_created", "rule_ids"),
+    (
+        ("1/1/2026", "5:11", "1/2/2026 8:08", ("CC-RULE-002",)),
+        ("1/2/2026", "5:11", "1/2/2026 8:08", ()),
+        ("1/7/2026", "0:19", "1/7/2026 21:30", ()),
+    ),
+)
+def test_supplied_non_padded_real_data_timestamp_scenarios(
+    application_date,
+    start_time,
+    date_created,
+    rule_ids,
+):
+    result = _audit_one(
+        application_date=application_date,
+        start_time=start_time,
+        date_created=date_created,
+    )
+
+    assert result.unable_to_evaluate_count == 0
+    assert tuple(
+        exception.rule_id for exception in result.exceptions
+    ) == rule_ids
 
 
 def test_rule_002_47_hours_59_minutes_passes_at_48_hours():
@@ -1627,6 +1688,29 @@ def test_rule_013_overnight_sequence_passes():
     )
 
 
+def test_rule_013_accepts_non_padded_times_and_preserves_source_text():
+    result = _audit_overlap(
+        start_time="5:00",
+        end_time="5:30",
+        date_created="2026-01-15 05:00",
+        end_time1="5:11",
+        start_time4="5:10",
+    )
+    exception = tuple(
+        finding
+        for finding in result.exceptions
+        if finding.rule_id == "CC-RULE-013"
+    )[0]
+
+    assert all(
+        warning.rule_id != "CC-RULE-013"
+        for warning in result.unable_to_evaluate
+    )
+    assert tuple(
+        detail.value for detail in exception.details[:4]
+    ) == ("5:00", "5:30", "5:11", "5:10")
+
+
 @pytest.mark.parametrize(
     ("field_name", "field_value", "expected_field"),
     (
@@ -2291,6 +2375,33 @@ def test_rule_006_ten_minute_gap_reports_five_minutes_over():
     assert exception.rule_id == "CC-RULE-006"
     assert exception.details[2].value == "10 minutes"
     assert exception.details[4].value == "5 minutes"
+
+
+@pytest.mark.parametrize(
+    ("type1_end", "type4_start"),
+    (("5:04", "5:11"), ("05:04", "05:11")),
+)
+def test_rule_006_accepts_padded_and_non_padded_step_times(
+    type1_end,
+    type4_start,
+):
+    result = _audit_gap(
+        end_time1=type1_end,
+        start_time4=type4_start,
+    )
+    exception = tuple(
+        finding
+        for finding in result.exceptions
+        if finding.rule_id == "CC-RULE-006"
+    )[0]
+
+    assert all(
+        warning.rule_id != "CC-RULE-006"
+        for warning in result.unable_to_evaluate
+    )
+    assert exception.details[0].value == type1_end
+    assert exception.details[1].value == type4_start
+    assert exception.details[2].value == "7 minutes"
 
 
 def test_rule_006_setting_zero_allows_only_zero_minute_gap():
@@ -3830,15 +3941,22 @@ def test_rule_010_type1_only_exception_details_are_exact():
     )
 
 
-def test_rule_010_combined_gap_details_preserve_source_times():
+@pytest.mark.parametrize(
+    ("type1_end", "type4_start"),
+    (("8:10", "8:16"), ("08:10", "08:16")),
+)
+def test_rule_010_combined_gap_details_preserve_source_times(
+    type1_end,
+    type4_start,
+):
     settings = replace(DEFAULT_SETTINGS, include_gap_in_event_time=True)
     result = _audit_event_time(
         settings=settings,
         type4_used="1",
         process_time1="10",
         process_time4="15",
-        end_time1="08:10",
-        start_time4="08:16",
+        end_time1=type1_end,
+        start_time4=type4_start,
     )
     exception = tuple(
         exception
@@ -3857,7 +3975,10 @@ def test_rule_010_combined_gap_details_preserve_source_times():
         ("Include Gap setting", "On"),
         (
             "Included gap",
-            "6 minutes (EndTime1 08:10 to StartTime4 08:16)",
+            (
+                f"6 minutes (EndTime1 {type1_end} to StartTime4 "
+                f"{type4_start})"
+            ),
         ),
         ("Calculated event time", "31 minutes"),
         ("Configured maximum event time", "30 minutes"),

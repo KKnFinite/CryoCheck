@@ -18,10 +18,14 @@ from app.services.time_of_day import (
 @pytest.mark.parametrize(
     ("source_text", "expected"),
     (
+        ("0:19", time(0, 19)),
+        ("5:11", time(5, 11)),
+        ("05:11", time(5, 11)),
+        ("20:58", time(20, 58)),
         ("00:00", time(0, 0)),
         ("08:05", time(8, 5)),
         ("23:59", time(23, 59)),
-        (" 08:05 ", time(8, 5)),
+        (" 8:05 ", time(8, 5)),
     ),
 )
 def test_parse_military_time_accepts_exact_whole_minute_text(
@@ -33,9 +37,19 @@ def test_parse_military_time_accepts_exact_whole_minute_text(
 
 @pytest.mark.parametrize(
     "source_text",
-    ("", "8:05", "08:5", "24:00", "23:60", "08:05:00", "8:05 AM"),
+    (
+        "",
+        "24:00",
+        "5:7",
+        "5:61",
+        "5:11 PM",
+        "08:5",
+        "23:60",
+        "08:05:00",
+        "8:05 AM",
+    ),
 )
-def test_parse_military_time_rejects_non_hhmm_text(source_text):
+def test_parse_military_time_rejects_invalid_clock_text(source_text):
     assert parse_military_time(source_text) is None
 
 
