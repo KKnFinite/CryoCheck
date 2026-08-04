@@ -238,7 +238,10 @@ def _rule_007_presentation(
             ResultDetail("Precipitation", details["Recorded precipitation"]),
             ResultDetail(
                 "Expected",
-                "Record positive Type IV usage during active precipitation.",
+                (
+                    "Type IV is expected during active precipitation, or a "
+                    "comment if another truck was used."
+                ),
             ),
         ),
     )
@@ -280,11 +283,16 @@ def _rule_012_presentation(
                 INVALID_VALUE,
             )
         )
+    format_details = (
+        ()
+        if failure == "Does not match UPS NxxxUP format"
+        else (ResultDetail("Expected Format", details["Required format"]),)
+    )
     return ExceptionPresentation(
         details=(
             *invalid_details,
             ResultDetail("Aircraft Type", details["Original AircraftType"]),
-            ResultDetail("Expected Format", details["Required format"]),
+            *format_details,
             ResultDetail("Explanation", failure),
         ),
     )
@@ -306,13 +314,9 @@ def _rule_013_presentation(
                 details["Type IV StartTime4"],
                 INVALID_VALUE,
             ),
-            ResultDetail("Calculated Overlap", details["Calculated overlap"]),
             ResultDetail(
                 "Expected",
-                (
-                    "Type IV should start at or after Type I ends for a "
-                    "same-day event."
-                ),
+                "Type IV pass cannot start prior to Type I pass ending.",
             ),
         ),
     )

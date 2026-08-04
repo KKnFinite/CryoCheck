@@ -204,7 +204,6 @@ _EXPECTED_LABELS_BY_RULE = {
     "CC-RULE-013": (
         "Type I End Time",
         "Type IV Start Time",
-        "Calculated Overlap",
         "Expected",
     ),
     "CC-RULE-014": (
@@ -529,8 +528,48 @@ def test_rule_012_marks_only_failed_source_fields_as_invalid(app):
     assert "Entered Tail Number" not in _visible_text(notes_card)
     assert "Entered Tail Number AB-123" in _visible_text(tail_card)
     assert "Entered Notes" not in _visible_text(tail_card)
+    assert "Expected Format" in _visible_text(notes_card)
+    assert "Expected Format" not in _visible_text(tail_card)
+    assert _visible_text(tail_card).endswith(
+        "Aircraft Type 1 Explanation Does not match UPS NxxxUP format"
+    )
     assert notes_card.count('data-display-kind="invalid"') == 1
     assert tail_card.count('data-display-kind="invalid"') == 1
+
+
+def test_rules_007_and_013_use_exact_expected_guidance(app):
+    rule_007 = replace(
+        _exception("CC-RULE-007", 7),
+        details=(
+            RuleDetail("Recorded precipitation", "Snow"),
+            RuleDetail("Type IV amount recorded", "0"),
+            RuleDetail("Finding", "OMIT-RULE-007-FINDING"),
+        ),
+    )
+    rule_013 = replace(
+        _exception("CC-RULE-013", 13),
+        details=(
+            RuleDetail("Type I EndTime1", "20:20"),
+            RuleDetail("Type IV StartTime4", "20:15"),
+            RuleDetail("Calculated overlap", "5 minutes"),
+            RuleDetail("Explanation", "OMIT-DUPLICATE-EXPLANATION"),
+        ),
+    )
+
+    rule_007_card, rule_013_card = _exception_cards(
+        _render_results(app, (rule_007, rule_013))
+    )
+    assert _visible_text(rule_007_card).endswith(
+        "Expected Type IV is expected during active precipitation, or a "
+        "comment if another truck was used."
+    )
+    assert "OMIT-RULE-007-FINDING" not in _visible_text(rule_007_card)
+    assert _visible_text(rule_013_card).endswith(
+        "Expected Type IV pass cannot start prior to Type I pass ending."
+    )
+    assert "Calculated Overlap" not in _visible_text(rule_013_card)
+    assert "5 minutes" not in _visible_text(rule_013_card)
+    assert "OMIT-DUPLICATE-EXPLANATION" not in _visible_text(rule_013_card)
 
 
 def test_export_form_and_warning_behavior_remain_unchanged(app):

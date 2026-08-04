@@ -724,6 +724,93 @@ def test_simplified_result_fields_remain_complete_in_excel():
     workbook.close()
 
 
+def test_rule_guidance_details_remain_complete_in_excel():
+    audit = _audit_result(
+        _audit_exception(
+            source_row_number=2,
+            rule_id="CC-RULE-007",
+            rule_name="No Type IV During Active Precipitation",
+            details=(
+                RuleDetail("Recorded precipitation", "Snow"),
+                RuleDetail("Type IV amount recorded", "0"),
+                RuleDetail("Finding", "No positive Type IV usage was recorded."),
+            ),
+        ),
+        _audit_exception(
+            source_row_number=3,
+            rule_id="CC-RULE-012",
+            rule_name="Incorrect Tail Number",
+            details=(
+                RuleDetail("Original AircraftType", "1"),
+                RuleDetail("Original TailNumber", "AB-123"),
+                RuleDetail("Required format", "UPS NxxxUP format"),
+                RuleDetail(
+                    "Failure reason",
+                    "Does not match UPS NxxxUP format",
+                ),
+            ),
+        ),
+        _audit_exception(
+            source_row_number=4,
+            rule_id="CC-RULE-013",
+            rule_name="Pass Overlap",
+            details=(
+                RuleDetail("Overall StartTime", "20:00"),
+                RuleDetail("Overall EndTime", "20:30"),
+                RuleDetail("Type I EndTime1", "20:20"),
+                RuleDetail("Type IV StartTime4", "20:15"),
+                RuleDetail("Calculated overlap", "5 minutes"),
+                RuleDetail(
+                    "Explanation",
+                    "Type IV began before Type I ended.",
+                ),
+            ),
+        ),
+    )
+    prepared = prepare_export(
+        audit,
+        secret_key="guidance-details-secret",
+        context_id="guidance-details-context",
+    )
+    snapshot = load_export_snapshot(
+        prepared.token,
+        secret_key="guidance-details-secret",
+        max_age_seconds=60,
+        expected_context_id="guidance-details-context",
+    )
+    selected = select_export_rows(
+        snapshot,
+        scope="all",
+        selected_identifiers=(),
+    )
+    stream, _filename = build_exception_workbook(selected)
+    workbook = load_workbook(stream)
+    worksheet = workbook["Exceptions"]
+    positions = _header_positions(worksheet)
+
+    assert worksheet.cell(
+        row=2,
+        column=positions["Detail \N{EM DASH} Finding"],
+    ).value == "No positive Type IV usage was recorded."
+    assert worksheet.cell(
+        row=3,
+        column=positions["Detail \N{EM DASH} Required format"],
+    ).value == "UPS NxxxUP format"
+    assert worksheet.cell(
+        row=4,
+        column=positions["Detail \N{EM DASH} Calculated overlap"],
+    ).value == "5 minutes"
+    assert worksheet.cell(
+        row=4,
+        column=positions["Detail \N{EM DASH} Explanation"],
+    ).value == "Type IV began before Type I ended."
+    assert "Calculated overlap: 5 minutes" in worksheet.cell(
+        row=4,
+        column=positions["Combined details"],
+    ).value
+    workbook.close()
+
+
 def test_results_and_export_preserve_non_padded_start_time_text(client):
     results = _upload_for_export(
         client,

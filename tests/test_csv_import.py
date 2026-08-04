@@ -835,6 +835,10 @@ def test_rule_007_exception_is_rendered_on_results_screen(
     assert b"Type IV Used" in response.data
     assert displayed_type4 in response.data
     assert b">Expected</dt>" in response.data
+    assert (
+        b"Type IV is expected during active precipitation, or a comment if "
+        b"another truck was used."
+    ) in response.data
 
 
 @pytest.mark.parametrize(
@@ -1437,8 +1441,11 @@ def test_rule_010_overlap_uses_zero_gap_while_rule_013_reports_overlap(
     assert b"CC-RULE-010 used a 0-minute gap" in response.data
     assert response.data.count(b"CC-RULE-013") == 1
     assert b"Pass overlap." in response.data
-    assert b"Calculated Overlap" in response.data
-    assert b">6 minutes</dd>" in response.data
+    assert b"Calculated Overlap" not in response.data
+    assert (
+        b"Type IV pass cannot start prior to Type I pass ending."
+        in response.data
+    )
 
 
 def test_personal_event_time_settings_affect_next_upload_and_reset(app, client):
@@ -1685,7 +1692,10 @@ def test_rule_012_invalid_tail_paths_render_specific_reason(
         b"Entered Tail Number" in response.data
         or b"Entered Notes" in response.data
     )
-    assert b"Expected Format" in response.data
+    if overrides["AircraftType"] == "1":
+        assert b"Expected Format" not in response.data
+    else:
+        assert b"Expected Format" in response.data
 
 
 def test_rule_012_invalid_aircraft_type_renders_warning(client):
@@ -1718,6 +1728,13 @@ def test_rule_012_invalid_aircraft_type_renders_warning(client):
             "Type4Used": "1",
             "Type4ABrix": "35",
             "StartTime4": "08:10",
+        },
+        {
+            "Type1Used": "1",
+            "EndTime1": "08:10",
+            "Type4Used": "1",
+            "Type4ABrix": "35",
+            "StartTime4": "08:11",
         },
         {
             "StartTime": "23:45",
@@ -1771,8 +1788,13 @@ def test_rule_013_same_day_overlap_renders_required_results_details(client):
     assert b">20:20</dd>" in response.data
     assert b"Type IV Start Time" in response.data
     assert b">20:15</dd>" in response.data
-    assert b"Calculated Overlap" in response.data
-    assert b">5 minutes</dd>" in response.data
+    assert b"Calculated Overlap" not in response.data
+    assert b">5 minutes</dd>" not in response.data
+    assert (
+        b"Type IV pass cannot start prior to Type I pass ending."
+        in response.data
+    )
+    assert b"Type IV began at 20:15" not in response.data
 
 
 @pytest.mark.parametrize(
