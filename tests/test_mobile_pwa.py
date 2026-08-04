@@ -221,12 +221,16 @@ def test_mobile_exception_cards_reuse_the_server_rendered_top_row():
     assert "hydrateMobileExceptions" not in script
     assert "data-mobile-exception-content" not in template
     assert 'class="exception-card__top-row"' in template
-    top_row = template.index('class="exception-card__top-row"')
-    checkbox = template.index('class="exception-card__selection"', top_row)
-    message = template.index('class="exception-card__message"', checkbox)
+    checkbox = template.index('class="exception-card__selection"')
+    content_grid = template.index(
+        'class="exception-card__content-grid"',
+        checkbox,
+    )
+    top_row = template.index('class="exception-card__top-row"', content_grid)
+    message = template.index('class="exception-card__message"', top_row)
     identity = template.index('class="exception-card__identity"', message)
     details = template.index('class="exception-details"', identity)
-    assert top_row < checkbox < message < identity < details
+    assert checkbox < content_grid < top_row < message < identity < details
 
 
 def test_mobile_warnings_rules_settings_auth_and_errors_are_dedicated(
@@ -341,8 +345,9 @@ def test_phone_css_prevents_page_horizontal_overflow_and_preserves_breakpoint():
         "border-radius: 0;",
     ):
         assert declaration in bottom_bar_rule.group()
-    assert "minmax(5.7rem, 1.05fr)" in stylesheet
-    assert "minmax(8rem, 1.35fr)" in stylesheet
+    assert "grid-template-columns: repeat(5, minmax(0, 1fr));" in stylesheet
+    assert "grid-template-columns: repeat(2, minmax(0, 1fr));" in stylesheet
+    assert "grid-template-columns: subgrid;" in stylesheet
     assert ".exception-card__top-row" in stylesheet
     assert ".mobile-exception-card__details" not in stylesheet
     assert ".mobile-exception-card__row" not in stylesheet

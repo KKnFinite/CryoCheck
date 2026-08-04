@@ -10,7 +10,11 @@ from types import SimpleNamespace
 
 from flask import render_template
 
-from app.services.results_display import exception_presentation
+from app.services.results_display import (
+    ExceptionPresentation,
+    ResultDetail,
+    exception_presentation,
+)
 from app.services.validation_engine import (
     AuditException,
     AuditResult,
@@ -260,6 +264,7 @@ def _render_results(
     exceptions: tuple[AuditException, ...],
     *,
     warnings: tuple[UnableToEvaluate, ...] = (),
+    presentations: tuple[ExceptionPresentation, ...] | None = None,
 ) -> str:
     audit = AuditResult(
         filename="layout-test.csv",
@@ -276,7 +281,11 @@ def _render_results(
         (
             f"exception-{index}",
             exception,
-            exception_presentation(exception),
+            (
+                presentations[index - 1]
+                if presentations is not None
+                else exception_presentation(exception)
+            ),
         )
         for index, exception in enumerate(exceptions, start=1)
     )
@@ -360,7 +369,7 @@ def test_all_fourteen_rules_use_standard_identity_and_mapped_values(app):
         assert visible.count("Entry Date") == 1
         assert f"APPLICATION-{index:02d}" in visible
         assert f"2026-07-24 10:{index:02d}" in visible
-        assert visible.index("Application Number") < visible.index("Entry Date")
+        assert visible.index("Entry Date") < visible.index("Application Number")
 
         for removed in (
             "Record ID",
@@ -377,8 +386,9 @@ def test_all_fourteen_rules_use_standard_identity_and_mapped_values(app):
         assert "data-exception-checkbox" in card
         assert 'aria-label="Rule-relevant details"' in card
         top_row_elements = (
-            'class="exception-card__top-row"',
             'class="exception-card__selection"',
+            'class="exception-card__content-grid"',
+            'class="exception-card__top-row"',
             'class="exception-card__message"',
             'class="exception-card__identity"',
             'class="exception-details"',
@@ -386,12 +396,29 @@ def test_all_fourteen_rules_use_standard_identity_and_mapped_values(app):
         assert all(element in card for element in top_row_elements)
         positions = tuple(card.index(element) for element in top_row_elements)
         assert positions == tuple(sorted(positions))
+        assert re.search(
+            r'class="exception-card__message"\s+'
+            r'data-grid-column="1"',
+            card,
+        )
+        assert re.search(
+            r'class="exception-card__field exception-card__field--entry'
+            r'.*?data-grid-column="3"',
+            card,
+            flags=re.DOTALL,
+        )
+        assert re.search(
+            r'class="exception-card__field '
+            r'exception-card__field--application"\s+'
+            r'data-grid-column="5"',
+            card,
+        )
 
         labels = tuple(
             re.findall(
                 r'<dt>([^<]+)</dt>',
                 re.search(
-                    r'<dl class="exception-details".*?</dl>',
+                    r'<dl\s+class="exception-details".*?</dl>',
                     card,
                     flags=re.DOTALL,
                 ).group(),
@@ -399,6 +426,19 @@ def test_all_fourteen_rules_use_standard_identity_and_mapped_values(app):
         )
         assert labels == _EXPECTED_LABELS_BY_RULE[rule_id]
         assert "Comparison" not in labels
+        detail_columns = tuple(
+            re.findall(
+                r'class="exception-details__item[^>]*?"[^>]*?'
+                r'data-display-kind="[^"]+"[^>]*?'
+                r'data-grid-column="(\d)"',
+                card,
+                flags=re.DOTALL,
+            )
+        )
+        assert detail_columns == tuple(
+            str((detail_index % 5) + 1)
+            for detail_index in range(len(labels))
+        )
 
         invalid_groups = re.findall(
             r'<(?:div)[^>]*data-display-kind="invalid"[^>]*>.*?</div>',
@@ -417,14 +457,72 @@ def test_all_fourteen_rules_use_standard_identity_and_mapped_values(app):
     assert "data-export-all" in html
 
     stylesheet = Path("app/static/css/app.css").read_text(encoding="utf-8")
-    top_row_rule = re.search(
-        r"\.exception-card__top-row \{.*?\}",
+    content_grid_rule = re.search(
+        r"\.exception-card__content-grid \{.*?\}",
         stylesheet,
         flags=re.DOTALL,
     ).group()
-    assert "display: grid;" in top_row_rule
-    assert "minmax(15rem, 1.35fr)" in top_row_rule
-    assert "minmax(22rem, 1fr)" in top_row_rule
+    assert "display: grid;" in content_grid_rule
+    assert "repeat(5, minmax(0, 1fr))" in content_grid_rule
+    assert "border-left" not in content_grid_rule
+    assert "border-right" not in content_grid_rule
+    assert stylesheet.count("grid-template-columns: subgrid;") >= 3
+
+
+def test_detail_grid_fills_columns_left_to_right_for_one_through_five(app):
+    exceptions = tuple(
+        replace(
+            _exception("CC-RULE-001", count),
+            exception_message=f"COUNT-{count}",
+        )
+        for count in range(1, 6)
+    )
+    presentations = tuple(
+        ExceptionPresentation(
+            details=tuple(
+                ResultDetail(f"Detail {index}", f"Value {index}")
+                for index in range(1, count + 1)
+            )
+        )
+        for count in range(1, 6)
+    )
+    cards = _exception_cards(
+        _render_results(
+            app,
+            exceptions,
+            presentations=presentations,
+        )
+    )
+
+    assert len(cards) == 5
+    for count, card in enumerate(cards, start=1):
+        columns = tuple(
+            re.findall(
+                r'class="exception-details__item[^>]*?"[^>]*?'
+                r'data-display-kind="[^"]+"[^>]*?'
+                r'data-grid-column="(\d)"',
+                card,
+                flags=re.DOTALL,
+            )
+        )
+        assert columns == tuple(str(index) for index in range(1, count + 1))
+
+    assert 'data-grid-column="3"' in cards[2]
+    assert 'data-grid-column="4"' not in re.search(
+        r'<dl\s+class="exception-details".*?</dl>',
+        cards[2],
+        flags=re.DOTALL,
+    ).group()
+    assert tuple(
+        re.findall(
+            r'data-grid-column="(\d)"',
+            re.search(
+                r'<dl\s+class="exception-details".*?</dl>',
+                cards[4],
+                flags=re.DOTALL,
+            ).group(),
+        )
+    ) == ("1", "2", "3", "4", "5")
 
 
 def test_rule_002_uses_entry_date_as_bad_value_and_one_threshold_sentence(app):
@@ -448,7 +546,7 @@ def test_rule_002_uses_entry_date_as_bad_value_and_one_threshold_sentence(app):
     visible = _visible_text(card)
 
     assert visible == (
-        "Late entry. Application Number APP-2002 Entry Date 1/2/2026 8:08 "
+        "Late entry. Entry Date 1/2/2026 8:08 Application Number APP-2002 "
         "Application Date/Time 1/1/2026 5:11 Threshold Overage "
         "2 hours, 57 minutes past the 24-hour threshold."
     )
@@ -456,7 +554,8 @@ def test_rule_002_uses_entry_date_as_bad_value_and_one_threshold_sentence(app):
     assert "Actual delay" not in visible
     assert "Amount beyond the threshold" not in visible
     assert re.search(
-        r'class="exception-card__field result-detail--invalid".*?'
+        r'class="exception-card__field exception-card__field--entry '
+        r'result-detail--invalid".*?'
         r'<dt>Entry Date</dt>',
         card,
         flags=re.DOTALL,
@@ -482,14 +581,15 @@ def test_rule_001_uses_entry_date_as_bad_value_and_two_details(app):
     visible = _visible_text(card)
 
     assert visible == (
-        "Application entry proceeds event. Application Number APP-1001 "
-        "Entry Date 1/1/2026 7:59 Application Date/Time 1/1/2026 8:00 "
+        "Application entry proceeds event. Entry Date 1/1/2026 7:59 "
+        "Application Number APP-1001 Application Date/Time 1/1/2026 8:00 "
         "Entered Early By 1 minute"
     )
     assert visible.count("1/1/2026 7:59") == 1
     assert "Entry date/time" not in visible
     assert re.search(
-        r'class="exception-card__field result-detail--invalid".*?'
+        r'class="exception-card__field exception-card__field--entry '
+        r'result-detail--invalid".*?'
         r'<dt>Entry Date</dt>',
         card,
         flags=re.DOTALL,

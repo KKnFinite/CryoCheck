@@ -409,8 +409,8 @@ def test_rule_exception_is_rendered_on_results_screen(client):
     assert b"CC-RULE-001" in response.data
     assert b'data-source-row-number="2"' in response.data
     assert card_text == (
-        "Application entry proceeds event. Application Number "
-        "application-000 Entry Date 2026-01-01 07:59 "
+        "Application entry proceeds event. Entry Date 2026-01-01 07:59 "
+        "Application Number application-000 "
         "Application Date/Time 2026-01-01 08:00 Entered Early By 1 minute"
     )
     assert card_text.count("2026-01-01 07:59") == 1
@@ -433,8 +433,8 @@ def test_rule_002_results_use_the_approved_timeline_presentation(client):
 
     assert response.status_code == 200
     assert card_text == (
-        "Late entry. Application Number application-000 "
-        "Entry Date 1/2/2026 8:08 "
+        "Late entry. Entry Date 1/2/2026 8:08 "
+        "Application Number application-000 "
         "Application Date/Time 1/1/2026 5:11 Threshold Overage "
         "2 hours, 57 minutes past the 24-hour threshold."
     )
@@ -517,8 +517,8 @@ def test_rule_004_exception_is_rendered_on_results_screen(client):
     assert b"CC-RULE-003" not in response.data
     assert b"CC-RULE-004" in response.data
     assert card_text == (
-        "18 degree buffer not met. Application Number application-000 "
-        "Entry Date 2026-01-01 08:00 "
+        "18 degree buffer not met. Entry Date 2026-01-01 08:00 "
+        "Application Number application-000 "
         "Recorded Concentration 65% OAT -33°F "
         "Correct Freeze Point -50.0°F Calculated Buffer 17.0°F"
     )

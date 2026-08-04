@@ -198,53 +198,69 @@
                   data-source-row-number="{{ exception.source_row_number }}"
                   aria-labelledby="exception-{{ loop.index }}-title"
                 >
-                  <div class="exception-card__top-row">
-                    <label class="exception-card__selection">
-                      <input
-                        type="checkbox"
-                        name="exception_id"
-                        value="{{ identifier }}"
-                        data-exception-checkbox
-                      >
-                      <span class="visually-hidden">
-                        Select exception for
-                        {{ exception.record_id or "unreported record" }}
-                      </span>
-                    </label>
+                  <label class="exception-card__selection">
+                    <input
+                      type="checkbox"
+                      name="exception_id"
+                      value="{{ identifier }}"
+                      data-exception-checkbox
+                    >
+                    <span class="visually-hidden">
+                      Select exception for
+                      {{ exception.record_id or "unreported record" }}
+                    </span>
+                  </label>
 
-                    <div class="exception-card__message">
-                      <h3 id="exception-{{ loop.index }}-title">
-                        {{ exception.exception_message }}
-                      </h3>
+                  <div
+                    class="exception-card__content-grid"
+                    data-exception-content-grid
+                  >
+                    <div class="exception-card__top-row">
+                      <div
+                        class="exception-card__message"
+                        data-grid-column="1"
+                      >
+                        <h3 id="exception-{{ loop.index }}-title">
+                          {{ exception.exception_message }}
+                        </h3>
+                      </div>
+
+                      <dl class="exception-card__identity">
+                        <div
+                          class="exception-card__field exception-card__field--entry{% if 'entry_date' in presentation.invalid_identity_fields %} result-detail--invalid{% endif %}"
+                          data-grid-column="3"
+                          {% if 'entry_date' in presentation.invalid_identity_fields %}data-display-kind="invalid"{% endif %}
+                        >
+                          <dt>Entry Date</dt>
+                          <dd>{{ exception.date_created or "Not reported" }}</dd>
+                        </div>
+
+                        <div
+                          class="exception-card__field exception-card__field--application"
+                          data-grid-column="5"
+                        >
+                          <dt>Application Number</dt>
+                          <dd>{{ exception.application_number or "Not reported" }}</dd>
+                        </div>
+                      </dl>
                     </div>
 
-                    <dl class="exception-card__identity">
-                      <div class="exception-card__field">
-                        <dt>Application Number</dt>
-                        <dd>{{ exception.application_number or "Not reported" }}</dd>
-                      </div>
-
-                      <div
-                        class="exception-card__field{% if 'entry_date' in presentation.invalid_identity_fields %} result-detail--invalid{% endif %}"
-                        {% if 'entry_date' in presentation.invalid_identity_fields %}data-display-kind="invalid"{% endif %}
-                      >
-                        <dt>Entry Date</dt>
-                        <dd>{{ exception.date_created or "Not reported" }}</dd>
-                      </div>
-                    </dl>
-                  </div>
-
-                  <dl class="exception-details" aria-label="Rule-relevant details">
-                    {% for detail in presentation.details %}
+                    <dl
+                      class="exception-details"
+                      aria-label="Rule-relevant details"
+                    >
+                      {% for detail in presentation.details %}
                       <div
                         class="exception-details__item{% if detail.value_kind == 'invalid' %} result-detail--invalid{% endif %}"
                         data-display-kind="{{ detail.value_kind }}"
+                        data-grid-column="{{ (loop.index0 % 5) + 1 }}"
                       >
                         <dt>{{ detail.label }}</dt>
                         <dd>{{ detail.value }}</dd>
                       </div>
-                    {% endfor %}
-                  </dl>
+                      {% endfor %}
+                    </dl>
+                  </div>
 
                 </article>
               </li>
