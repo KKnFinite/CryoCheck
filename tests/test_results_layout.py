@@ -348,6 +348,7 @@ def test_results_header_is_reduced_to_neofont_title_and_import_action(app):
         flags=re.DOTALL,
     ).group()
     assert 'font-family: "NeoFont", Arial, sans-serif;' in heading_rule
+    assert "app.css?v=exception-grid-1" in html
 
 
 def test_all_fourteen_rules_use_standard_identity_and_mapped_values(app):

@@ -273,7 +273,7 @@ def test_service_worker_cache_is_versioned_and_static_only(client):
         flags=re.DOTALL,
     )
 
-    assert 'const CACHE_NAME = "cryocheck-static-shell-v10";' in script
+    assert 'const CACHE_NAME = "cryocheck-static-shell-v11";' in script
     assert asset_block is not None
     assets = set(re.findall(r'"([^"]+)"', asset_block.group(1)))
     assert {
