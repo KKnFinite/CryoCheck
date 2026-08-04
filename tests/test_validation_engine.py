@@ -91,7 +91,6 @@ def _import_result(*rows: CSVSourceRow) -> CSVImportResult:
         gateway_codes=("GATEWAY-A",),
         earliest_application_date="2026-01-15",
         latest_application_date="2026-01-15",
-        preview_records=(),
     )
 
 

@@ -129,10 +129,9 @@ def test_valid_baseline_csv_imports_successfully(client):
     assert b"Audit Results" in response.data
     assert b"No exceptions found" in response.data
     assert b"synthetic-deice.csv" in response.data
-    assert b"GATEWAY-A" in response.data
-    assert b"GATEWAY-B" in response.data
-    assert b"2026-01-02" in response.data
-    assert b"2026-01-05" in response.data
+    assert b"Rows audited" in response.data
+    assert b"GATEWAY-A" not in response.data
+    assert b"GATEWAY-B" not in response.data
 
 
 def test_get_import_redirects_to_fresh_landing_without_running_audit(
@@ -339,33 +338,45 @@ def test_valid_csv_between_10_and_15_mib_passes_request_size_gate(client):
     assert b"large-valid-deice.csv" in response.data
 
 
-def test_preview_is_limited_to_first_10_rows(client):
+def test_results_do_not_render_a_source_preview(client):
     response = _upload(client, _synthetic_csv(row_count=12))
 
     assert response.status_code == 200
-    assert b"record-009" in response.data
+    assert b"Source preview" not in response.data
+    assert b"First 10 data rows" not in response.data
+    assert b"preview-table" not in response.data
+    assert b"data-mobile-preview" not in response.data
+    assert b"record-000" not in response.data
+    assert b"record-009" not in response.data
     assert b"record-010" not in response.data
     assert b"record-011" not in response.data
-    assert b"First 10 data rows" in response.data
 
 
-def test_source_csv_row_numbering_starts_at_two(client):
-    response = _upload(client, _synthetic_csv())
+def test_source_csv_row_numbering_starts_at_two():
+    result = parse_csv_upload(
+        FileStorage(
+            stream=io.BytesIO(_synthetic_csv()),
+            filename="source-row.csv",
+        )
+    )
 
-    assert response.status_code == 200
-    assert b'<td class="preview-table__row">\n                    2\n' in response.data
+    assert result.rows[0].source_row_number == 2
+    assert not hasattr(result, "preview_records")
 
 
-def test_source_csv_row_numbering_accounts_for_blank_lines(client):
+def test_source_csv_row_numbering_accounts_for_blank_lines():
     payload = _synthetic_csv().replace(b"\n", b"\n\n", 1)
+    result = parse_csv_upload(
+        FileStorage(
+            stream=io.BytesIO(payload),
+            filename="source-row-with-blank.csv",
+        )
+    )
 
-    response = _upload(client, payload)
-
-    assert response.status_code == 200
-    assert b'<td class="preview-table__row">\n                    3\n' in response.data
+    assert result.rows[0].source_row_number == 3
 
 
-def test_uploaded_markup_is_escaped_and_formula_text_is_not_evaluated(client):
+def test_unrelated_uploaded_source_values_are_not_rendered(client):
     payload = _synthetic_csv(
         overrides={
             0: {
@@ -378,9 +389,9 @@ def test_uploaded_markup_is_escaped_and_formula_text_is_not_evaluated(client):
     response = _upload(client, payload)
 
     assert response.status_code == 200
-    assert b"&lt;script&gt;alert" in response.data
+    assert b"&lt;script&gt;alert" not in response.data
     assert b'<script>alert("unsafe")</script>' not in response.data
-    assert b"=1+1" in response.data
+    assert b"=1+1" not in response.data
 
 
 def test_rule_exception_is_rendered_on_results_screen(client):

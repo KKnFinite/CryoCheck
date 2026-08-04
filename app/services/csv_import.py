@@ -73,28 +73,6 @@ EXPECTED_COLUMNS = (
     "Notes",
 )
 
-PREVIEW_COLUMNS = (
-    "RecordID",
-    "ApplicationNumber",
-    "GatewayCode",
-    "ApplicationDate",
-    "StartTime",
-    "AircraftType",
-    "TailNumber",
-    "TruckNumber",
-    "Operator",
-    "Driver",
-    "Type1Used",
-    "Type1Concentration",
-    "FreezingPoint1",
-    "Type4Used",
-    "Type4ABrix",
-)
-
-PREVIEW_DISPLAY_COLUMNS = ("CSV Row", *PREVIEW_COLUMNS)
-PREVIEW_ROW_LIMIT = 10
-
-
 @dataclass(frozen=True, slots=True)
 class CSVSourceRow:
     """One immutable CSV row with its original fields and physical row number."""
@@ -125,7 +103,6 @@ class CSVImportResult:
     gateway_codes: tuple[str, ...]
     earliest_application_date: str | None
     latest_application_date: str | None
-    preview_records: tuple[dict[str, str | int], ...]
 
 
 class CSVImportError(ValueError):
@@ -245,8 +222,6 @@ def parse_csv_upload(upload: FileStorage | None) -> CSVImportResult:
     earliest_date, latest_date = _application_date_range(
         dataframe["ApplicationDate"]
     )
-    preview_records = _build_preview(source_rows)
-
     return CSVImportResult(
         filename=display_filename,
         row_count=len(dataframe.index),
@@ -261,7 +236,6 @@ def parse_csv_upload(upload: FileStorage | None) -> CSVImportResult:
         gateway_codes=gateway_codes,
         earliest_application_date=earliest_date,
         latest_application_date=latest_date,
-        preview_records=preview_records,
     )
 
 
@@ -347,31 +321,10 @@ def _application_date_range(
     )
 
 
-def _build_preview(
-    source_rows: tuple[CSVSourceRow, ...],
-) -> tuple[dict[str, str | int], ...]:
-    preview_records: list[dict[str, str | int]] = []
-
-    for source_row in source_rows[:PREVIEW_ROW_LIMIT]:
-        preview_record: dict[str, str | int] = {
-            "CSV Row": source_row.source_row_number
-        }
-        preview_record.update(
-            {
-                column: source_row.get(column)
-                for column in PREVIEW_COLUMNS
-            }
-        )
-        preview_records.append(preview_record)
-
-    return tuple(preview_records)
-
-
 __all__ = [
     "CSVImportError",
     "CSVImportResult",
     "CSVSourceRow",
     "EXPECTED_COLUMNS",
-    "PREVIEW_DISPLAY_COLUMNS",
     "parse_csv_upload",
 ]

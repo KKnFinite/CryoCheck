@@ -302,61 +302,6 @@
       {% endif %}
     </section>
 
-    <section class="preview-panel desktop-results-only" aria-labelledby="preview-heading">
-      <div class="preview-panel__heading">
-        <div>
-          <p class="eyebrow">Source preview</p>
-          <h2 id="preview-heading">
-            First {{ import_result.preview_records | length }} data rows
-          </h2>
-        </div>
-        <p>
-          Values are shown exactly as imported. The complete dataset was
-          audited in memory.
-        </p>
-      </div>
-
-      <div class="table-scroll" tabindex="0" aria-label="Imported CSV preview table">
-        <table class="preview-table">
-          <thead>
-            <tr>
-              {% for column in preview_columns %}
-                <th scope="col">{{ column }}</th>
-              {% endfor %}
-            </tr>
-          </thead>
-          <tbody>
-            {% for record in import_result.preview_records %}
-              <tr>
-                {% for column in preview_columns %}
-                  <td{% if column == "CSV Row" %} class="preview-table__row"{% endif %}>
-                    {{ record[column] }}
-                  </td>
-                {% endfor %}
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <details class="mobile-preview mobile-results-only">
-      <summary>
-        <span>
-          <strong>Source preview</strong>
-          First {{ import_result.preview_records | length }} data rows
-        </span>
-        <span aria-hidden="true">+</span>
-      </summary>
-      <div class="mobile-preview__body">
-        <p>
-          Values are shown exactly as imported. The complete dataset was
-          audited in memory.
-        </p>
-        <ol data-mobile-preview-list></ol>
-      </div>
-    </details>
-
     <div class="results-actions">
       <a class="button button--primary" href="{{ url_for('main.index') }}">
         Import Another CSV

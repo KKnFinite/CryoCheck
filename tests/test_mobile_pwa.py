@@ -229,7 +229,7 @@ def test_mobile_exception_cards_reuse_the_server_rendered_top_row():
     assert top_row < checkbox < message < identity < details
 
 
-def test_mobile_warnings_preview_rules_settings_auth_and_errors_are_dedicated(
+def test_mobile_warnings_rules_settings_auth_and_errors_are_dedicated(
     client,
 ):
     warning_page = client.post(
@@ -245,7 +245,11 @@ def test_mobile_warnings_preview_rules_settings_auth_and_errors_are_dedicated(
     error_page = client.get("/not-a-real-page").get_data(as_text=True)
 
     assert 'class="mobile-warning-summary mobile-results-only"' in warning_page
-    assert 'class="mobile-preview mobile-results-only"' in warning_page
+    assert "mobile-preview" not in warning_page
+    assert "data-mobile-preview" not in warning_page
+    assert "hydrateMobilePreview" not in Path(
+        "app/static/js/mobile-shell.js"
+    ).read_text(encoding="utf-8")
     assert warning_page.count("CC-RULE-008") == 1
     assert 'class="rules-list rules-list--desktop"' in rules_page
     assert 'data-mobile-rules-list' in rules_page

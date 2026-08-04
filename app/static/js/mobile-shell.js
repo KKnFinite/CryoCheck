@@ -56,29 +56,6 @@
     }
   };
 
-  const hydrateMobilePreview = () => {
-    const target = document.querySelector("[data-mobile-preview-list]");
-    const table = document.querySelector(".preview-table");
-    if (!target || !table) {
-      return;
-    }
-    const headings = Array.from(table.querySelectorAll("thead th"))
-      .map(normalizedText);
-    for (const row of table.querySelectorAll("tbody tr")) {
-      const item = createElement("li");
-      const definitions = createElement("dl");
-      Array.from(row.querySelectorAll("td")).forEach((cell, index) => {
-        appendDefinition(
-          definitions,
-          headings[index] || "Value",
-          normalizedText(cell),
-        );
-      });
-      item.append(definitions);
-      target.append(item);
-    }
-  };
-
   const hydrateMobileRules = () => {
     const target = document.querySelector("[data-mobile-rules-list]");
     if (!target) {
@@ -143,7 +120,6 @@
   };
 
   hydrateMobileWarnings();
-  hydrateMobilePreview();
   hydrateMobileRules();
   document.documentElement.classList.add("mobile-layout-ready");
 

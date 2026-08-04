@@ -280,7 +280,6 @@ def _render_results(
     )
     import_result = SimpleNamespace(
         unexpected_columns=(),
-        preview_records=(),
     )
     export_entries = tuple(
         (
@@ -297,7 +296,6 @@ def _render_results(
             active_page="import",
             audit=audit,
             import_result=import_result,
-            preview_columns=(),
             export_available=bool(exceptions),
             export_token="layout-export-token",
             export_entries=export_entries,

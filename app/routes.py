@@ -31,11 +31,7 @@ from app.extensions import csrf, db, limiter
 from app.forms import LoginForm, RegisterForm, ResetSettingsForm, SettingsForm
 from app.models import User, normalize_username, utc_now
 
-from app.services.csv_import import (
-    CSVImportError,
-    PREVIEW_DISPLAY_COLUMNS,
-    parse_csv_upload,
-)
+from app.services.csv_import import CSVImportError, parse_csv_upload
 from app.services.excel_export import (
     ExportRequestError,
     build_exception_workbook,
@@ -139,7 +135,6 @@ def _audit_uploaded_csv():
         active_page="reports",
         audit=audit_result,
         import_result=result,
-        preview_columns=PREVIEW_DISPLAY_COLUMNS,
         report_available=True,
         export_available=prepared_export is not None,
         export_token=(
