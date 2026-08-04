@@ -672,6 +672,61 @@ def test_results_and_export_preserve_non_padded_start_time_text(client):
     workbook.close()
 
 
+def test_outside_chart_concentration_details_are_exported(client):
+    results = _upload_for_export(
+        client,
+        {
+            "RecordID": "422634",
+            "Type1Used": "10",
+            "Type1Concentration": "90",
+        },
+    )
+    token, identifiers = _export_form(results)
+
+    assert identifiers == ("exception-1",)
+    response = client.post(
+        "/export",
+        data={"export_token": token, "scope": "all"},
+    )
+    workbook = _workbook_from_response(response)
+    worksheet = workbook["Exceptions"]
+    positions = _header_positions(worksheet)
+
+    assert response.status_code == 200
+    assert worksheet.max_row == 2
+    assert worksheet.cell(row=2, column=positions["Rule ID"]).value == (
+        "CC-RULE-003"
+    )
+    assert worksheet.cell(
+        row=2,
+        column=positions["Exception message"],
+    ).value == "Type I concentration outside manufacturer chart."
+    assert worksheet.cell(
+        row=2,
+        column=positions["Detail \N{EM DASH} Entered concentration"],
+    ).value == "90%"
+    assert worksheet.cell(
+        row=2,
+        column=positions["Detail \N{EM DASH} Selected Type I fluid"],
+    ).value == "Cryotech Polar Plus LT"
+    assert worksheet.cell(
+        row=2,
+        column=positions["Detail \N{EM DASH} Supported chart range"],
+    ).value == "0\N{EN DASH}70%"
+    assert worksheet.cell(
+        row=2,
+        column=positions["Detail \N{EM DASH} Comparison"],
+    ).value == (
+        "Entered Type I concentration 90% is outside the supported "
+        "manufacturer-chart range of 0\N{EN DASH}70%."
+    )
+    assert "Entered concentration: 90%" in worksheet.cell(
+        row=2,
+        column=positions["Combined details"],
+    ).value
+    workbook.close()
+
+
 def test_export_escapes_formula_like_text_in_source_and_detail_fields():
     audit = _audit_result(
         _audit_exception(

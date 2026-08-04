@@ -108,8 +108,18 @@ RULES: Final[tuple[RuleDefinition, ...]] = (
                 "concentrations from 0–70%."
             ),
             (
-                "A non-whole or unsupported concentration is unable to "
-                "evaluate."
+                "A whole-number concentration outside the selected fluid's "
+                "supported chart range creates one CC-RULE-003 exception and "
+                "no unable-to-evaluate warning."
+            ),
+            (
+                "Blank, malformed, non-finite, and non-whole concentrations "
+                "remain unable to evaluate."
+            ),
+            (
+                "CC-RULE-004 produces no finding for an out-of-chart "
+                "concentration because no authoritative manufacturer-chart "
+                "value exists for the buffer calculation."
             ),
             "Compare the expected value with FreezingPoint1.",
             "Numerically equal decimal forms such as -50 and -50.0 are equivalent.",
@@ -127,6 +137,8 @@ RULES: Final[tuple[RuleDefinition, ...]] = (
             "Entered freeze point",
             "Expected manufacturer-chart freeze point",
             "Concise comparison",
+            "Entered concentration",
+            "Supported chart range",
         ),
         implementation_status=IMPLEMENTED_STATUS,
     ),
@@ -155,8 +167,16 @@ RULES: Final[tuple[RuleDefinition, ...]] = (
                 "concentrations from 0–70%."
             ),
             (
-                "A non-whole or unsupported concentration is unable to "
-                "evaluate."
+                "Blank, malformed, non-finite, and non-whole concentrations "
+                "are unable to evaluate."
+            ),
+            (
+                "A whole-number concentration outside the chart creates only "
+                "a CC-RULE-003 exception."
+            ),
+            (
+                "CC-RULE-004 produces no warning or exception because the "
+                "buffer cannot be calculated without a chart value."
             ),
             (
                 "Do not create a false buffer exception solely because the "

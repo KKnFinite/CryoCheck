@@ -83,7 +83,12 @@ Settings. Uploaded rows, audit results, and exceptions are not persisted.
 - Concentrations 60 and 60.0 both select the 60% chart row.
 - The current Cryotech Polar Plus LT chart supports whole-number
   concentrations from 0–70%.
-- A non-whole or unsupported concentration is unable to evaluate.
+- A whole-number concentration outside the selected fluid's supported chart
+  range creates one CC-RULE-003 exception and no unable-to-evaluate warning.
+- Blank, malformed, non-finite, and non-whole concentrations remain unable to
+  evaluate.
+- CC-RULE-004 produces no finding for an out-of-chart concentration because no
+  authoritative manufacturer-chart value exists for the buffer calculation.
 - Compare the expected value with FreezingPoint1.
 - Numerically equal decimal forms such as -50 and -50.0 are equivalent.
 - Any other difference fails.
@@ -98,12 +103,23 @@ Settings. Uploaded rows, audit results, and exceptions are not persisted.
 
 `Incorrect freeze point.`
 
+For a valid whole-number concentration outside the selected fluid's chart:
+
+`Type I concentration outside manufacturer chart.`
+
 ### Output details
 
 - Selected Type I fluid
 - Recorded concentration
 - Entered freeze point
 - Expected manufacturer-chart freeze point
+- Concise comparison
+
+For an out-of-chart concentration:
+
+- Entered concentration
+- Selected Type I fluid
+- Supported chart range
 - Concise comparison
 
 ## CC-RULE-004 — 18 Degree Buffer Not Met
@@ -122,7 +138,11 @@ Settings. Uploaded rows, audit results, and exceptions are not persisted.
 - A buffer of 18.0°F or greater passes.
 - The current Cryotech Polar Plus LT chart supports whole-number
   concentrations from 0–70%.
-- A non-whole or unsupported concentration is unable to evaluate.
+- Blank, malformed, non-finite, and non-whole concentrations are unable to
+  evaluate.
+- A whole-number concentration outside the chart creates only a CC-RULE-003
+  exception. CC-RULE-004 produces no warning or exception because the buffer
+  cannot be calculated without a chart value.
 - Do not create a false buffer exception solely because the entered freeze
   point is wrong.
 - If the entered freeze point is wrong but the correct chart value passes the

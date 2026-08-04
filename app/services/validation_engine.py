@@ -466,19 +466,15 @@ def _evaluate_type1_rules(
         concentration_decimal < minimum_concentration
         or concentration_decimal > maximum_concentration
     ):
-        return exceptions, [
-            _unable_to_evaluate(
+        return [
+            _rule_003_outside_chart_exception(
                 source_row,
-                rule,
-                ("Type1Concentration",),
-                message=(
-                    f"Type1Concentration {concentration_text} is outside the "
-                    f"available {minimum_concentration}–"
-                    f"{maximum_concentration}% manufacturer chart."
-                ),
+                fluid_name=profile.name,
+                concentration_text=concentration_text,
+                minimum_concentration=minimum_concentration,
+                maximum_concentration=maximum_concentration,
             )
-            for rule in _TYPE1_RULES
-        ]
+        ], warnings
 
     concentration = int(concentration_decimal)
     expected_freeze_point = profile.freeze_point_for(concentration)
@@ -1769,6 +1765,38 @@ def _rule_003_exception(
     )
 
 
+def _rule_003_outside_chart_exception(
+    source_row: CSVSourceRow,
+    *,
+    fluid_name: str,
+    concentration_text: str,
+    minimum_concentration: int,
+    maximum_concentration: int,
+) -> AuditException:
+    entered_concentration = f"{concentration_text.strip()}%"
+    supported_range = (
+        f"{minimum_concentration}\N{EN DASH}{maximum_concentration}%"
+    )
+    return _build_exception(
+        source_row,
+        _RULE_003,
+        exception_message="Type I concentration outside manufacturer chart.",
+        details=(
+            RuleDetail("Entered concentration", entered_concentration),
+            RuleDetail("Selected Type I fluid", fluid_name),
+            RuleDetail("Supported chart range", supported_range),
+            RuleDetail(
+                "Comparison",
+                (
+                    f"Entered Type I concentration {entered_concentration} "
+                    "is outside the supported manufacturer-chart range of "
+                    f"{supported_range}."
+                ),
+            ),
+        ),
+    )
+
+
 def _rule_004_exception(
     source_row: CSVSourceRow,
     *,
@@ -2286,11 +2314,16 @@ def _build_exception(
     rule: RuleDefinition,
     *,
     details: tuple[RuleDetail, ...],
+    exception_message: str | None = None,
 ) -> AuditException:
     return AuditException(
         rule_id=rule.rule_id,
         rule_name=rule.name,
-        exception_message=rule.exception_message,
+        exception_message=(
+            rule.exception_message
+            if exception_message is None
+            else exception_message
+        ),
         source_row_number=source_row.source_row_number,
         record_id=source_row.get("RecordID"),
         application_number=source_row.get("ApplicationNumber"),

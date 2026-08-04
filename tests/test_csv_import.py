@@ -402,6 +402,37 @@ def test_rule_003_exception_is_rendered_on_results_screen(client):
     assert b"CC-RULE-004" not in response.data
 
 
+def test_outside_chart_concentration_renders_one_rule_003_exception(client):
+    response = _upload(
+        client,
+        _synthetic_csv(
+            overrides={
+                0: {
+                    "RecordID": "422634",
+                    "Type1Concentration": "90",
+                }
+            }
+        ),
+    )
+    page = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert page.count("CC-RULE-003") == 1
+    assert "CC-RULE-004" not in page
+    assert "Some rule evaluations could not run" not in page
+    assert "Type I concentration outside manufacturer chart." in page
+    assert "Entered concentration" in page
+    assert "90%" in page
+    assert "Selected Type I fluid" in page
+    assert "Cryotech Polar Plus LT" in page
+    assert "Supported chart range" in page
+    assert "0\N{EN DASH}70%" in page
+    assert (
+        "Entered Type I concentration 90% is outside the supported "
+        "manufacturer-chart range of 0\N{EN DASH}70%."
+    ) in page
+
+
 def test_rule_004_exception_is_rendered_on_results_screen(client):
     response = _upload(
         client,

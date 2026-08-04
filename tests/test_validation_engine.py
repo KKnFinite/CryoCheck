@@ -549,8 +549,79 @@ def test_rule_003_whole_concentration_forms_select_same_row(concentration):
     assert result.unable_to_evaluate_count == 0
 
 
-@pytest.mark.parametrize("concentration", ("60.5", "71", "-1"))
-def test_unsupported_concentration_is_unable_to_evaluate(concentration):
+def test_rule_003_outside_chart_concentration_is_one_exception_with_details():
+    result = _audit_one(
+        type1_used="1",
+        type1_concentration="90",
+        freezing_point1="-39.2",
+        ambient_temp="-21",
+    )
+
+    assert result.unable_to_evaluate_count == 0
+    assert result.exception_count == 1
+    exception = result.exceptions[0]
+    assert exception.rule_id == "CC-RULE-003"
+    assert exception.exception_message == (
+        "Type I concentration outside manufacturer chart."
+    )
+    assert tuple(
+        (detail.label, detail.value) for detail in exception.details
+    ) == (
+        ("Entered concentration", "90%"),
+        ("Selected Type I fluid", "Cryotech Polar Plus LT"),
+        ("Supported chart range", "0\N{EN DASH}70%"),
+        (
+            "Comparison",
+            "Entered Type I concentration 90% is outside the supported "
+            "manufacturer-chart range of 0\N{EN DASH}70%.",
+        ),
+    )
+
+
+@pytest.mark.parametrize("concentration", ("-1", "71"))
+def test_rule_003_other_outside_chart_concentrations_are_one_exception(
+    concentration,
+):
+    result = _audit_one(
+        type1_used="1",
+        type1_concentration=concentration,
+        freezing_point1="-39.2",
+        ambient_temp="-21",
+    )
+
+    assert tuple(
+        exception.rule_id for exception in result.exceptions
+    ) == ("CC-RULE-003",)
+    assert result.unable_to_evaluate_count == 0
+
+
+@pytest.mark.parametrize(
+    ("concentration", "freezing_point", "ambient_temp"),
+    (
+        ("0", "32.0", "50"),
+        ("70", "-59.8", "-41.8"),
+    ),
+)
+def test_type1_chart_boundaries_remain_valid(
+    concentration,
+    freezing_point,
+    ambient_temp,
+):
+    result = _audit_one(
+        type1_used="1",
+        type1_concentration=concentration,
+        freezing_point1=freezing_point,
+        ambient_temp=ambient_temp,
+    )
+
+    assert result.exception_count == 0
+    assert result.unable_to_evaluate_count == 0
+
+
+@pytest.mark.parametrize("concentration", ("", "malformed", "NaN", "60.5"))
+def test_invalid_or_nonwhole_concentration_remains_unable_to_evaluate(
+    concentration,
+):
     result = _audit_one(
         type1_used="1",
         type1_concentration=concentration,

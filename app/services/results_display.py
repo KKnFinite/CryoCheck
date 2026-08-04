@@ -95,6 +95,15 @@ def concise_exception_details(
     exception: AuditException,
 ) -> tuple[RuleDetail, ...]:
     """Return only nonduplicated details needed to understand an exception."""
+    if (
+        exception.rule_id == "CC-RULE-003"
+        and any(
+            detail.label == "Supported chart range"
+            for detail in exception.details
+        )
+    ):
+        return exception.details
+
     details = tuple(
         detail
         for detail in exception.details
