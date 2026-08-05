@@ -321,12 +321,12 @@ def test_phone_css_prevents_page_horizontal_overflow_and_preserves_breakpoint():
         stylesheet
     )
     assert (
-        "padding-bottom: calc(11.5rem + env(safe-area-inset-bottom));"
+        "padding-bottom: calc(12rem + env(safe-area-inset-bottom));"
         in stylesheet
     )
     assert (
         "scroll-padding-bottom: "
-        "calc(11.5rem + env(safe-area-inset-bottom));"
+        "calc(12rem + env(safe-area-inset-bottom));"
         in stylesheet
     )
     bottom_bar_rule = re.search(
@@ -341,7 +341,7 @@ def test_phone_css_prevents_page_horizontal_overflow_and_preserves_breakpoint():
         "left: 0;",
         "width: 100%;",
         "max-width: none;",
-        "padding: 0.55rem 0.65rem calc(0.55rem + env(safe-area-inset-bottom));",
+        "padding: 0.55rem 0.65rem calc(1rem + env(safe-area-inset-bottom));",
         "border-radius: 0;",
     ):
         assert declaration in bottom_bar_rule.group()
