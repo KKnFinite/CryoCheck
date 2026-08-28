@@ -76,6 +76,23 @@ def test_anonymous_settings_post_redirects_to_login(client):
     assert "/login?next=/settings" in response.headers["Location"]
 
 
+def test_adjusted_rate_fields_use_fluid_column_order(app, client):
+    with app.app_context():
+        _create_user("RateLayoutUser")
+    _login(client, "RateLayoutUser")
+
+    response = client.get("/settings")
+    assert response.status_code == 200
+    page = response.get_data(as_text=True)
+    order = [
+        page.index('name="max_type1_rate_gpm"'),
+        page.index('name="min_type1_rate_gpm"'),
+        page.index('name="max_type4_rate_gpm"'),
+        page.index('name="min_type4_rate_gpm"'),
+    ]
+    assert order == sorted(order)
+
+
 def test_logged_in_user_can_save_personal_settings(app, client):
     with app.app_context():
         _create_user("SettingsUser")
