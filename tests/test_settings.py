@@ -86,8 +86,8 @@ def test_adjusted_rate_fields_use_fluid_column_order(app, client):
     page = response.get_data(as_text=True)
     order = [
         page.index('name="max_type1_rate_gpm"'),
-        page.index('name="min_type1_rate_gpm"'),
         page.index('name="max_type4_rate_gpm"'),
+        page.index('name="min_type1_rate_gpm"'),
         page.index('name="min_type4_rate_gpm"'),
     ]
     assert order == sorted(order)

@@ -146,16 +146,6 @@
               {% endif %}
             </div>
             <div class="form-field">
-              {{ settings_form.min_type1_rate_gpm.label }}
-              <div class="input-suffix">
-                {{ settings_form.min_type1_rate_gpm(min="0.000001", max="999", step="any") }}
-                <span>GPM</span>
-              </div>
-              {% if settings_form.min_type1_rate_gpm.errors %}
-                <ul class="form-errors" role="alert">{% for error in settings_form.min_type1_rate_gpm.errors %}<li>{{ error }}</li>{% endfor %}</ul>
-              {% endif %}
-            </div>
-            <div class="form-field">
               {{ settings_form.max_type4_rate_gpm.label }}
               <div class="input-suffix">
                 {{ settings_form.max_type4_rate_gpm(min="0.000001", max="999", step="any") }}
@@ -163,6 +153,16 @@
               </div>
               {% if settings_form.max_type4_rate_gpm.errors %}
                 <ul class="form-errors" role="alert">{% for error in settings_form.max_type4_rate_gpm.errors %}<li>{{ error }}</li>{% endfor %}</ul>
+              {% endif %}
+            </div>
+            <div class="form-field">
+              {{ settings_form.min_type1_rate_gpm.label }}
+              <div class="input-suffix">
+                {{ settings_form.min_type1_rate_gpm(min="0.000001", max="999", step="any") }}
+                <span>GPM</span>
+              </div>
+              {% if settings_form.min_type1_rate_gpm.errors %}
+                <ul class="form-errors" role="alert">{% for error in settings_form.min_type1_rate_gpm.errors %}<li>{{ error }}</li>{% endfor %}</ul>
               {% endif %}
             </div>
             <div class="form-field">
