@@ -42,7 +42,7 @@
     >
     <link
       rel="stylesheet"
-      href="{{ url_for('static', filename='css/app.css', v='mobile-export-spacing-1') }}"
+      href="{{ url_for('static', filename='css/app.css', v='pdf-results-export-1') }}"
     >
   </head>
   <body{% block body_attributes %}{% endblock %}>
@@ -180,12 +180,10 @@
           {% if export_available %}
             <button
               class="mobile-menu__link"
-              type="submit"
-              form="exception-export-form"
-              name="scope"
-              value="all"
-              data-export-all
-            >Export All Exceptions</button>
+              type="button"
+              aria-haspopup="dialog"
+              data-export-dialog-open
+            >Export Results</button>
           {% endif %}
           <button
             class="mobile-menu__link mobile-menu__install"

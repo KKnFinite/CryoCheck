@@ -226,7 +226,7 @@ def test_results_show_one_checkbox_per_exception_and_export_controls(client):
         response.data,
     )
     assert re.search(
-        rb'value="selected"\s+disabled\s+data-export-selected',
+        rb'value="selected"[^>]+disabled[^>]+data-export-selected',
         response.data,
     )
     token, identifiers = _export_form(response)
@@ -234,7 +234,7 @@ def test_results_show_one_checkbox_per_exception_and_export_controls(client):
     assert identifiers == ("exception-1", "exception-2")
 
 
-def test_export_navigation_is_hidden_when_audit_has_no_exceptions(client):
+def test_pdf_export_remains_available_when_audit_has_no_exceptions(client):
     response = _upload_for_export(client, {})
 
     assert response.status_code == 200
@@ -243,6 +243,8 @@ def test_export_navigation_is_hidden_when_audit_has_no_exceptions(client):
     assert re.search(rb">\s*Reports\s*</a>", response.data)
     assert b"Export Exceptions" not in response.data
     assert b"data-export-all" not in response.data
+    assert b"Export Results" in response.data
+    assert b"Download PDF Report" in response.data
 
 
 def test_export_all_downloads_every_exception_in_audit_order(client):

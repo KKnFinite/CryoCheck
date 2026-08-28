@@ -47,6 +47,12 @@ from app.services.excel_export import (
     prepare_export,
     select_export_rows,
 )
+from app.services.pdf_report import (
+    PDFReportRequestError,
+    build_pdf_report,
+    load_pdf_report,
+    prepare_pdf_report,
+)
 from app.services.rules import RULES
 from app.services.results_display import exception_presentation
 from app.services.settings import (
@@ -134,16 +140,21 @@ def _audit_uploaded_csv():
     active_settings = get_active_settings()
     audit_result = run_audit(result, active_settings)
     track_completed_validation()
+    export_context_id = secrets.token_urlsafe(32)
+    session["export_context_id"] = export_context_id
+    prepared_pdf = prepare_pdf_report(
+        audit_result,
+        unexpected_columns=result.unexpected_columns,
+        secret_key=current_app.config["SECRET_KEY"],
+        context_id=export_context_id,
+    )
     if audit_result.exceptions:
-        export_context_id = secrets.token_urlsafe(32)
-        session["export_context_id"] = export_context_id
         prepared_export = prepare_export(
             audit_result,
             secret_key=current_app.config["SECRET_KEY"],
             context_id=export_context_id,
         )
     else:
-        session.pop("export_context_id", None)
         prepared_export = None
     return render_template(
         "results.html",
@@ -151,7 +162,8 @@ def _audit_uploaded_csv():
         audit=audit_result,
         import_result=result,
         report_available=True,
-        export_available=prepared_export is not None,
+        export_available=True,
+        pdf_report_token=prepared_pdf.token,
         export_token=(
             prepared_export.token if prepared_export is not None else None
         ),
@@ -245,6 +257,40 @@ def export_exceptions():
             "application/vnd.openxmlformats-officedocument."
             "spreadsheetml.sheet"
         ),
+    )
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@main.post("/export/pdf")
+def export_pdf_report():
+    """Validate the current Results snapshot and stream an in-memory PDF."""
+    try:
+        report = load_pdf_report(
+            request.form.get("pdf_report_token", ""),
+            secret_key=current_app.config["SECRET_KEY"],
+            max_age_seconds=current_app.config[
+                "EXPORT_TOKEN_MAX_AGE_SECONDS"
+            ],
+            expected_context_id=session.get("export_context_id", ""),
+        )
+    except PDFReportRequestError as error:
+        return (
+            render_template(
+                "export_error.html",
+                active_page="reports",
+                error=error,
+            ),
+            400,
+        )
+
+    pdf, filename = build_pdf_report(report)
+    track_completed_export()
+    response = send_file(
+        pdf,
+        as_attachment=True,
+        download_name=filename,
+        mimetype="application/pdf",
     )
     response.headers["Cache-Control"] = "no-store"
     return response

@@ -6,9 +6,17 @@
   <section id="audit-results" class="results-page" aria-labelledby="page-title">
     <header class="results-heading">
       <h1 id="page-title">Audit Results</h1>
-      <a class="button button--secondary" href="{{ url_for('main.index') }}">
-        Import Another CSV
-      </a>
+      <div class="results-heading__actions">
+        <button
+          class="button button--primary desktop-results-only"
+          type="button"
+          aria-haspopup="dialog"
+          data-export-dialog-open
+        >Export Results</button>
+        <a class="button button--secondary" href="{{ url_for('main.index') }}">
+          Import Another CSV
+        </a>
+      </div>
     </header>
 
     <section class="audit-overview" aria-labelledby="overview-heading">
@@ -105,6 +113,121 @@
       </details>
     {% endif %}
 
+    <dialog
+      id="export-results-dialog"
+      class="export-results-dialog"
+      aria-labelledby="export-results-title"
+      data-export-dialog
+    >
+      <div class="export-results-dialog__surface">
+        <header class="export-results-dialog__heading">
+          <div>
+            <p class="eyebrow">Export Results</p>
+            <h2 id="export-results-title">Choose an export format</h2>
+          </div>
+          <button
+            class="export-results-dialog__close"
+            type="button"
+            aria-label="Close Export Results"
+            data-export-dialog-close
+          >&times;</button>
+        </header>
+
+        <div class="export-results-choices">
+          <article class="export-choice export-choice--pdf">
+            <div>
+              <p class="export-choice__format">PDF Report</p>
+              <h3>Readable Audit Results</h3>
+              <p>
+                Export this Audit Results page as a clean report for review,
+                printing, or sharing.
+              </p>
+            </div>
+            <form
+              action="{{ url_for('main.export_pdf_report') }}"
+              method="post"
+              target="_blank"
+              data-pdf-export-form
+            >
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="pdf_report_token" value="{{ pdf_report_token }}">
+              <button class="button button--primary" type="submit">
+                Download PDF Report
+              </button>
+            </form>
+          </article>
+
+          <article class="export-choice export-choice--excel">
+            <div>
+              <p class="export-choice__format">Excel Exception Data</p>
+              <h3>Filtered Log Data</h3>
+              <p>
+                Export exception rows and full technical audit details for
+                sorting, filtering, or further analysis.
+              </p>
+            </div>
+            {% if audit.exceptions %}
+              <div class="export-choice__selection">
+                <div class="exception-export__selection-controls">
+                  <button
+                    class="exception-export__text-control"
+                    type="button"
+                    data-select-all
+                  >Select All</button>
+                  <span aria-hidden="true">/</span>
+                  <button
+                    class="exception-export__text-control"
+                    type="button"
+                    data-clear-all
+                  >Clear All</button>
+                  <span
+                    class="exception-export__status"
+                    aria-live="polite"
+                    data-selection-status
+                  >0 of {{ audit.exception_count }} selected</span>
+                </div>
+                <div class="export-choice__actions">
+                  <button
+                    class="button button--primary"
+                    type="submit"
+                    name="scope"
+                    value="selected"
+                    form="exception-export-form"
+                    disabled
+                    data-export-selected
+                    formtarget="_blank"
+                  >Export Selected</button>
+                  <button
+                    class="button button--secondary"
+                    type="submit"
+                    name="scope"
+                    value="all"
+                    form="exception-export-form"
+                    data-export-all
+                    formtarget="_blank"
+                  >Export All</button>
+                </div>
+                <div
+                  class="export-feedback"
+                  role="status"
+                  aria-live="polite"
+                  data-export-feedback
+                  hidden
+                >
+                  <span class="export-feedback__spinner" aria-hidden="true"></span>
+                  <span data-export-feedback-message></span>
+                </div>
+              </div>
+            {% else %}
+              <p class="export-choice__empty">
+                This report has no exception rows to export to Excel.
+              </p>
+            {% endif %}
+          </article>
+        </div>
+      </div>
+    </dialog>
+
     <section class="exceptions-section" aria-labelledby="exceptions-heading">
       <div class="exceptions-heading">
         <div>
@@ -127,66 +250,6 @@
         >
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="export_token" value="{{ export_token }}">
-
-          <div class="exception-export__toolbar">
-            <div class="exception-export__selection-controls">
-              <button
-                class="exception-export__text-control"
-                type="button"
-                data-select-all
-              >
-                Select All
-              </button>
-              <span aria-hidden="true">/</span>
-              <button
-                class="exception-export__text-control"
-                type="button"
-                data-clear-all
-              >
-                Clear All
-              </button>
-              <span
-                class="exception-export__status"
-                aria-live="polite"
-                data-selection-status
-              >
-                0 of {{ audit.exception_count }} selected
-              </span>
-            </div>
-            <div class="exception-export__actions">
-              <button
-                class="button button--primary"
-                type="submit"
-                name="scope"
-                value="selected"
-                disabled
-                data-export-selected
-                formtarget="_blank"
-              >
-                Export Selected
-              </button>
-              <button
-                class="button button--secondary"
-                type="submit"
-                name="scope"
-                value="all"
-                data-export-all
-                formtarget="_blank"
-              >
-                Export All
-              </button>
-            </div>
-            <div
-              class="export-feedback export-feedback--desktop"
-              role="status"
-              aria-live="polite"
-              data-export-feedback
-              hidden
-            >
-              <span class="export-feedback__spinner" aria-hidden="true"></span>
-              <span data-export-feedback-message></span>
-            </div>
-          </div>
 
           <ol class="exception-list">
             {% for identifier, exception, presentation in export_entries %}
@@ -267,44 +330,6 @@
             {% endfor %}
           </ol>
 
-          <div class="mobile-export-bar mobile-results-only" data-mobile-export-bar>
-            <span
-              class="mobile-export-bar__count"
-              aria-live="polite"
-              data-selection-status
-            >0 of {{ audit.exception_count }} selected</span>
-            <div class="mobile-export-bar__selection">
-              <button type="button" data-select-all>Select All</button>
-              <button type="button" data-clear-all>Clear</button>
-            </div>
-            <div class="mobile-export-bar__actions">
-              <button
-                type="submit"
-                name="scope"
-                value="selected"
-                disabled
-                data-export-selected
-                formtarget="_blank"
-              >Export Selected</button>
-              <button
-                type="submit"
-                name="scope"
-                value="all"
-                data-export-all
-                formtarget="_blank"
-              >Export All</button>
-            </div>
-            <div
-              class="export-feedback export-feedback--mobile"
-              role="status"
-              aria-live="polite"
-              data-export-feedback
-              hidden
-            >
-              <span class="export-feedback__spinner" aria-hidden="true"></span>
-              <span data-export-feedback-message></span>
-            </div>
-          </div>
         </form>
       {% else %}
         <div class="audit-empty-state">
@@ -318,6 +343,15 @@
       {% endif %}
     </section>
 
+    <div class="mobile-export-bar mobile-export-bar--chooser mobile-results-only" data-mobile-export-bar>
+      <button
+        class="button button--primary"
+        type="button"
+        aria-haspopup="dialog"
+        data-export-dialog-open
+      >Export Results</button>
+    </div>
+
     <div class="results-actions">
       <a class="button button--primary" href="{{ url_for('main.index') }}">
         Import Another CSV
@@ -328,7 +362,7 @@
 
 {% block scripts %}
   <script
-    src="{{ url_for('static', filename='js/exception-export.js', v='results-export-3') }}"
+    src="{{ url_for('static', filename='js/exception-export.js', v='pdf-results-export-1') }}"
     defer
   ></script>
 {% endblock %}

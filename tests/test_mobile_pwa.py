@@ -183,7 +183,7 @@ def test_get_share_target_uses_branded_405_without_running_validation(
     assert "no-store" in response.headers["Cache-Control"]
 
 
-def test_results_have_mobile_cards_and_sticky_selection_controls(client):
+def test_results_have_mobile_cards_and_compact_export_chooser(client):
     response = client.post(
         "/import",
         data=_shared_file(
@@ -197,13 +197,15 @@ def test_results_have_mobile_cards_and_sticky_selection_controls(client):
     assert page.count("data-exception-checkbox") == 1
     assert page.count('class="exception-card__top-row"') == 1
     assert "data-mobile-exception-content" not in page
-    assert 'class="exception-export__toolbar"' in page
-    assert 'class="mobile-export-bar mobile-results-only"' in page
-    assert page.count("data-select-all") == 2
-    assert page.count("data-clear-all") == 2
-    assert page.count("data-export-selected") == 2
-    assert page.count("data-export-feedback\n") == 2
-    assert page.count('formtarget="_blank"') == 4
+    assert 'id="export-results-dialog"' in page
+    assert 'class="mobile-export-bar mobile-export-bar--chooser mobile-results-only"' in page
+    assert page.count("data-select-all") == 1
+    assert page.count("data-clear-all") == 1
+    assert page.count("data-export-selected") == 1
+    assert page.count("data-export-feedback\n") == 1
+    assert page.count('formtarget="_blank"') == 2
+    assert "Readable Audit Results" in page
+    assert "Filtered Log Data" in page
     assert "Export All" in page
     assert "Application Number" in page
     assert "Entry Date" in page
@@ -322,12 +324,12 @@ def test_phone_css_prevents_page_horizontal_overflow_and_preserves_breakpoint():
         stylesheet
     )
     assert (
-        "padding-bottom: calc(12rem + env(safe-area-inset-bottom));"
+        "padding-bottom: calc(6.5rem + env(safe-area-inset-bottom));"
         in stylesheet
     )
     assert (
         "scroll-padding-bottom: "
-        "calc(12rem + env(safe-area-inset-bottom));"
+        "calc(6.5rem + env(safe-area-inset-bottom));"
         in stylesheet
     )
     bottom_bar_rule = re.search(

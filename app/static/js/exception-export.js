@@ -1,4 +1,54 @@
 (() => {
+  const exportDialog = document.querySelector("[data-export-dialog]");
+  const openDialogControls = Array.from(
+    document.querySelectorAll("[data-export-dialog-open]"),
+  );
+  const closeDialogControls = Array.from(
+    document.querySelectorAll("[data-export-dialog-close]"),
+  );
+
+  const openExportDialog = () => {
+    if (!exportDialog) {
+      return;
+    }
+    const mobileMenuClose = document.querySelector(
+      "[data-mobile-menu-close]",
+    );
+    if (mobileMenuClose) {
+      mobileMenuClose.click();
+    }
+    if (typeof exportDialog.showModal === "function") {
+      exportDialog.showModal();
+    } else {
+      exportDialog.setAttribute("open", "");
+    }
+  };
+
+  const closeExportDialog = () => {
+    if (!exportDialog) {
+      return;
+    }
+    if (typeof exportDialog.close === "function") {
+      exportDialog.close();
+    } else {
+      exportDialog.removeAttribute("open");
+    }
+  };
+
+  for (const control of openDialogControls) {
+    control.addEventListener("click", openExportDialog);
+  }
+  for (const control of closeDialogControls) {
+    control.addEventListener("click", closeExportDialog);
+  }
+  if (exportDialog) {
+    exportDialog.addEventListener("click", (event) => {
+      if (event.target === exportDialog) {
+        closeExportDialog();
+      }
+    });
+  }
+
   const form = document.querySelector("[data-export-form]");
   if (!form) {
     return;
@@ -8,26 +58,26 @@
     form.querySelectorAll("[data-exception-checkbox]"),
   );
   const selectAllControls = Array.from(
-    form.querySelectorAll("[data-select-all]"),
+    document.querySelectorAll("[data-select-all]"),
   );
   const clearAllControls = Array.from(
-    form.querySelectorAll("[data-clear-all]"),
+    document.querySelectorAll("[data-clear-all]"),
   );
   const exportSelectedControls = Array.from(
-    form.querySelectorAll("[data-export-selected]"),
+    document.querySelectorAll("[data-export-selected]"),
   );
   const exportAllControls = Array.from(
-    form.querySelectorAll("[data-export-all]"),
+    document.querySelectorAll("[data-export-all]"),
   );
   const exportControls = [
     ...exportSelectedControls,
     ...exportAllControls,
   ];
   const statuses = Array.from(
-    form.querySelectorAll("[data-selection-status]"),
+    document.querySelectorAll("[data-selection-status]"),
   );
   const feedbackRegions = Array.from(
-    form.querySelectorAll("[data-export-feedback]"),
+    document.querySelectorAll("[data-export-feedback]"),
   );
   let exportInProgress = false;
   let feedbackTimer;
