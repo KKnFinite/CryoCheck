@@ -310,10 +310,10 @@ def test_utc_fields_do_not_influence_rule_001_or_rule_002():
     assert result.unable_to_evaluate_count == 0
 
 
-def test_audit_reports_fourteen_rules_executed():
+def test_audit_reports_fifteen_rules_executed():
     result = _audit_one()
 
-    assert result.rules_executed == 14
+    assert result.rules_executed == 15
 
 
 def test_rule_002_23_hours_59_minutes_passes_at_24_hours():

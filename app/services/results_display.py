@@ -107,6 +107,7 @@ _STANDARD_SPECS: dict[str, tuple[_DetailSpec, ...]] = {
             "Maximum Type IV Rate",
         ),
     ),
+    "CC-RULE-015": (),
     "CC-RULE-010": (
         _DetailSpec("ProcessTime1", "Process Time 1", INVALID_VALUE),
         _DetailSpec("ProcessTime4", "Process Time 4", INVALID_VALUE),
@@ -375,6 +376,34 @@ def _rule_014_presentation(
     )
 
 
+def _rule_015_presentation(
+    exception: AuditException,
+) -> ExceptionPresentation:
+    details = _details_by_label(exception)
+    fluid_name = "Type I" if "Adjusted Type I rate" in details else "Type IV"
+    return ExceptionPresentation(
+        details=(
+            ResultDetail(
+                f"Adjusted {fluid_name} Rate",
+                details[f"Adjusted {fluid_name} rate"],
+                INVALID_VALUE,
+            ),
+            ResultDetail(
+                f"{fluid_name} Used",
+                details[f"{fluid_name} gallons used"],
+            ),
+            ResultDetail(
+                f"Process Time {1 if fluid_name == 'Type I' else 4}",
+                details[f"Recorded ProcessTime{1 if fluid_name == 'Type I' else 4}"],
+            ),
+            ResultDetail(
+                f"Minimum {fluid_name} Rate",
+                details[f"Configured minimum {fluid_name} rate"],
+            ),
+        ),
+    )
+
+
 def exception_presentation(
     exception: AuditException,
 ) -> ExceptionPresentation:
@@ -391,6 +420,8 @@ def exception_presentation(
         return _rule_013_presentation(exception)
     if exception.rule_id == "CC-RULE-014":
         return _rule_014_presentation(exception)
+    if exception.rule_id == "CC-RULE-015":
+        return _rule_015_presentation(exception)
 
     details = _mapped_details(
         exception,

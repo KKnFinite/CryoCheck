@@ -404,6 +404,10 @@ def settings():
         personal_settings.allowed_gap_minutes = form.allowed_gap_minutes.data
         personal_settings.max_type1_rate_gpm = form.max_type1_rate_gpm.data
         personal_settings.max_type4_rate_gpm = form.max_type4_rate_gpm.data
+        if form.min_type1_rate_gpm.data is not None:
+            personal_settings.min_type1_rate_gpm = form.min_type1_rate_gpm.data
+        if form.min_type4_rate_gpm.data is not None:
+            personal_settings.min_type4_rate_gpm = form.min_type4_rate_gpm.data
         personal_settings.max_event_time_minutes = (
             form.max_event_time_minutes.data
         )

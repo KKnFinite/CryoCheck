@@ -77,6 +77,8 @@ class UserSettings(db.Model):
     allowed_gap_minutes = db.Column(db.Integer, nullable=False)
     max_type1_rate_gpm = db.Column(db.Numeric(12, 6), nullable=False)
     max_type4_rate_gpm = db.Column(db.Numeric(12, 6), nullable=False)
+    min_type1_rate_gpm = db.Column(db.Numeric(12, 6), nullable=False)
+    min_type4_rate_gpm = db.Column(db.Numeric(12, 6), nullable=False)
     max_event_time_minutes = db.Column(db.Integer, nullable=False)
     include_gap_in_event_time = db.Column(
         db.Boolean,

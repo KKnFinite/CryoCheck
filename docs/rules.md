@@ -1,7 +1,7 @@
 # CryoCheck Rules
 
 This document is the approved specification for CryoCheck’s audit rules.
-CC-RULE-001 through CC-RULE-014 are implemented and execute automatically
+CC-RULE-001 through CC-RULE-015 are implemented and execute automatically
 after a structurally valid CSV upload.
 
 The in-application registry and this documentation must remain synchronized.
@@ -651,3 +651,38 @@ Examples that fail:
 - Original Notes
 - Missing or failed requirement
 - Documented truck number when found
+
+## CC-RULE-015 — Minimum Spray Rate
+
+**Implementation status:** Implemented
+
+### Logic
+
+- Evaluate Type I and Type IV independently when their usage is numerically greater than 0.
+- Blank, zero, or negative usage skips that fluid; malformed or non-finite usage is unable to evaluate.
+- Use the CSV’s existing whole-number ProcessTime1 or ProcessTime4 value directly.
+- Adjusted rate = fluid used / (recorded process time + 1).
+- Use Decimal-safe arithmetic without rounding before comparison.
+- Generate an exception only when the adjusted rate is below the configured minimum.
+- A rate equal to or above the configured minimum passes.
+- Invalid required values or an invalid runtime minimum produce an unable-to-evaluate warning, not an exception.
+
+### Settings
+
+- Minimum Type I rate: active profile setting; Default: 1 gallon per minute
+- Minimum Type IV rate: active profile setting; Default: 5 gallons per minute
+- Personal Settings apply to the next signed-in upload
+- Mandatory
+
+### Exception message
+
+`Minimum spray rate not met.`
+
+### Output details
+
+- Fluid gallons used
+- Recorded process time
+- Adjusted calculation time
+- Adjusted gallons per minute
+- Configured minimum
+- Comparison statement

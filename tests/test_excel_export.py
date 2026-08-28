@@ -173,7 +173,7 @@ def _audit_result(
     return AuditResult(
         filename="request-only.csv",
         rows_audited=2,
-        rules_executed=14,
+        rules_executed=15,
         active_settings_profile_name="Default",
         exceptions=exceptions,
         unable_to_evaluate=warnings,

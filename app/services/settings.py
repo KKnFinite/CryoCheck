@@ -30,6 +30,8 @@ class SettingsDefinition:
     allowed_gap_minutes: int
     max_type1_rate_gpm: Decimal
     max_type4_rate_gpm: Decimal
+    min_type1_rate_gpm: Decimal
+    min_type4_rate_gpm: Decimal
     max_event_time_minutes: int
     include_gap_in_event_time: bool
 
@@ -43,6 +45,8 @@ DEFAULT_SETTINGS: Final = SettingsDefinition(
     allowed_gap_minutes=5,
     max_type1_rate_gpm=Decimal("60"),
     max_type4_rate_gpm=Decimal("30"),
+    min_type1_rate_gpm=Decimal("1"),
+    min_type4_rate_gpm=Decimal("5"),
     max_event_time_minutes=30,
     include_gap_in_event_time=False,
 )
@@ -57,6 +61,8 @@ def default_model_values() -> dict[str, object]:
         "allowed_gap_minutes": DEFAULT_SETTINGS.allowed_gap_minutes,
         "max_type1_rate_gpm": DEFAULT_SETTINGS.max_type1_rate_gpm,
         "max_type4_rate_gpm": DEFAULT_SETTINGS.max_type4_rate_gpm,
+        "min_type1_rate_gpm": DEFAULT_SETTINGS.min_type1_rate_gpm,
+        "min_type4_rate_gpm": DEFAULT_SETTINGS.min_type4_rate_gpm,
         "max_event_time_minutes": DEFAULT_SETTINGS.max_event_time_minutes,
         "include_gap_in_event_time": DEFAULT_SETTINGS.include_gap_in_event_time,
     }
@@ -88,6 +94,8 @@ def settings_for_user(user: User) -> SettingsDefinition:
         allowed_gap_minutes=settings.allowed_gap_minutes,
         max_type1_rate_gpm=settings.max_type1_rate_gpm,
         max_type4_rate_gpm=settings.max_type4_rate_gpm,
+        min_type1_rate_gpm=settings.min_type1_rate_gpm,
+        min_type4_rate_gpm=settings.min_type4_rate_gpm,
         max_event_time_minutes=settings.max_event_time_minutes,
         include_gap_in_event_time=settings.include_gap_in_event_time,
     )

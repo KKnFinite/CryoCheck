@@ -22,6 +22,7 @@ from wtforms.validators import (
     InputRequired,
     Length,
     NumberRange,
+    Optional,
     Regexp,
     ValidationError,
 )
@@ -38,6 +39,8 @@ def _trim(value: str | None) -> str:
 
 def _positive_rate(form, field) -> None:
     del form
+    if field.data is None:
+        return
     if (
         field.data is None
         or not field.data.is_finite()
@@ -144,6 +147,24 @@ class SettingsForm(FlaskForm):
         places=None,
         validators=[
             InputRequired(),
+            _positive_rate,
+            NumberRange(max=Decimal("999")),
+        ],
+    )
+    min_type1_rate_gpm = CompactDecimalField(
+        "Minimum Type I adjusted rate",
+        places=None,
+        validators=[
+            Optional(),
+            _positive_rate,
+            NumberRange(max=Decimal("999")),
+        ],
+    )
+    min_type4_rate_gpm = CompactDecimalField(
+        "Minimum Type IV adjusted rate",
+        places=None,
+        validators=[
+            Optional(),
             _positive_rate,
             NumberRange(max=Decimal("999")),
         ],

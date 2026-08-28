@@ -41,6 +41,7 @@ _RULE_011 = _EXECUTED_RULES_BY_ID["CC-RULE-011"]
 _RULE_012 = _EXECUTED_RULES_BY_ID["CC-RULE-012"]
 _RULE_013 = _EXECUTED_RULES_BY_ID["CC-RULE-013"]
 _RULE_014 = _EXECUTED_RULES_BY_ID["CC-RULE-014"]
+_RULE_015 = _EXECUTED_RULES_BY_ID["CC-RULE-015"]
 _TIMESTAMP_RULES: Final = (_RULE_001, _RULE_002)
 _TYPE1_RULES: Final = (_RULE_003, _RULE_004)
 _REQUIRED_TYPE1_BUFFER: Final = Decimal("18.0")
@@ -275,6 +276,12 @@ def run_audit(
         )
         exceptions.extend(type4_rate_exceptions)
         warnings.extend(type4_rate_warnings)
+
+        minimum_rate_exceptions, minimum_rate_warnings = (
+            _evaluate_minimum_rate_rule(source_row, active_settings)
+        )
+        exceptions.extend(minimum_rate_exceptions)
+        warnings.extend(minimum_rate_warnings)
 
         event_time_exceptions, event_time_warnings = (
             _evaluate_event_time_rule(source_row, active_settings)
@@ -616,6 +623,48 @@ def _evaluate_type4_rate_rule(
     if calculation is None or not calculation.exceeds_maximum:
         return [], []
     return [_rule_009_exception(source_row, calculation)], []
+
+
+def _evaluate_minimum_rate_rule(
+    source_row: CSVSourceRow,
+    active_settings: SettingsDefinition,
+) -> tuple[list[AuditException], list[UnableToEvaluate]]:
+    """Evaluate Type I and Type IV minimum adjusted rates independently."""
+    evaluations = (
+        (
+            "Type I",
+            "Type1Used",
+            "ProcessTime1",
+            "min_type1_rate_gpm",
+            "Minimum Type I rate setting",
+        ),
+        (
+            "Type IV",
+            "Type4Used",
+            "ProcessTime4",
+            "min_type4_rate_gpm",
+            "Minimum Type IV rate setting",
+        ),
+    )
+    exceptions: list[AuditException] = []
+    warnings: list[UnableToEvaluate] = []
+    for fluid_name, usage_field, process_time_field, setting_name, setting_label in evaluations:
+        calculation, warning = _evaluate_adjusted_rate(
+            source_row,
+            active_settings,
+            rule=_RULE_015,
+            usage_field=usage_field,
+            process_time_field=process_time_field,
+            maximum_setting_name=setting_name,
+            maximum_setting_label=setting_label,
+        )
+        if warning is not None:
+            warnings.append(warning)
+        elif calculation is not None and calculation.adjusted_rate < calculation.configured_maximum:
+            exceptions.append(
+                _rule_015_exception(source_row, calculation, fluid_name)
+            )
+    return exceptions, warnings
 
 
 def _evaluate_adjusted_rate(
@@ -2021,6 +2070,56 @@ def _rule_009_exception(
                 (
                     f"Adjusted rate {rate_text} gallons per minute exceeds "
                     f"the configured maximum of {maximum_text} gallons per "
+                    "minute."
+                ),
+            ),
+        ),
+    )
+
+
+def _rule_015_exception(
+    source_row: CSVSourceRow,
+    calculation: AdjustedRateCalculation,
+    fluid_name: str,
+) -> AuditException:
+    usage_unit = "gallon" if calculation.usage == 1 else "gallons"
+    recorded_time = _format_decimal_minutes(
+        calculation.process_time_text,
+        calculation.recorded_minutes,
+    )
+    adjusted_time = _format_decimal_minutes(
+        _format_compact_decimal(calculation.adjusted_minutes),
+        calculation.adjusted_minutes,
+    )
+    rate_text = _format_compact_decimal(calculation.adjusted_rate)
+    minimum_text = _format_compact_decimal(calculation.configured_maximum)
+    process_time_number = 1 if fluid_name == "Type I" else 4
+    return _build_exception(
+        source_row,
+        _RULE_015,
+        details=(
+            RuleDetail(
+                f"{fluid_name} gallons used",
+                f"{calculation.usage_text} {usage_unit}",
+            ),
+            RuleDetail(
+                f"Recorded ProcessTime{process_time_number}",
+                recorded_time,
+            ),
+            RuleDetail("Adjusted calculation time", adjusted_time),
+            RuleDetail(
+                f"Adjusted {fluid_name} rate",
+                f"{rate_text} gallons per minute",
+            ),
+            RuleDetail(
+                f"Configured minimum {fluid_name} rate",
+                f"{minimum_text} gallons per minute",
+            ),
+            RuleDetail(
+                "Comparison",
+                (
+                    f"Adjusted rate {rate_text} gallons per minute is below "
+                    f"the configured minimum of {minimum_text} gallons per "
                     "minute."
                 ),
             ),

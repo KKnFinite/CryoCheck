@@ -132,6 +132,14 @@ _DETAIL_LABELS_BY_RULE = {
         "Missing or failed requirement",
         "Documented truck number",
     ),
+    "CC-RULE-015": (
+        "Type I gallons used",
+        "Recorded ProcessTime1",
+        "Adjusted calculation time",
+        "Adjusted Type I rate",
+        "Configured minimum Type I rate",
+        "Comparison",
+    ),
 }
 
 _EXPECTED_LABELS_BY_RULE = {
@@ -211,6 +219,12 @@ _EXPECTED_LABELS_BY_RULE = {
         "Documented Truck Number",
         "Expected",
     ),
+    "CC-RULE-015": (
+        "Adjusted Type I Rate",
+        "Type I Used",
+        "Process Time 1",
+        "Minimum Type I Rate",
+    ),
 }
 
 _INVALID_LABELS_BY_RULE = {
@@ -228,6 +242,7 @@ _INVALID_LABELS_BY_RULE = {
     "CC-RULE-012": ("Entered Tail Number",),
     "CC-RULE-013": ("Type I End Time", "Type IV Start Time"),
     "CC-RULE-014": ("Entered Notes",),
+    "CC-RULE-015": ("Adjusted Type I Rate",),
 }
 
 
@@ -269,7 +284,7 @@ def _render_results(
     audit = AuditResult(
         filename="layout-test.csv",
         rows_audited=len(exceptions) or 1,
-        rules_executed=14,
+        rules_executed=15,
         active_settings_profile_name="Default",
         exceptions=exceptions,
         unable_to_evaluate=warnings,
@@ -351,7 +366,7 @@ def test_results_header_is_reduced_to_neofont_title_and_import_action(app):
     assert "app.css?v=mobile-export-spacing-1" in html
 
 
-def test_all_fourteen_rules_use_standard_identity_and_mapped_values(app):
+def test_all_fifteen_rules_use_standard_identity_and_mapped_values(app):
     exceptions = tuple(
         _exception(rule_id, index)
         for index, rule_id in enumerate(_DETAIL_LABELS_BY_RULE, start=1)
@@ -359,7 +374,7 @@ def test_all_fourteen_rules_use_standard_identity_and_mapped_values(app):
     html = _render_results(app, exceptions)
     cards = _exception_cards(html)
 
-    assert len(cards) == 14
+    assert len(cards) == 15
     for index, (rule_id, card) in enumerate(
         zip(_DETAIL_LABELS_BY_RULE, cards, strict=True),
         start=1,
