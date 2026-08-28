@@ -1225,6 +1225,15 @@ h1 {
   line-height: 1.2;
 }
 
+@media (min-width: 48rem) {
+  .exception-card__message h3,
+  .exception-card__field--entry dd,
+  .exception-card__field--application dd {
+    font-size: 1.02rem;
+    font-weight: 700;
+  }
+}
+
 .exception-details {
   row-gap: 0.32rem;
   max-width: 100%;

@@ -351,7 +351,9 @@ def test_results_header_is_reduced_to_neofont_title_and_import_action(app):
         flags=re.DOTALL,
     ).group()
 
-    assert _visible_text(header) == "Audit Results Import Another CSV"
+    assert _visible_text(header) == (
+        "Audit Results Export Results Import Another CSV"
+    )
     assert '<h1 id="page-title">Audit Results</h1>' in header
     assert "Audit complete" not in html
     assert "CryoCheck audited every imported row" not in html
@@ -363,7 +365,18 @@ def test_results_header_is_reduced_to_neofont_title_and_import_action(app):
         flags=re.DOTALL,
     ).group()
     assert 'font-family: "NeoFont", Arial, sans-serif;' in heading_rule
-    assert "app.css?v=mobile-export-spacing-1" in html
+    assert "app.css?v=pdf-results-export-1" in html
+
+    desktop_identity_rule = re.search(
+        r"@media \(min-width: 48rem\)\s*\{.*?"
+        r"\.exception-card__message h3,.*?\}"
+        r"\s*\}",
+        stylesheet,
+        flags=re.DOTALL,
+    )
+    assert desktop_identity_rule is not None
+    assert "font-size: 1.02rem;" in desktop_identity_rule.group()
+    assert "font-weight: 700;" in desktop_identity_rule.group()
 
 
 def test_all_fifteen_rules_use_standard_identity_and_mapped_values(app):
@@ -846,8 +859,8 @@ def test_export_form_and_warning_behavior_remain_unchanged(app):
 
     assert 'method="post"' in html
     assert 'target="_blank"' in html
-    assert html.count('formtarget="_blank"') == 4
-    assert html.count("data-export-feedback\n") == 2
+    assert html.count('formtarget="_blank"') == 2
+    assert html.count("data-export-feedback\n") == 1
     assert "Record ID WARNING-RECORD" in _visible_text(warning_card)
     assert 'data-rule-id="CC-RULE-004"' in warning_card
     assert 'data-source-row-number="8"' in warning_card
