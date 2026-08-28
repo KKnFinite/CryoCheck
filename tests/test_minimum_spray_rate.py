@@ -1,4 +1,4 @@
-"""Focused coverage for CC-RULE-015 minimum spray-rate validation."""
+"""Focused coverage for CC-RULE-015 minimum spray-amount validation."""
 
 from __future__ import annotations
 
@@ -63,46 +63,47 @@ def _rule_015_warnings(audit):
     return tuple(item for item in audit.unable_to_evaluate if item.rule_id == "CC-RULE-015")
 
 
-def test_default_minimum_rate_boundaries_for_type_i_and_type_iv():
-    assert len(_rule_015_exceptions(_audit(Type1Used="1", ProcessTime1="1"))) == 1
-    assert not _rule_015_exceptions(_audit(Type1Used="2", ProcessTime1="1"))
-    assert not _rule_015_exceptions(_audit(Type1Used="3", ProcessTime1="1"))
+def test_default_minimum_gallon_boundaries_for_type_i_and_type_iv():
+    assert len(_rule_015_exceptions(_audit(Type1Used="0.99"))) == 1
+    assert not _rule_015_exceptions(_audit(Type1Used="1"))
+    assert not _rule_015_exceptions(_audit(Type1Used="1.01"))
 
-    assert len(_rule_015_exceptions(_audit(Type4Used="9", ProcessTime4="1"))) == 1
-    assert not _rule_015_exceptions(_audit(Type4Used="10", ProcessTime4="1"))
-    assert not _rule_015_exceptions(_audit(Type4Used="11", ProcessTime4="1"))
+    assert len(_rule_015_exceptions(_audit(Type4Used="4.99"))) == 1
+    assert not _rule_015_exceptions(_audit(Type4Used="5"))
+    assert not _rule_015_exceptions(_audit(Type4Used="5.01"))
 
 
-def test_personal_minimum_overrides_apply_independently():
+def test_personal_minimum_gallon_overrides_apply_independently():
     settings = replace(
         DEFAULT_SETTINGS,
         name="Personal — MinimumRateUser",
         is_default=False,
-        min_type1_rate_gpm=Decimal("0.5"),
-        min_type4_rate_gpm=Decimal("4"),
+        min_type1_gallons=Decimal("2"),
+        min_type4_gallons=Decimal("8"),
     )
 
     assert not _rule_015_exceptions(
-        _audit(settings=settings, Type1Used="1", ProcessTime1="1")
+        _audit(settings=settings, Type1Used="2")
     )
     assert not _rule_015_exceptions(
-        _audit(settings=settings, Type4Used="8", ProcessTime4="1")
+        _audit(settings=settings, Type4Used="8")
     )
 
 
-def test_migration_backfills_existing_personal_settings_with_defaults():
+def test_migration_uses_new_defaults_without_copying_old_rate_values():
     migration = Path(
-        "migrations/versions/4ef8596ab5d2_add_minimum_spray_rate_settings.py"
+        "migrations/versions/f2a6b8c1d904_correct_minimum_spray_amount_settings.py"
     ).read_text(encoding="utf-8")
 
-    assert '"min_type1_rate_gpm"' in migration
+    assert '"min_type1_gallons"' in migration
     assert 'server_default="1"' in migration
-    assert '"min_type4_rate_gpm"' in migration
+    assert '"min_type4_gallons"' in migration
     assert 'server_default="5"' in migration
+    assert "UPDATE user_settings" not in migration
 
 
 def test_both_fluids_can_fail_independently_on_one_row():
-    audit = _audit(Type1Used="1", ProcessTime1="1", Type4Used="9", ProcessTime4="1")
+    audit = _audit(Type1Used="0.5", Type4Used="4")
 
     exceptions = _rule_015_exceptions(audit)
     assert len(exceptions) == 2
@@ -116,29 +117,35 @@ def test_malformed_values_warn_and_blank_or_nonpositive_usage_skips():
     malformed_usage = _audit(Type1Used="NaN")
     assert _rule_015_warnings(malformed_usage)[0].invalid_fields == ("Type1Used",)
 
-    malformed_time = _audit(Type4Used="9", ProcessTime4="1.5")
-    assert _rule_015_warnings(malformed_time)[0].invalid_fields == ("ProcessTime4",)
-
     skipped = _audit(Type1Used="0", ProcessTime1="bad", Type4Used="", ProcessTime4="bad")
     assert not _rule_015_exceptions(skipped)
     assert not _rule_015_warnings(skipped)
 
 
-def test_results_card_is_concise_and_marks_failing_rate_invalid():
-    exception = _rule_015_exceptions(_audit(Type1Used="1", ProcessTime1="1"))[0]
+def test_rule_015_no_longer_depends_on_process_time():
+    audit = _audit(
+        Type1Used="0.5",
+        ProcessTime1="bad",
+        Type4Used="4",
+        ProcessTime4="NaN",
+    )
+    assert len(_rule_015_exceptions(audit)) == 2
+    assert not _rule_015_warnings(audit)
+
+
+def test_results_card_is_concise_and_marks_failing_usage_invalid():
+    exception = _rule_015_exceptions(_audit(Type1Used="0.5"))[0]
 
     presentation = exception_presentation(exception)
     assert tuple(detail.label for detail in presentation.details) == (
-        "Adjusted Type I Rate",
         "Type I Used",
-        "Process Time 1",
-        "Minimum Type I Rate",
+        "Minimum Type I Gallons",
     )
     assert presentation.details[0].value_kind == "invalid"
 
 
-def test_excel_export_retains_complete_minimum_rate_details():
-    audit = _audit(Type1Used="1", ProcessTime1="1")
+def test_excel_export_retains_complete_minimum_amount_details():
+    audit = _audit(Type1Used="0.5")
     prepared = prepare_export(audit, secret_key="minimum-rate-secret", context_id="minimum-rate")
     snapshot = load_export_snapshot(
         prepared.token,
@@ -152,6 +159,8 @@ def test_excel_export_retains_complete_minimum_rate_details():
     workbook = load_workbook(stream)
     worksheet = workbook["Exceptions"]
     headers = {cell.value: cell.column for cell in worksheet[1]}
-    assert worksheet.cell(2, headers["Detail — Configured minimum Type I rate"]).value == "1 gallons per minute"
+    assert worksheet.cell(2, headers["Detail — Configured minimum Type I gallons"]).value == "1 gallon"
     assert "Comparison" in worksheet.cell(2, headers["Combined details"]).value
+    assert "Detail — Recorded ProcessTime1" not in headers
+    assert "Detail — Adjusted Type I rate" not in headers
     workbook.close()

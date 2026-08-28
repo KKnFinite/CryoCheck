@@ -32,7 +32,7 @@ EXPECTED_EXCEPTION_MESSAGES = (
     "Incorrect tail number.",
     "Pass overlap.",
     "Type IV applied without documented Type I truck.",
-    "Minimum spray rate not met.",
+    "Minimum spray amount not met.",
 )
 
 

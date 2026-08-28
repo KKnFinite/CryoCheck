@@ -380,25 +380,17 @@ def _rule_015_presentation(
     exception: AuditException,
 ) -> ExceptionPresentation:
     details = _details_by_label(exception)
-    fluid_name = "Type I" if "Adjusted Type I rate" in details else "Type IV"
+    fluid_name = "Type I" if "Type I gallons used" in details else "Type IV"
     return ExceptionPresentation(
         details=(
             ResultDetail(
-                f"Adjusted {fluid_name} Rate",
-                details[f"Adjusted {fluid_name} rate"],
+                f"{fluid_name} Used",
+                details[f"{fluid_name} gallons used"],
                 INVALID_VALUE,
             ),
             ResultDetail(
-                f"{fluid_name} Used",
-                details[f"{fluid_name} gallons used"],
-            ),
-            ResultDetail(
-                f"Process Time {1 if fluid_name == 'Type I' else 4}",
-                details[f"Recorded ProcessTime{1 if fluid_name == 'Type I' else 4}"],
-            ),
-            ResultDetail(
-                f"Minimum {fluid_name} Rate",
-                details[f"Configured minimum {fluid_name} rate"],
+                f"Minimum {fluid_name} Gallons",
+                details[f"Configured minimum {fluid_name} gallons"],
             ),
         ),
     )

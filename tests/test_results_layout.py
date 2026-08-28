@@ -134,10 +134,7 @@ _DETAIL_LABELS_BY_RULE = {
     ),
     "CC-RULE-015": (
         "Type I gallons used",
-        "Recorded ProcessTime1",
-        "Adjusted calculation time",
-        "Adjusted Type I rate",
-        "Configured minimum Type I rate",
+        "Configured minimum Type I gallons",
         "Comparison",
     ),
 }
@@ -220,10 +217,8 @@ _EXPECTED_LABELS_BY_RULE = {
         "Expected",
     ),
     "CC-RULE-015": (
-        "Adjusted Type I Rate",
         "Type I Used",
-        "Process Time 1",
-        "Minimum Type I Rate",
+        "Minimum Type I Gallons",
     ),
 }
 
@@ -242,7 +237,7 @@ _INVALID_LABELS_BY_RULE = {
     "CC-RULE-012": ("Entered Tail Number",),
     "CC-RULE-013": ("Type I End Time", "Type IV Start Time"),
     "CC-RULE-014": ("Entered Notes",),
-    "CC-RULE-015": ("Adjusted Type I Rate",),
+    "CC-RULE-015": ("Type I Used",),
 }
 
 

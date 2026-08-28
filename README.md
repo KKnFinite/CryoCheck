@@ -75,7 +75,7 @@ The current pipeline executes:
 - `CC-RULE-012` — Incorrect Tail Number
 - `CC-RULE-013` — Pass Overlap
 - `CC-RULE-014` — Type IV Without Type I Explanation Required
-- `CC-RULE-015` — Minimum Spray Rate
+- `CC-RULE-015` — Minimum Spray Amount
 
 The first two rules compare the local `ApplicationDate + StartTime` event timestamp with local `DateCreated`; UTC columns are not used. Blank or malformed required timestamps produce clearly separated unable-to-evaluate warnings, not rule exceptions. `CC-RULE-002` uses the active profile’s 24- or 48-hour late-entry threshold and fails at exact equality.
 
@@ -91,7 +91,7 @@ Type IV fluid profiles are also version-controlled, read-only reference data. Th
 
 `CC-RULE-008` runs only for positive `Type1Used` and uses the CSV’s existing whole-minute `ProcessTime1` value without recalculating it from start/end times. The adjusted rate is `Type1Used / (ProcessTime1 + 1)` using Decimal-safe arithmetic. A rate equal to the active profile’s maximum passes; only a greater rate fails. Default is 60 GPM, and signed-in Personal Settings apply immediately to the next upload. Malformed or non-finite usage, invalid whole-minute process time, and invalid runtime maximum settings produce unable-to-evaluate warnings rather than exceptions.
 
-`CC-RULE-015` independently checks both positive Type I and Type IV usage with the same adjusted-rate calculation used by Rules 008 and 009. A rate below the active profile’s minimum fails; equality and higher values pass. Defaults are 1 GPM for Type I and 5 GPM for Type IV, with Personal Settings overrides applied on the next signed-in upload. Malformed usage, invalid whole-minute process time, and invalid runtime minimum settings produce unable-to-evaluate warnings.
+`CC-RULE-015` independently checks positive Type I and Type IV usage against configured minimum total gallons. An amount below the active profile’s minimum fails; equality and higher values pass. Defaults are 1 gallon for Type I and 5 gallons for Type IV, with Personal Settings overrides applied on the next signed-in upload. Process times and adjusted-rate calculations do not apply to this rule. Malformed usage and invalid runtime minimum settings produce unable-to-evaluate warnings.
 
 `CC-RULE-010` sums the original whole-minute process time for every positively used fluid step and compares the result with the active profile’s maximum event time. Default is 30 minutes. Type I-only and Type IV-only rows are both evaluated. For combined events, the Include Gap setting optionally adds the whole-minute Type I-to-Type IV gap, including a recognized overnight gap; same-day overlaps contribute zero and are evaluated independently by `CC-RULE-013`. Equality passes, and invalid required inputs produce unable-to-evaluate warnings.
 
@@ -129,7 +129,7 @@ Login and registration are protected by CSRF validation and IP-based rate limits
 
 The `/settings` page is public. Anonymous users see the authoritative, immutable **Default** profile in read-only form. Default is the fallback for all anonymous use and is never stored as an editable database row.
 
-Registering creates exactly one private `UserSettings` record copied from the current Default values. A signed-in user can explicitly save changes to that record or reset it to the current Default. Personal changes affect only the owning account and never modify Default or another user’s settings. Anonymous audits use **Default**; signed-in audits use that account’s **Personal** profile. The Personal late-entry threshold affects `CC-RULE-002`, the active Type I fluid selection affects `CC-RULE-003` and `CC-RULE-004`, the active Type IV fluid selection affects `CC-RULE-005` and `CC-RULE-011`, the Personal Allowed Gap affects `CC-RULE-006`, the Personal maximum Type I and Type IV rates independently affect `CC-RULE-008` and `CC-RULE-009`, the Personal minimum Type I and Type IV rates independently affect `CC-RULE-015`, and the Personal maximum event time and Include Gap setting affect `CC-RULE-010` immediately on the next upload.
+Registering creates exactly one private `UserSettings` record copied from the current Default values. A signed-in user can explicitly save changes to that record or reset it to the current Default. Personal changes affect only the owning account and never modify Default or another user’s settings. Anonymous audits use **Default**; signed-in audits use that account’s **Personal** profile. The Personal late-entry threshold affects `CC-RULE-002`, the active Type I fluid selection affects `CC-RULE-003` and `CC-RULE-004`, the active Type IV fluid selection affects `CC-RULE-005` and `CC-RULE-011`, the Personal Allowed Gap affects `CC-RULE-006`, the Personal maximum Type I and Type IV rates independently affect `CC-RULE-008` and `CC-RULE-009`, the Personal minimum Type I and Type IV gallons independently affect `CC-RULE-015`, and the Personal maximum event time and Include Gap setting affect `CC-RULE-010` immediately on the next upload.
 
 ## Rules catalog
 

@@ -151,8 +151,8 @@ class SettingsForm(FlaskForm):
             NumberRange(max=Decimal("999")),
         ],
     )
-    min_type1_rate_gpm = CompactDecimalField(
-        "Minimum Type I adjusted rate",
+    min_type1_gallons = CompactDecimalField(
+        "Minimum Type I gallons",
         places=None,
         validators=[
             Optional(),
@@ -160,8 +160,8 @@ class SettingsForm(FlaskForm):
             NumberRange(max=Decimal("999")),
         ],
     )
-    min_type4_rate_gpm = CompactDecimalField(
-        "Minimum Type IV adjusted rate",
+    min_type4_gallons = CompactDecimalField(
+        "Minimum Type IV gallons",
         places=None,
         validators=[
             Optional(),

@@ -44,8 +44,8 @@ def _valid_settings(**overrides):
         "allowed_gap_minutes": "9",
         "max_type1_rate_gpm": "72.5",
         "max_type4_rate_gpm": "34.25",
-        "min_type1_rate_gpm": "2.5",
-        "min_type4_rate_gpm": "6.25",
+        "min_type1_gallons": "2.5",
+        "min_type4_gallons": "6.25",
         "max_event_time_minutes": "45",
         "include_gap_in_event_time": "y",
     }
@@ -76,7 +76,7 @@ def test_anonymous_settings_post_redirects_to_login(client):
     assert "/login?next=/settings" in response.headers["Location"]
 
 
-def test_adjusted_rate_fields_use_fluid_column_order(app, client):
+def test_spray_limit_fields_use_requested_grid_order(app, client):
     with app.app_context():
         _create_user("RateLayoutUser")
     _login(client, "RateLayoutUser")
@@ -87,8 +87,8 @@ def test_adjusted_rate_fields_use_fluid_column_order(app, client):
     order = [
         page.index('name="max_type1_rate_gpm"'),
         page.index('name="max_type4_rate_gpm"'),
-        page.index('name="min_type1_rate_gpm"'),
-        page.index('name="min_type4_rate_gpm"'),
+        page.index('name="min_type1_gallons"'),
+        page.index('name="min_type4_gallons"'),
     ]
     assert order == sorted(order)
 
@@ -107,8 +107,8 @@ def test_logged_in_user_can_save_personal_settings(app, client):
         assert settings.allowed_gap_minutes == 9
         assert settings.max_type1_rate_gpm == Decimal("72.500000")
         assert settings.max_type4_rate_gpm == Decimal("34.250000")
-        assert settings.min_type1_rate_gpm == Decimal("2.500000")
-        assert settings.min_type4_rate_gpm == Decimal("6.250000")
+        assert settings.min_type1_gallons == Decimal("2.500000")
+        assert settings.min_type4_gallons == Decimal("6.250000")
         assert settings.max_event_time_minutes == 45
         assert settings.include_gap_in_event_time is True
 
@@ -149,8 +149,8 @@ def test_reset_to_default_restores_all_values(app, client):
         assert settings.allowed_gap_minutes == 5
         assert settings.max_type1_rate_gpm == Decimal("60.000000")
         assert settings.max_type4_rate_gpm == Decimal("30.000000")
-        assert settings.min_type1_rate_gpm == Decimal("1.000000")
-        assert settings.min_type4_rate_gpm == Decimal("5.000000")
+        assert settings.min_type1_gallons == Decimal("1.000000")
+        assert settings.min_type4_gallons == Decimal("5.000000")
         assert settings.max_event_time_minutes == 30
         assert settings.include_gap_in_event_time is False
 
@@ -181,8 +181,8 @@ def test_reset_requires_confirmation(app, client):
         ("max_type4_rate_gpm", "0"),
         ("max_type4_rate_gpm", "1000"),
         ("max_type4_rate_gpm", "Infinity"),
-        ("min_type1_rate_gpm", "0"),
-        ("min_type4_rate_gpm", "Infinity"),
+        ("min_type1_gallons", "0"),
+        ("min_type4_gallons", "Infinity"),
         ("max_event_time_minutes", "0"),
         ("max_event_time_minutes", "1000"),
     ),
@@ -214,8 +214,8 @@ def test_settings_boundary_values_are_accepted(app, client):
             allowed_gap_minutes="0",
             max_type1_rate_gpm="0.001",
             max_type4_rate_gpm="0.001",
-            min_type1_rate_gpm="0.001",
-            min_type4_rate_gpm="0.001",
+            min_type1_gallons="0.001",
+            min_type4_gallons="0.001",
             max_event_time_minutes="1",
         ),
     )
@@ -225,8 +225,8 @@ def test_settings_boundary_values_are_accepted(app, client):
             allowed_gap_minutes="99",
             max_type1_rate_gpm="999",
             max_type4_rate_gpm="999",
-            min_type1_rate_gpm="999",
-            min_type4_rate_gpm="999",
+            min_type1_gallons="999",
+            min_type4_gallons="999",
             max_event_time_minutes="999",
         ),
     )

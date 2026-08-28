@@ -55,11 +55,11 @@ def test_registration_creates_account_and_private_default_settings(app, client):
         assert user.settings.max_type4_rate_gpm == (
             DEFAULT_SETTINGS.max_type4_rate_gpm
         )
-        assert user.settings.min_type1_rate_gpm == (
-            DEFAULT_SETTINGS.min_type1_rate_gpm
+        assert user.settings.min_type1_gallons == (
+            DEFAULT_SETTINGS.min_type1_gallons
         )
-        assert user.settings.min_type4_rate_gpm == (
-            DEFAULT_SETTINGS.min_type4_rate_gpm
+        assert user.settings.min_type4_gallons == (
+            DEFAULT_SETTINGS.min_type4_gallons
         )
         assert user.settings.max_event_time_minutes == (
             DEFAULT_SETTINGS.max_event_time_minutes

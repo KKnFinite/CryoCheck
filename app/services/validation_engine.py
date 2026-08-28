@@ -165,6 +165,15 @@ class AdjustedRateCalculation:
 
 
 @dataclass(frozen=True, slots=True)
+class MinimumSprayAmountCalculation:
+    """Validated usage and configured minimum for one fluid."""
+
+    usage_text: str
+    usage: Decimal
+    configured_minimum: Decimal
+
+
+@dataclass(frozen=True, slots=True)
 class EventTimeCalculation:
     """Validated inputs and output for one event-time calculation."""
 
@@ -277,11 +286,11 @@ def run_audit(
         exceptions.extend(type4_rate_exceptions)
         warnings.extend(type4_rate_warnings)
 
-        minimum_rate_exceptions, minimum_rate_warnings = (
-            _evaluate_minimum_rate_rule(source_row, active_settings)
+        minimum_amount_exceptions, minimum_amount_warnings = (
+            _evaluate_minimum_spray_amount_rule(source_row, active_settings)
         )
-        exceptions.extend(minimum_rate_exceptions)
-        warnings.extend(minimum_rate_warnings)
+        exceptions.extend(minimum_amount_exceptions)
+        warnings.extend(minimum_amount_warnings)
 
         event_time_exceptions, event_time_warnings = (
             _evaluate_event_time_rule(source_row, active_settings)
@@ -625,44 +634,75 @@ def _evaluate_type4_rate_rule(
     return [_rule_009_exception(source_row, calculation)], []
 
 
-def _evaluate_minimum_rate_rule(
+def _evaluate_minimum_spray_amount_rule(
     source_row: CSVSourceRow,
     active_settings: SettingsDefinition,
 ) -> tuple[list[AuditException], list[UnableToEvaluate]]:
-    """Evaluate Type I and Type IV minimum adjusted rates independently."""
+    """Evaluate Type I and Type IV minimum total gallons independently."""
     evaluations = (
         (
             "Type I",
             "Type1Used",
-            "ProcessTime1",
-            "min_type1_rate_gpm",
-            "Minimum Type I rate setting",
+            "min_type1_gallons",
+            "Minimum Type I gallons setting",
         ),
         (
             "Type IV",
             "Type4Used",
-            "ProcessTime4",
-            "min_type4_rate_gpm",
-            "Minimum Type IV rate setting",
+            "min_type4_gallons",
+            "Minimum Type IV gallons setting",
         ),
     )
     exceptions: list[AuditException] = []
     warnings: list[UnableToEvaluate] = []
-    for fluid_name, usage_field, process_time_field, setting_name, setting_label in evaluations:
-        calculation, warning = _evaluate_adjusted_rate(
-            source_row,
+    for fluid_name, usage_field, setting_name, setting_label in evaluations:
+        usage_text = source_row.get(usage_field)
+        if not usage_text.strip():
+            continue
+        usage = _parse_decimal(usage_text)
+        if usage is None:
+            warnings.append(
+                _unable_to_evaluate(
+                    source_row,
+                    _RULE_015,
+                    (usage_field,),
+                    message=(
+                        f"{usage_field} is malformed or non-finite, so "
+                        f"{_RULE_015.rule_id} applicability could not be determined."
+                    ),
+                )
+            )
+            continue
+        if usage <= 0:
+            continue
+        configured_minimum = _valid_positive_decimal_setting(
             active_settings,
-            rule=_RULE_015,
-            usage_field=usage_field,
-            process_time_field=process_time_field,
-            maximum_setting_name=setting_name,
-            maximum_setting_label=setting_label,
+            setting_name,
         )
-        if warning is not None:
-            warnings.append(warning)
-        elif calculation is not None and calculation.adjusted_rate < calculation.configured_maximum:
+        if configured_minimum is None:
+            warnings.append(
+                _unable_to_evaluate(
+                    source_row,
+                    _RULE_015,
+                    (setting_label,),
+                    message=(
+                        f"{setting_label} must be an available, finite, "
+                        "positive Decimal value."
+                    ),
+                )
+            )
+            continue
+        if usage < configured_minimum:
             exceptions.append(
-                _rule_015_exception(source_row, calculation, fluid_name)
+                _rule_015_exception(
+                    source_row,
+                    MinimumSprayAmountCalculation(
+                        usage_text=usage_text,
+                        usage=usage,
+                        configured_minimum=configured_minimum,
+                    ),
+                    fluid_name,
+                )
             )
     return exceptions, warnings
 
@@ -2079,21 +2119,12 @@ def _rule_009_exception(
 
 def _rule_015_exception(
     source_row: CSVSourceRow,
-    calculation: AdjustedRateCalculation,
+    calculation: MinimumSprayAmountCalculation,
     fluid_name: str,
 ) -> AuditException:
     usage_unit = "gallon" if calculation.usage == 1 else "gallons"
-    recorded_time = _format_decimal_minutes(
-        calculation.process_time_text,
-        calculation.recorded_minutes,
-    )
-    adjusted_time = _format_decimal_minutes(
-        _format_compact_decimal(calculation.adjusted_minutes),
-        calculation.adjusted_minutes,
-    )
-    rate_text = _format_compact_decimal(calculation.adjusted_rate)
-    minimum_text = _format_compact_decimal(calculation.configured_maximum)
-    process_time_number = 1 if fluid_name == "Type I" else 4
+    minimum_text = _format_compact_decimal(calculation.configured_minimum)
+    minimum_unit = "gallon" if calculation.configured_minimum == 1 else "gallons"
     return _build_exception(
         source_row,
         _RULE_015,
@@ -2103,24 +2134,14 @@ def _rule_015_exception(
                 f"{calculation.usage_text} {usage_unit}",
             ),
             RuleDetail(
-                f"Recorded ProcessTime{process_time_number}",
-                recorded_time,
-            ),
-            RuleDetail("Adjusted calculation time", adjusted_time),
-            RuleDetail(
-                f"Adjusted {fluid_name} rate",
-                f"{rate_text} gallons per minute",
-            ),
-            RuleDetail(
-                f"Configured minimum {fluid_name} rate",
-                f"{minimum_text} gallons per minute",
+                f"Configured minimum {fluid_name} gallons",
+                f"{minimum_text} {minimum_unit}",
             ),
             RuleDetail(
                 "Comparison",
                 (
-                    f"Adjusted rate {rate_text} gallons per minute is below "
-                    f"the configured minimum of {minimum_text} gallons per "
-                    "minute."
+                    f"{calculation.usage_text} {usage_unit} is below the "
+                    f"configured minimum of {minimum_text} {minimum_unit}."
                 ),
             ),
         ),

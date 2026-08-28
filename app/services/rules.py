@@ -803,34 +803,29 @@ RULES: Final[tuple[RuleDefinition, ...]] = (
     ),
     RuleDefinition(
         rule_id="CC-RULE-015",
-        name="Minimum Spray Rate",
+        name="Minimum Spray Amount",
         description=(
-            "Checks adjusted Type I and Type IV application rates against "
-            "their independently configured minimums."
+            "Checks total Type I and Type IV gallons sprayed against their "
+            "independently configured minimums."
         ),
         logic_summary=(
             "Evaluate Type I and Type IV independently when their usage is numerically greater than 0.",
             "Blank, zero, or negative usage skips that fluid; malformed or non-finite usage is unable to evaluate.",
-            "Use the CSV’s existing whole-number ProcessTime1 or ProcessTime4 value directly.",
-            "Adjusted rate = fluid used / (recorded process time + 1).",
-            "Use Decimal-safe arithmetic without rounding before comparison.",
-            "Generate an exception only when the adjusted rate is below the configured minimum.",
-            "A rate equal to or above the configured minimum passes.",
+            "Compare the recorded total gallons directly; process time and adjusted rate do not apply.",
+            "Generate an exception only when total gallons are below the configured minimum.",
+            "An amount equal to or above the configured minimum passes.",
             "Invalid required values or an invalid runtime minimum produce an unable-to-evaluate warning, not an exception.",
         ),
         settings_defaults=(
-            "Minimum Type I rate: active profile setting; Default: 1 gallon per minute",
-            "Minimum Type IV rate: active profile setting; Default: 5 gallons per minute",
+            "Minimum Type I gallons: active profile setting; Default: 1 gallon",
+            "Minimum Type IV gallons: active profile setting; Default: 5 gallons",
             "Personal Settings apply to the next signed-in upload",
             "Mandatory",
         ),
-        exception_message="Minimum spray rate not met.",
+        exception_message="Minimum spray amount not met.",
         output_details=(
             "Fluid gallons used",
-            "Recorded process time",
-            "Adjusted calculation time",
-            "Adjusted gallons per minute",
-            "Configured minimum",
+            "Configured minimum gallons",
             "Comparison statement",
         ),
         implementation_status=IMPLEMENTED_STATUS,

@@ -40,8 +40,8 @@
           <div><dt>Allowed gap</dt><dd>{{ default_settings.allowed_gap_minutes }} minutes</dd></div>
           <div><dt>Maximum Type I adjusted rate</dt><dd>{{ default_settings.max_type1_rate_gpm }} GPM</dd></div>
           <div><dt>Maximum Type IV adjusted rate</dt><dd>{{ default_settings.max_type4_rate_gpm }} GPM</dd></div>
-          <div><dt>Minimum Type I adjusted rate</dt><dd>{{ default_settings.min_type1_rate_gpm }} GPM</dd></div>
-          <div><dt>Minimum Type IV adjusted rate</dt><dd>{{ default_settings.min_type4_rate_gpm }} GPM</dd></div>
+          <div><dt>Minimum Type I gallons</dt><dd>{{ default_settings.min_type1_gallons }} gal</dd></div>
+          <div><dt>Minimum Type IV gallons</dt><dd>{{ default_settings.min_type4_gallons }} gal</dd></div>
           <div><dt>Maximum event time</dt><dd>{{ default_settings.max_event_time_minutes }} minutes</dd></div>
           <div><dt>Include gap in event time</dt><dd>{{ "On" if default_settings.include_gap_in_event_time else "Off" }}</dd></div>
         </dl>
@@ -132,7 +132,7 @@
         <section class="settings-group" aria-labelledby="rate-settings">
           <div class="settings-group__heading">
             <p class="eyebrow">Application rates</p>
-            <h2 id="rate-settings">Adjusted rate limits</h2>
+            <h2 id="rate-settings">Spray limits</h2>
           </div>
           <div class="settings-fields settings-fields--two">
             <div class="form-field">
@@ -156,23 +156,23 @@
               {% endif %}
             </div>
             <div class="form-field">
-              {{ settings_form.min_type1_rate_gpm.label }}
+              {{ settings_form.min_type1_gallons.label }}
               <div class="input-suffix">
-                {{ settings_form.min_type1_rate_gpm(min="0.000001", max="999", step="any") }}
-                <span>GPM</span>
+                {{ settings_form.min_type1_gallons(min="0.000001", max="999", step="any") }}
+                <span>gal</span>
               </div>
-              {% if settings_form.min_type1_rate_gpm.errors %}
-                <ul class="form-errors" role="alert">{% for error in settings_form.min_type1_rate_gpm.errors %}<li>{{ error }}</li>{% endfor %}</ul>
+              {% if settings_form.min_type1_gallons.errors %}
+                <ul class="form-errors" role="alert">{% for error in settings_form.min_type1_gallons.errors %}<li>{{ error }}</li>{% endfor %}</ul>
               {% endif %}
             </div>
             <div class="form-field">
-              {{ settings_form.min_type4_rate_gpm.label }}
+              {{ settings_form.min_type4_gallons.label }}
               <div class="input-suffix">
-                {{ settings_form.min_type4_rate_gpm(min="0.000001", max="999", step="any") }}
-                <span>GPM</span>
+                {{ settings_form.min_type4_gallons(min="0.000001", max="999", step="any") }}
+                <span>gal</span>
               </div>
-              {% if settings_form.min_type4_rate_gpm.errors %}
-                <ul class="form-errors" role="alert">{% for error in settings_form.min_type4_rate_gpm.errors %}<li>{{ error }}</li>{% endfor %}</ul>
+              {% if settings_form.min_type4_gallons.errors %}
+                <ul class="form-errors" role="alert">{% for error in settings_form.min_type4_gallons.errors %}<li>{{ error }}</li>{% endfor %}</ul>
               {% endif %}
             </div>
           </div>
