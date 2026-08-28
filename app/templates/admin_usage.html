@@ -13,8 +13,8 @@
         <p class="eyebrow">Private administration</p>
         <h1 id="page-title">Usage Dashboard</h1>
         <p class="hero__intro">
-          Lightweight account activity totals. CryoCheck does not retain
-          uploaded data, audit findings, filenames, or identifying network data.
+          Aggregate activity only. CryoCheck never retains uploaded files,
+          audit findings, filenames, or network identifiers.
         </p>
       </div>
     </header>
@@ -24,19 +24,17 @@
         <span>Total accounts</span>
         <strong>{{ summary.total_accounts }}</strong>
       </article>
-      <article class="usage-summary__card" data-summary="accounts-created">
-        <span>Accounts created</span>
-        <strong>{{ summary.accounts_created_7_days }}</strong>
-        <small>7 days</small>
-        <strong>{{ summary.accounts_created_30_days }}</strong>
-        <small>30 days</small>
-      </article>
-      <article class="usage-summary__card" data-summary="active-accounts">
-        <span>Active accounts</span>
+      <article class="usage-summary__card" data-summary="active-accounts-7-days">
+        <span>Active — 7 days</span>
         <strong>{{ summary.active_accounts_7_days }}</strong>
-        <small>7 days</small>
+      </article>
+      <article class="usage-summary__card" data-summary="active-accounts-30-days">
+        <span>Active — 30 days</span>
         <strong>{{ summary.active_accounts_30_days }}</strong>
-        <small>30 days</small>
+      </article>
+      <article class="usage-summary__card" data-summary="total-validations">
+        <span>Total validations</span>
+        <strong>{{ summary.total_validations }}</strong>
       </article>
       <article class="usage-summary__card" data-summary="signed-in-validations">
         <span>Signed-in validations</span>
@@ -46,10 +44,24 @@
         <span>Anonymous validations</span>
         <strong>{{ summary.anonymous_validations }}</strong>
       </article>
-      <article class="usage-summary__card" data-summary="exports">
-        <span>Exports</span>
-        <strong>{{ summary.exports }}</strong>
+      <article class="usage-summary__card" data-summary="total-exports">
+        <span>Total exports</span>
+        <strong>{{ summary.total_exports }}</strong>
       </article>
+      <article class="usage-summary__card" data-summary="signed-in-exports">
+        <span>Signed-in exports</span>
+        <strong>{{ summary.signed_in_exports }}</strong>
+      </article>
+      <article class="usage-summary__card" data-summary="anonymous-exports">
+        <span>Anonymous exports</span>
+        <strong>{{ summary.anonymous_exports }}</strong>
+      </article>
+    </section>
+
+    <section class="usage-growth" aria-label="Account growth">
+      <span>Account growth</span>
+      <p><strong>{{ summary.accounts_created_7_days }}</strong> created in the last 7 days</p>
+      <p><strong>{{ summary.accounts_created_30_days }}</strong> created in the last 30 days</p>
     </section>
 
     <section class="usage-accounts" aria-labelledby="accounts-title">
@@ -73,13 +85,13 @@
           <tbody>
             {% for account in accounts %}
               <tr>
-                <th scope="row">{{ account.username }}</th>
-                <td>{{ timestamp(account.created_at) }}</td>
-                <td>{{ timestamp(account.last_login_at) }}</td>
-                <td>{{ account.validation_count }}</td>
-                <td>{{ timestamp(account.last_validation_at) }}</td>
-                <td>{{ account.export_count }}</td>
-                <td>{{ timestamp(account.last_export_at) }}</td>
+                <th scope="row" data-label="Username">{{ account.username }}</th>
+                <td data-label="Created">{{ timestamp(account.created_at) }}</td>
+                <td data-label="Last Login">{{ timestamp(account.last_login_at) }}</td>
+                <td data-label="Validations">{{ account.validation_count }}</td>
+                <td data-label="Last Validation">{{ timestamp(account.last_validation_at) }}</td>
+                <td data-label="Exports">{{ account.export_count }}</td>
+                <td data-label="Last Export">{{ timestamp(account.last_export_at) }}</td>
               </tr>
             {% else %}
               <tr>

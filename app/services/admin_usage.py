@@ -21,9 +21,12 @@ class UsageSummary:
     accounts_created_30_days: int
     active_accounts_7_days: int
     active_accounts_30_days: int
+    total_validations: int
     signed_in_validations: int
     anonymous_validations: int
-    exports: int
+    total_exports: int
+    signed_in_exports: int
+    anonymous_exports: int
 
 
 def is_admin_user(user=None) -> bool:
@@ -46,21 +49,18 @@ def track_completed_validation() -> None:
         current_user.validation_count += 1
         current_user.last_validation_at = completed_at
     else:
-        totals = db.session.get(UsageTotals, 1)
-        if totals is None:
-            totals = UsageTotals(id=1, anonymous_validation_count=0)
-            db.session.add(totals)
+        totals = _usage_totals()
         totals.anonymous_validation_count += 1
     db.session.commit()
 
 
 def track_completed_export() -> None:
-    """Record one generated workbook for a signed-in account."""
-    if not current_user.is_authenticated:
-        return
-
-    current_user.export_count += 1
-    current_user.last_export_at = utc_now()
+    """Record one generated workbook without retaining export content."""
+    if current_user.is_authenticated:
+        current_user.export_count += 1
+        current_user.last_export_at = utc_now()
+    else:
+        _usage_totals().anonymous_export_count += 1
     db.session.commit()
 
 
@@ -68,6 +68,7 @@ def build_usage_summary(
     users: tuple[User, ...],
     *,
     anonymous_validations: int,
+    anonymous_exports: int,
     now: datetime | None = None,
 ) -> UsageSummary:
     """Build deterministic dashboard totals from account metadata only."""
@@ -89,6 +90,8 @@ def build_usage_summary(
             for timestamp in activity
         )
 
+    signed_in_validations = sum(user.validation_count for user in users)
+    signed_in_exports = sum(user.export_count for user in users)
     return UsageSummary(
         total_accounts=len(users),
         accounts_created_7_days=sum(
@@ -103,10 +106,26 @@ def build_usage_summary(
         active_accounts_30_days=sum(
             active_since(user, thirty_days_ago) for user in users
         ),
-        signed_in_validations=sum(user.validation_count for user in users),
+        total_validations=(signed_in_validations + anonymous_validations),
+        signed_in_validations=signed_in_validations,
         anonymous_validations=anonymous_validations,
-        exports=sum(user.export_count for user in users),
+        total_exports=(signed_in_exports + anonymous_exports),
+        signed_in_exports=signed_in_exports,
+        anonymous_exports=anonymous_exports,
     )
+
+
+def _usage_totals() -> UsageTotals:
+    """Load the one anonymous aggregate, creating it for fresh test schemas."""
+    totals = db.session.get(UsageTotals, 1)
+    if totals is None:
+        totals = UsageTotals(
+            id=1,
+            anonymous_validation_count=0,
+            anonymous_export_count=0,
+        )
+        db.session.add(totals)
+    return totals
 
 
 def _aware_utc(value: datetime) -> datetime:

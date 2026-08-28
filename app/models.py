@@ -115,6 +115,11 @@ class UsageTotals(db.Model):
         nullable=False,
         default=0,
     )
+    anonymous_export_count = db.Column(
+        db.Integer,
+        nullable=False,
+        default=0,
+    )
 
 
 __all__ = [

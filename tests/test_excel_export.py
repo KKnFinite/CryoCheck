@@ -14,6 +14,7 @@ from werkzeug.datastructures import MultiDict
 
 from app import create_app
 from app.extensions import db
+from app.models import UsageTotals
 from app.services.csv_import import EXPECTED_COLUMNS
 from app.services.excel_export import (
     build_exception_workbook,
@@ -1198,7 +1199,7 @@ def test_unable_to_evaluate_warnings_are_excluded_from_export(client):
     workbook.close()
 
 
-def test_export_request_performs_no_database_operations(app, client):
+def test_anonymous_export_writes_only_its_aggregate_usage_total(app, client):
     results = _upload_for_export(
         client,
         {"DateCreated": "2026-01-15 07:59"},
@@ -1229,7 +1230,19 @@ def test_export_request_performs_no_database_operations(app, client):
             event.remove(engine, "before_cursor_execute", record_statement)
 
     assert response.status_code == 200
-    assert executed_statements == []
+    mutating = [
+        statement
+        for statement in executed_statements
+        if statement.lstrip().upper().startswith(
+            ("INSERT", "UPDATE", "DELETE", "CREATE", "DROP", "ALTER")
+        )
+    ]
+    assert len(mutating) == 1
+    assert "usage_totals" in mutating[0]
+    with app.app_context():
+        totals = db.session.get(UsageTotals, 1)
+        assert totals is not None
+        assert totals.anonymous_export_count == 1
 
 
 def test_production_export_route_requires_csrf():

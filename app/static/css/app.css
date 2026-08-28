@@ -1515,12 +1515,16 @@ h1 {
 .admin-page {
   display: grid;
   min-width: 0;
-  gap: 2rem;
+  gap: 1.25rem;
+}
+
+.admin-heading {
+  padding: 0.35rem 0.2rem 0;
 }
 
 .admin-heading h1 {
-  margin-bottom: 1rem;
-  font-size: clamp(2.5rem, 5vw, 4.25rem);
+  margin-bottom: 0.65rem;
+  font-size: clamp(2.4rem, 4.4vw, 3.8rem);
 }
 
 .admin-heading .hero__intro {
@@ -1530,20 +1534,22 @@ h1 {
 
 .usage-summary {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.8rem;
 }
 
 .usage-summary__card {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.25rem 1rem;
-  align-items: baseline;
-  padding: 1.25rem 1.4rem;
-  border: 1px solid rgb(255 255 255 / 90%);
-  border-radius: var(--radius-md);
-  background: rgb(255 255 255 / 80%);
-  box-shadow: 0 14px 32px rgb(6 40 70 / 9%);
+  min-height: 7.6rem;
+  align-content: space-between;
+  gap: 0.8rem;
+  padding: 1.15rem 1.2rem;
+  border: 1px solid rgb(255 255 255 / 88%);
+  border-radius: 1rem;
+  background:
+    radial-gradient(circle at 100% 0, rgb(157 221 239 / 23%), transparent 10rem),
+    rgb(255 255 255 / 80%);
+  box-shadow: 0 12px 28px rgb(6 40 70 / 8%);
   backdrop-filter: blur(18px);
 }
 
@@ -1558,15 +1564,37 @@ h1 {
 
 .usage-summary__card > strong {
   color: var(--color-navy-950);
-  font-size: 1.8rem;
+  font-size: clamp(1.8rem, 2.6vw, 2.2rem);
   line-height: 1.15;
 }
 
-.usage-summary__card > small {
+.usage-growth {
+  display: flex;
+  gap: 1.2rem;
+  align-items: center;
+  padding: 0.9rem 1.2rem;
+  border: 1px solid rgb(43 145 194 / 17%);
+  border-radius: 0.85rem;
   color: var(--color-muted);
-  font-size: 0.75rem;
-  font-weight: 750;
-  text-align: right;
+  background: rgb(235 249 252 / 62%);
+  font-size: 0.82rem;
+}
+
+.usage-growth > span {
+  color: var(--color-navy-900);
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.usage-growth p {
+  margin: 0;
+}
+
+.usage-growth strong {
+  color: var(--color-navy-950);
+  font-size: 1.05rem;
 }
 
 .usage-accounts {
@@ -1579,7 +1607,7 @@ h1 {
 }
 
 .usage-accounts > header {
-  padding: 1.4rem 1.6rem;
+  padding: 1.15rem 1.4rem;
   border-bottom: 1px solid rgb(9 34 62 / 8%);
 }
 
@@ -1599,7 +1627,7 @@ h1 {
 
 .usage-table {
   width: 100%;
-  min-width: 64rem;
+  min-width: 67rem;
   border-collapse: collapse;
   color: var(--color-navy-900);
   font-size: 0.8rem;
@@ -1608,7 +1636,7 @@ h1 {
 
 .usage-table th,
 .usage-table td {
-  padding: 0.85rem 1rem;
+  padding: 1rem 1.35rem;
   border-bottom: 1px solid rgb(9 34 62 / 7%);
   white-space: nowrap;
 }
@@ -1620,6 +1648,17 @@ h1 {
   font-weight: 850;
   letter-spacing: 0.05em;
   text-transform: uppercase;
+}
+
+.usage-table td {
+  color: var(--color-navy-800);
+}
+
+.usage-table td:nth-child(2),
+.usage-table td:nth-child(3),
+.usage-table td:nth-child(5),
+.usage-table td:nth-child(7) {
+  font-variant-numeric: tabular-nums;
 }
 
 .usage-table tbody th {
@@ -3157,6 +3196,7 @@ h1 {
   }
 
   .usage-summary__card {
+    min-height: 6.6rem;
     padding: 0.85rem;
     border-radius: 0.75rem;
   }
@@ -3167,6 +3207,82 @@ h1 {
 
   .usage-accounts {
     border-radius: 0.8rem;
+  }
+
+  .usage-growth {
+    display: grid;
+    gap: 0.35rem;
+    padding: 0.85rem;
+  }
+
+  .usage-growth p {
+    font-size: 0.78rem;
+  }
+
+  .usage-table-wrap {
+    overflow: visible;
+  }
+
+  .usage-table {
+    min-width: 0;
+    font-size: 0.78rem;
+  }
+
+  .usage-table thead {
+    display: none;
+  }
+
+  .usage-table,
+  .usage-table tbody,
+  .usage-table tr,
+  .usage-table th,
+  .usage-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .usage-table tbody {
+    display: grid;
+    gap: 0.65rem;
+    padding: 0.65rem;
+  }
+
+  .usage-table tbody tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow: hidden;
+    border: 1px solid rgb(25 118 168 / 13%);
+    border-radius: 0.7rem;
+    background: rgb(255 255 255 / 64%);
+  }
+
+  .usage-table tbody th,
+  .usage-table tbody td {
+    min-width: 0;
+    padding: 0.55rem 0.65rem;
+    border-bottom: 1px solid rgb(9 34 62 / 7%);
+    white-space: normal;
+  }
+
+  .usage-table tbody th {
+    grid-column: 1 / -1;
+    color: var(--color-navy-950);
+    font-size: 0.86rem;
+  }
+
+  .usage-table tbody td::before {
+    display: block;
+    margin-bottom: 0.18rem;
+    color: var(--color-muted);
+    content: attr(data-label);
+    font-size: 0.6rem;
+    font-weight: 850;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .usage-table tbody tr:last-child > * {
+    border-bottom: 1px solid rgb(9 34 62 / 7%);
   }
 
   .usage-accounts > header {

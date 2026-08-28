@@ -273,6 +273,9 @@ def admin_usage() -> str:
         anonymous_validations=(
             totals.anonymous_validation_count if totals is not None else 0
         ),
+        anonymous_exports=(
+            totals.anonymous_export_count if totals is not None else 0
+        ),
     )
     return render_template(
         "admin_usage.html",

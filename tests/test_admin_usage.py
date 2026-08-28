@@ -198,6 +198,27 @@ def test_anonymous_validations_use_only_the_single_aggregate(app, client):
         totals = db.session.get(UsageTotals, 1)
         assert totals is not None
         assert totals.anonymous_validation_count == 2
+        assert totals.anonymous_export_count == 0
+
+
+def test_anonymous_completed_export_updates_only_the_single_aggregate(
+    app,
+    client,
+):
+    results = _upload(client, exception=True)
+    token = _export_token(results)
+
+    export = client.post(
+        "/export",
+        data={"export_token": token, "scope": "all"},
+    )
+
+    assert export.status_code == 200
+    with app.app_context():
+        assert User.query.count() == 0
+        totals = db.session.get(UsageTotals, 1)
+        assert totals.anonymous_validation_count == 1
+        assert totals.anonymous_export_count == 1
 
 
 def test_dashboard_totals_and_account_table_use_metadata_only(app, client):
@@ -224,7 +245,13 @@ def test_dashboard_totals_and_account_table_use_metadata_only(app, client):
             validation_count=6,
             export_count=2,
         )
-        db.session.add(UsageTotals(id=1, anonymous_validation_count=7))
+        db.session.add(
+            UsageTotals(
+                id=1,
+                anonymous_validation_count=7,
+                anonymous_export_count=4,
+            )
+        )
         db.session.commit()
 
     _login(client, "AdminUser")
@@ -233,19 +260,24 @@ def test_dashboard_totals_and_account_table_use_metadata_only(app, client):
 
     assert response.status_code == 200
     assert _summary_card(page, "total-accounts") == "Total accounts 3"
-    assert _summary_card(page, "accounts-created") == (
-        "Accounts created 1 7 days 2 30 days"
+    assert _summary_card(page, "active-accounts-7-days") == (
+        "Active — 7 days 2"
     )
-    assert _summary_card(page, "active-accounts") == (
-        "Active accounts 2 7 days 3 30 days"
+    assert _summary_card(page, "active-accounts-30-days") == (
+        "Active — 30 days 3"
     )
+    assert _summary_card(page, "total-validations") == "Total validations 18"
     assert _summary_card(page, "signed-in-validations") == (
         "Signed-in validations 11"
     )
     assert _summary_card(page, "anonymous-validations") == (
         "Anonymous validations 7"
     )
-    assert _summary_card(page, "exports") == "Exports 5"
+    assert _summary_card(page, "total-exports") == "Total exports 9"
+    assert _summary_card(page, "signed-in-exports") == "Signed-in exports 5"
+    assert _summary_card(page, "anonymous-exports") == "Anonymous exports 4"
+    assert "created in the last 7 days" in page
+    assert 'data-label="Last Export"' in page
     assert page.index("AdminUser") < page.index("MonthlyUser") < page.index(
         "RecentUser"
     )
@@ -270,8 +302,13 @@ def test_audit_payload_and_filename_are_never_persisted(app, client):
 def test_new_account_usage_fields_default_to_zero(app):
     with app.app_context():
         user = _create_user("DefaultCounters")
+        totals = UsageTotals(id=1)
+        db.session.add(totals)
+        db.session.commit()
 
         assert user.validation_count == 0
         assert user.last_validation_at is None
         assert user.export_count == 0
         assert user.last_export_at is None
+        assert totals.anonymous_validation_count == 0
+        assert totals.anonymous_export_count == 0
