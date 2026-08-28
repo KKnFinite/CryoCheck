@@ -15,7 +15,7 @@ from app.services.type4_fluids import TypeIVFluidProfile
 from app.services.validation_engine import run_audit
 
 # Keep legacy rule-isolation fixtures above the new mandatory minimum floors;
-# CC-RULE-015 has dedicated coverage in test_minimum_spray_rate.py.
+# CC-RULE-015 has dedicated coverage in test_minimum_spray_amount.py.
 DEFAULT_SETTINGS = replace(
     DEFAULT_SETTINGS,
     min_type1_gallons=Decimal("0.000001"),
