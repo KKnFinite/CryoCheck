@@ -574,7 +574,7 @@ def test_rule_005_inclusive_boundaries_pass_on_results_screen(
         _synthetic_csv(
             overrides={
                 0: {
-                    "Type4Used": "1",
+                    "Type4Used": "10",
                     "Type4ABrix": type4_brix,
                 }
             }
@@ -596,7 +596,7 @@ def test_rule_005_exception_is_rendered_on_results_screen(
         _synthetic_csv(
             overrides={
                 0: {
-                    "Type4Used": "1",
+                    "Type4Used": "10",
                     "Type4ABrix": type4_brix,
                 }
             }
@@ -639,7 +639,7 @@ def test_rule_006_default_five_minute_gap_passes_on_results_screen(client):
         _synthetic_csv(
             overrides={
                 0: {
-                    "Type4Used": "1",
+                    "Type4Used": "10",
                     "Type4ABrix": "35",
                     "EndTime1": "23:44",
                     "StartTime4": "23:49",
@@ -660,7 +660,7 @@ def test_rule_006_default_six_minute_gap_renders_required_details(client):
         _synthetic_csv(
             overrides={
                 0: {
-                    "Type4Used": "1",
+                    "Type4Used": "10",
                     "Type4ABrix": "35",
                     "EndTime1": "23:44",
                     "StartTime4": "23:50",
@@ -692,7 +692,7 @@ def test_rule_006_overnight_results_screen(client, type4_start, should_fail):
                     "StartTime": "23:45",
                     "EndTime": "00:10",
                     "DateCreated": "2026-01-01 23:45",
-                    "Type4Used": "1",
+                    "Type4Used": "10",
                     "Type4ABrix": "35",
                     "EndTime1": "23:58",
                     "StartTime4": type4_start,
@@ -713,7 +713,7 @@ def test_rule_006_same_day_overlap_defers_exception_to_rule_013(client):
                 0: {
                     "StartTime": "08:00",
                     "EndTime": "09:00",
-                    "Type4Used": "1",
+                    "Type4Used": "10",
                     "Type4ABrix": "35",
                     "EndTime1": "08:40",
                     "StartTime4": "08:30",
@@ -764,13 +764,13 @@ def test_personal_allowed_gap_affects_next_upload_and_reset(app, client):
             row_count=2,
             overrides={
                 0: {
-                    "Type4Used": "1",
+                    "Type4Used": "10",
                     "Type4ABrix": "35",
                     "EndTime1": "08:10",
                     "StartTime4": "08:20",
                 },
                 1: {
-                    "Type4Used": "1",
+                    "Type4Used": "10",
                     "Type4ABrix": "35",
                     "EndTime1": "08:10",
                     "StartTime4": "08:21",
@@ -787,7 +787,7 @@ def test_personal_allowed_gap_affects_next_upload_and_reset(app, client):
         _synthetic_csv(
             overrides={
                 0: {
-                    "Type4Used": "1",
+                    "Type4Used": "10",
                     "Type4ABrix": "35",
                     "EndTime1": "08:10",
                     "StartTime4": "08:16",
@@ -852,7 +852,7 @@ def test_rule_007_exception_is_rendered_on_results_screen(
 @pytest.mark.parametrize(
     ("precipitation", "type4_used", "type4_brix"),
     (
-        ("Snow", "1", "35"),
+        ("Snow", "10", "35"),
         ("None", "0", ""),
         ("", "", ""),
     ),
@@ -1302,9 +1302,9 @@ def test_rule_010_combined_event_ignores_clocks_when_gap_is_off(client):
         _synthetic_csv(
             overrides={
                 0: {
-                    "Type1Used": "1",
+                    "Type1Used": "11",
                     "ProcessTime1": "15",
-                    "Type4Used": "1",
+                    "Type4Used": "10",
                     "Type4ABrix": "35",
                     "ProcessTime4": "16",
                     "EndTime1": "invalid",
@@ -1382,7 +1382,7 @@ def test_rule_010_personal_include_gap_adds_same_day_and_overnight_gaps(
                     "Type1Used": "1",
                     "ProcessTime1": "10",
                     "EndTime1": type1_end,
-                    "Type4Used": "1",
+                    "Type4Used": "10",
                     "Type4ABrix": "35",
                     "ProcessTime4": "15",
                     "StartTime4": type4_start,
@@ -1443,7 +1443,7 @@ def test_rule_010_overlap_uses_zero_gap_while_rule_013_reports_overlap(
                     "Type1Used": "1",
                     "ProcessTime1": "20",
                     "EndTime1": "08:16",
-                    "Type4Used": "1",
+                    "Type4Used": "10",
                     "Type4ABrix": "35",
                     "ProcessTime4": "11",
                     "StartTime4": "08:10",
@@ -1501,10 +1501,10 @@ def test_personal_event_time_settings_affect_next_upload_and_reset(app, client):
     payload = _synthetic_csv(
         overrides={
             0: {
-                "Type1Used": "1",
+                "Type1Used": "11",
                 "ProcessTime1": "10",
                 "EndTime1": "08:10",
-                "Type4Used": "1",
+                "Type4Used": "55",
                 "Type4ABrix": "35",
                 "ProcessTime4": "10",
                 "StartTime4": "08:11",
@@ -1541,7 +1541,7 @@ def test_rule_011_required_concentration_formats_pass_on_results_screen(
         _synthetic_csv(
             overrides={
                 0: {
-                    "Type4Used": "1",
+                    "Type4Used": "10",
                     "Type4ABrix": "35",
                     "Type4AConcentration": type4_concentration,
                     "ProcessTime4": "1",
@@ -1561,7 +1561,7 @@ def test_rule_011_exception_renders_required_results_details(client):
         _synthetic_csv(
             overrides={
                 0: {
-                    "Type4Used": "1",
+                    "Type4Used": "10",
                     "Type4ABrix": "35",
                     "Type4AConcentration": "99.9",
                     "ProcessTime4": "1",
@@ -1586,7 +1586,7 @@ def test_rule_011_malformed_concentration_renders_warning(client):
         _synthetic_csv(
             overrides={
                 0: {
-                    "Type4Used": "1",
+                    "Type4Used": "10",
                     "Type4ABrix": "35",
                     "Type4AConcentration": "malformed",
                     "ProcessTime4": "1",
@@ -1743,14 +1743,14 @@ def test_rule_012_invalid_aircraft_type_renders_warning(client):
         {
             "Type1Used": "1",
             "EndTime1": "08:10",
-            "Type4Used": "1",
+            "Type4Used": "10",
             "Type4ABrix": "35",
             "StartTime4": "08:10",
         },
         {
             "Type1Used": "1",
             "EndTime1": "08:10",
-            "Type4Used": "1",
+            "Type4Used": "10",
             "Type4ABrix": "35",
             "StartTime4": "08:11",
         },
@@ -1760,7 +1760,7 @@ def test_rule_012_invalid_aircraft_type_renders_warning(client):
             "DateCreated": "2026-01-01 23:45",
             "Type1Used": "1",
             "EndTime1": "23:59",
-            "Type4Used": "1",
+            "Type4Used": "10",
             "Type4ABrix": "35",
             "StartTime4": "00:01",
         },
@@ -1791,7 +1791,7 @@ def test_rule_013_same_day_overlap_renders_required_results_details(client):
                     "DateCreated": "2026-01-01 20:00",
                     "Type1Used": "1",
                     "EndTime1": "20:20",
-                    "Type4Used": "1",
+                    "Type4Used": "10",
                     "Type4ABrix": "35",
                     "StartTime4": "20:15",
                 }
@@ -1822,7 +1822,7 @@ def test_rule_013_same_day_overlap_renders_required_results_details(client):
             {
                 "Type1Used": "1",
                 "EndTime1": "",
-                "Type4Used": "1",
+                "Type4Used": "10",
                 "Type4ABrix": "35",
                 "StartTime4": "08:15",
             },
@@ -1833,7 +1833,7 @@ def test_rule_013_same_day_overlap_renders_required_results_details(client):
                 "StartTime": "malformed",
                 "Type1Used": "1",
                 "EndTime1": "23:59",
-                "Type4Used": "1",
+                "Type4Used": "10",
                 "Type4ABrix": "35",
                 "StartTime4": "00:01",
             },
@@ -1869,7 +1869,7 @@ def test_rule_014_aircraft_type_0_is_exempt_on_results_screen(client):
                     "Notes": "Equipment treatment",
                     "TruckNumber": "malformed",
                     "Type1Used": "",
-                    "Type4Used": "1",
+                    "Type4Used": "10",
                     "Type4ABrix": "35",
                 }
             }
@@ -1906,7 +1906,7 @@ def test_rule_014_valid_other_truck_explanation_passes_on_results_screen(
                     "TruckNumber": "1",
                     "Notes": notes,
                     "Type1Used": "",
-                    "Type4Used": "1",
+                    "Type4Used": "10",
                     "Type4ABrix": "35",
                 }
             }
@@ -1953,7 +1953,7 @@ def test_rule_014_invalid_explanation_renders_specific_failure(
                     "TruckNumber": "1",
                     "Notes": notes,
                     "Type1Used": "",
-                    "Type4Used": "1",
+                    "Type4Used": "10",
                     "Type4ABrix": "35",
                 }
             }
@@ -2066,7 +2066,7 @@ def test_signed_in_audit_uses_personal_type4_fluid_selection(app, client):
     payload = _synthetic_csv(
         overrides={
             0: {
-                "Type4Used": "1",
+                "Type4Used": "10",
                 "Type4ABrix": "33.9",
             }
         }
@@ -2129,7 +2129,7 @@ def test_successful_import_performs_no_database_operations(app, client):
                         0: {
                             "Type1Used": "1",
                             "EndTime1": "08:20",
-                            "Type4Used": "1",
+                            "Type4Used": "10",
                             "Type4ABrix": "35",
                             "StartTime4": "08:15",
                         }

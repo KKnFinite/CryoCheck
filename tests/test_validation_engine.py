@@ -14,6 +14,14 @@ from app.services.settings import DEFAULT_SETTINGS
 from app.services.type4_fluids import TypeIVFluidProfile
 from app.services.validation_engine import run_audit
 
+# Keep legacy rule-isolation fixtures above the new mandatory minimum floors;
+# CC-RULE-015 has dedicated coverage in test_minimum_spray_rate.py.
+DEFAULT_SETTINGS = replace(
+    DEFAULT_SETTINGS,
+    min_type1_rate_gpm=Decimal("0.000001"),
+    min_type4_rate_gpm=Decimal("0.000001"),
+)
+
 
 def _source_row(
     *,
@@ -663,6 +671,7 @@ def test_malformed_type1_used_is_unable_to_evaluate():
         "CC-RULE-008",
         "CC-RULE-010",
         "CC-RULE-013",
+        "CC-RULE-015",
     )
     assert all(
         warning.invalid_fields == ("Type1Used",)
@@ -1296,7 +1305,7 @@ def test_malformed_process_time_does_not_block_rule_011():
     ) == ("CC-RULE-011",)
     assert tuple(
         warning.rule_id for warning in result.unable_to_evaluate
-    ) == ("CC-RULE-009", "CC-RULE-010")
+    ) == ("CC-RULE-009", "CC-RULE-010", "CC-RULE-015")
 
 
 def test_malformed_concentration_does_not_block_rules_005_or_009():
@@ -3429,7 +3438,7 @@ def test_rule_009_warning_does_not_block_rule_005():
     ) == ("CC-RULE-005",)
     assert tuple(
         warning.rule_id for warning in result.unable_to_evaluate
-    ) == ("CC-RULE-009", "CC-RULE-010")
+    ) == ("CC-RULE-009", "CC-RULE-010", "CC-RULE-015")
 
 
 def test_rule_009_orders_by_csv_row_then_rule_id():
