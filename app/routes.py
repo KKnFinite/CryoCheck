@@ -38,6 +38,7 @@ from app.services.admin_usage import (
     track_completed_export,
     track_completed_validation,
 )
+from app.services.neon_efficiency import fetch_neon_efficiency
 from app.services.csv_import import CSVImportError, parse_csv_upload
 from app.services.excel_export import (
     ExportRequestError,
@@ -277,10 +278,15 @@ def admin_usage() -> str:
             totals.anonymous_export_count if totals is not None else 0
         ),
     )
+    neon_efficiency = fetch_neon_efficiency(
+        current_app.config.get("NEON_API_KEY"),
+        current_app.config.get("NEON_PROJECT_ID"),
+    )
     return render_template(
         "admin_usage.html",
         active_page="admin",
         accounts=users,
+        neon_efficiency=neon_efficiency,
         summary=summary,
     )
 

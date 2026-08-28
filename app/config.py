@@ -44,6 +44,8 @@ class Config:
 
     APPLICATION_NAME = "CryoCheck"
     CRYOCHECK_ADMIN_USERNAME = os.getenv("CRYOCHECK_ADMIN_USERNAME", "")
+    NEON_API_KEY = os.getenv("NEON_API_KEY", "")
+    NEON_PROJECT_ID = os.getenv("NEON_PROJECT_ID", "")
     SECRET_KEY = os.getenv("SECRET_KEY")
     DEBUG = False
     TESTING = False
@@ -83,6 +85,8 @@ class TestingConfig(Config):
     """Automated test settings."""
 
     TESTING = True
+    NEON_API_KEY = ""
+    NEON_PROJECT_ID = ""
     SECRET_KEY = "testing-only-secret"
     SQLALCHEMY_DATABASE_URI = "sqlite+pysqlite:///:memory:"
     SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True}

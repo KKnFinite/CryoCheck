@@ -1597,6 +1597,121 @@ h1 {
   font-size: 1.05rem;
 }
 
+.database-efficiency {
+  display: grid;
+  gap: 1rem;
+  overflow: hidden;
+  padding: 1.25rem 1.4rem;
+  border: 1px solid rgb(255 255 255 / 90%);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(circle at 100% 0, rgb(157 221 239 / 24%), transparent 22rem),
+    rgb(255 255 255 / 80%);
+  box-shadow: var(--shadow-panel);
+  backdrop-filter: blur(20px);
+}
+
+.database-efficiency__heading {
+  display: flex;
+  gap: 2rem;
+  align-items: end;
+  justify-content: space-between;
+}
+
+.database-efficiency__heading h2 {
+  margin: 0;
+  color: var(--color-navy-950);
+  font-size: 1.45rem;
+}
+
+.database-efficiency__heading > p {
+  max-width: 28rem;
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.75rem;
+  line-height: 1.45;
+  text-align: right;
+}
+
+.database-efficiency__metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.database-efficiency__metrics article {
+  display: grid;
+  min-width: 0;
+  gap: 0.35rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid rgb(25 118 168 / 12%);
+  border-radius: 0.75rem;
+  background: rgb(235 249 252 / 54%);
+}
+
+.database-efficiency__metrics span,
+.database-efficiency__status > span {
+  color: var(--color-muted);
+  font-size: 0.66rem;
+  font-weight: 850;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.database-efficiency__metrics strong {
+  color: var(--color-navy-950);
+  font-size: 1rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.database-efficiency__status {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  gap: 0.45rem 0.8rem;
+  align-items: center;
+  padding: 0.8rem 0.95rem;
+  border: 1px solid rgb(25 118 168 / 14%);
+  border-left-width: 4px;
+  border-radius: 0.7rem;
+  background: rgb(255 255 255 / 68%);
+}
+
+.database-efficiency__status--good {
+  border-left-color: #27805a;
+}
+
+.database-efficiency__status--review {
+  border-left-color: #b26b17;
+}
+
+.database-efficiency__status strong {
+  color: var(--color-navy-950);
+}
+
+.database-efficiency__status p,
+.database-efficiency__notice,
+.database-efficiency__period {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.database-efficiency__notice {
+  padding: 0.8rem 0.95rem;
+  border: 1px solid rgb(25 118 168 / 12%);
+  border-radius: 0.7rem;
+  background: var(--color-glacier-100);
+}
+
+.database-efficiency__period {
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  padding-top: 0.15rem;
+}
+
 .usage-accounts {
   overflow: hidden;
   border: 1px solid rgb(255 255 255 / 90%);
@@ -3217,6 +3332,38 @@ h1 {
 
   .usage-growth p {
     font-size: 0.78rem;
+  }
+
+  .database-efficiency {
+    gap: 0.8rem;
+    padding: 0.95rem;
+    border-radius: 0.8rem;
+  }
+
+  .database-efficiency__heading {
+    display: grid;
+    gap: 0.45rem;
+  }
+
+  .database-efficiency__heading > p {
+    text-align: left;
+  }
+
+  .database-efficiency__metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .database-efficiency__status {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .database-efficiency__status p {
+    grid-column: 1 / -1;
+  }
+
+  .database-efficiency__period {
+    display: grid;
+    gap: 0.25rem;
   }
 
   .usage-table-wrap {

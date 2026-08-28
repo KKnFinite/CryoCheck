@@ -64,6 +64,80 @@
       <p><strong>{{ summary.accounts_created_30_days }}</strong> created in the last 30 days</p>
     </section>
 
+    <section class="database-efficiency" aria-labelledby="database-efficiency-title">
+      <header class="database-efficiency__heading">
+        <div>
+          <p class="eyebrow">Neon control plane</p>
+          <h2 id="database-efficiency-title">Database Efficiency</h2>
+        </div>
+        <p>Fetched only on page load. The monitoring request does not wake Neon compute.</p>
+      </header>
+
+      {% if neon_efficiency.state == "available" %}
+        <div class="database-efficiency__metrics">
+          {% if neon_efficiency.history_state == "available" %}
+            <article data-neon-metric="month-to-date-cu-hours">
+              <span>CU-hours this month</span>
+              <strong>{{ "%.4f" | format(neon_efficiency.cu_hours_month_to_date) }}</strong>
+            </article>
+            <article data-neon-metric="projected-cu-hours">
+              <span>Projected month-end</span>
+              <strong>
+                {% if neon_efficiency.projected_cu_hours is not none %}
+                  {{ "%.4f" | format(neon_efficiency.projected_cu_hours) }} CU-hours
+                {% else %}
+                  Unavailable
+                {% endif %}
+              </strong>
+            </article>
+          {% endif %}
+          <article data-neon-metric="minimum-cu">
+            <span>Minimum compute</span>
+            <strong>{{ neon_efficiency.min_cu if neon_efficiency.min_cu is not none else "Unavailable" }}{% if neon_efficiency.min_cu is not none %} CU{% endif %}</strong>
+          </article>
+          <article data-neon-metric="maximum-cu">
+            <span>Maximum compute</span>
+            <strong>{{ neon_efficiency.max_cu if neon_efficiency.max_cu is not none else "Unavailable" }}{% if neon_efficiency.max_cu is not none %} CU{% endif %}</strong>
+          </article>
+          <article data-neon-metric="suspend-timeout">
+            <span>Scale-to-zero timeout</span>
+            <strong>{{ neon_efficiency.suspend_timeout or "Unavailable" }}</strong>
+          </article>
+          <article data-neon-metric="last-compute-activity">
+            <span>Last compute activity</span>
+            <strong>{{ neon_efficiency.last_compute_activity or "No activity reported" }}</strong>
+          </article>
+        </div>
+
+        {% if neon_efficiency.history_state != "available" %}
+          <p class="database-efficiency__notice" data-neon-history-state="{{ neon_efficiency.history_state }}">
+            {{ neon_efficiency.message }}
+          </p>
+        {% endif %}
+
+        <div class="database-efficiency__status database-efficiency__status--{{ neon_efficiency.configuration_status | lower }}">
+          <span>Configuration status</span>
+          <strong>{{ neon_efficiency.configuration_status }}</strong>
+          <p>{{ neon_efficiency.configuration_reason }}</p>
+        </div>
+
+        {% if neon_efficiency.consumption_period or neon_efficiency.consumption_plan %}
+          <p class="database-efficiency__period">
+            {% if neon_efficiency.consumption_period %}
+              Consumption period: {{ neon_efficiency.consumption_period }}
+            {% endif %}
+            {% if neon_efficiency.consumption_plan %}
+              <span>Plan: {{ neon_efficiency.consumption_plan }}</span>
+            {% endif %}
+          </p>
+        {% endif %}
+      {% else %}
+        <p class="database-efficiency__notice" data-neon-state="{{ neon_efficiency.state }}">
+          {{ neon_efficiency.message }}
+        </p>
+      {% endif %}
+    </section>
+
     <section class="usage-accounts" aria-labelledby="accounts-title">
       <header>
         <p class="eyebrow">Account activity</p>
