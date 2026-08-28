@@ -8,6 +8,7 @@ from urllib.parse import urlsplit
 
 from flask import (
     Blueprint,
+    abort,
     current_app,
     flash,
     jsonify,
@@ -29,8 +30,14 @@ from sqlalchemy.exc import IntegrityError
 
 from app.extensions import csrf, db, limiter
 from app.forms import LoginForm, RegisterForm, ResetSettingsForm, SettingsForm
-from app.models import User, normalize_username, utc_now
+from app.models import UsageTotals, User, normalize_username, utc_now
 
+from app.services.admin_usage import (
+    build_usage_summary,
+    is_admin_user,
+    track_completed_export,
+    track_completed_validation,
+)
 from app.services.csv_import import CSVImportError, parse_csv_upload
 from app.services.excel_export import (
     ExportRequestError,
@@ -51,6 +58,12 @@ from app.services.validation_engine import run_audit
 
 
 main = Blueprint("main", __name__)
+
+
+@main.app_context_processor
+def admin_navigation_context():
+    """Expose only the current account's admin status to navigation templates."""
+    return {"is_admin": is_admin_user()}
 
 
 @main.after_app_request
@@ -119,6 +132,7 @@ def _audit_uploaded_csv():
 
     active_settings = get_active_settings()
     audit_result = run_audit(result, active_settings)
+    track_completed_validation()
     if audit_result.exceptions:
         export_context_id = secrets.token_urlsafe(32)
         session["export_context_id"] = export_context_id
@@ -221,6 +235,7 @@ def export_exceptions():
         return response
 
     workbook, filename = build_exception_workbook(selected_rows)
+    track_completed_export()
     response = send_file(
         workbook,
         as_attachment=True,
@@ -241,6 +256,29 @@ def rules() -> str:
         "rules.html",
         active_page="rules",
         rules=RULES,
+    )
+
+
+@main.get("/admin/usage")
+@login_required
+def admin_usage() -> str:
+    """Render private aggregate usage metadata for the configured admin."""
+    if not is_admin_user():
+        abort(403)
+
+    users = tuple(User.query.order_by(User.username_normalized).all())
+    totals = db.session.get(UsageTotals, 1)
+    summary = build_usage_summary(
+        users,
+        anonymous_validations=(
+            totals.anonymous_validation_count if totals is not None else 0
+        ),
+    )
+    return render_template(
+        "admin_usage.html",
+        active_page="admin",
+        accounts=users,
+        summary=summary,
     )
 
 

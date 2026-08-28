@@ -12,7 +12,7 @@ from sqlalchemy import event
 from werkzeug.datastructures import FileStorage
 
 from app.extensions import db
-from app.models import User
+from app.models import UsageTotals, User
 from app.services.csv_import import EXPECTED_COLUMNS, parse_csv_upload
 from app.services.settings import create_default_user_settings
 
@@ -2104,7 +2104,7 @@ def test_signed_in_audit_uses_personal_type4_fluid_selection(app, client):
     assert b"Cryotech Polar Guard Xtend" in personal_response.data
 
 
-def test_successful_import_performs_no_database_operations(app, client):
+def test_successful_import_writes_only_anonymous_usage_total(app, client):
     executed_statements: list[str] = []
 
     def record_statement(
@@ -2141,4 +2141,14 @@ def test_successful_import_performs_no_database_operations(app, client):
 
     assert response.status_code == 200
     assert b"CC-RULE-013" in response.data
-    assert executed_statements == []
+    mutating = [
+        statement
+        for statement in executed_statements
+        if statement.lstrip().upper().startswith(
+            ("INSERT", "UPDATE", "DELETE", "CREATE", "DROP", "ALTER")
+        )
+    ]
+    assert len(mutating) == 1
+    assert "usage_totals" in mutating[0]
+    with app.app_context():
+        assert db.session.get(UsageTotals, 1).anonymous_validation_count == 1

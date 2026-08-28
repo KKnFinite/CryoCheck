@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}Usage Administration | CryoCheck{% endblock %}
+
+{% macro timestamp(value) -%}
+  {{ value.strftime("%Y-%m-%d %H:%M UTC") if value else "Never" }}
+{%- endmacro %}
+
+{% block content %}
+  <section class="admin-page" aria-labelledby="page-title">
+    <header class="admin-heading">
+      <div>
+        <p class="eyebrow">Private administration</p>
+        <h1 id="page-title">Usage Dashboard</h1>
+        <p class="hero__intro">
+          Lightweight account activity totals. CryoCheck does not retain
+          uploaded data, audit findings, filenames, or identifying network data.
+        </p>
+      </div>
+    </header>
+
+    <section class="usage-summary" aria-label="Usage summary">
+      <article class="usage-summary__card" data-summary="total-accounts">
+        <span>Total accounts</span>
+        <strong>{{ summary.total_accounts }}</strong>
+      </article>
+      <article class="usage-summary__card" data-summary="accounts-created">
+        <span>Accounts created</span>
+        <strong>{{ summary.accounts_created_7_days }}</strong>
+        <small>7 days</small>
+        <strong>{{ summary.accounts_created_30_days }}</strong>
+        <small>30 days</small>
+      </article>
+      <article class="usage-summary__card" data-summary="active-accounts">
+        <span>Active accounts</span>
+        <strong>{{ summary.active_accounts_7_days }}</strong>
+        <small>7 days</small>
+        <strong>{{ summary.active_accounts_30_days }}</strong>
+        <small>30 days</small>
+      </article>
+      <article class="usage-summary__card" data-summary="signed-in-validations">
+        <span>Signed-in validations</span>
+        <strong>{{ summary.signed_in_validations }}</strong>
+      </article>
+      <article class="usage-summary__card" data-summary="anonymous-validations">
+        <span>Anonymous validations</span>
+        <strong>{{ summary.anonymous_validations }}</strong>
+      </article>
+      <article class="usage-summary__card" data-summary="exports">
+        <span>Exports</span>
+        <strong>{{ summary.exports }}</strong>
+      </article>
+    </section>
+
+    <section class="usage-accounts" aria-labelledby="accounts-title">
+      <header>
+        <p class="eyebrow">Account activity</p>
+        <h2 id="accounts-title">Accounts</h2>
+      </header>
+      <div class="usage-table-wrap" tabindex="0" role="region" aria-label="Account usage table">
+        <table class="usage-table">
+          <thead>
+            <tr>
+              <th scope="col">Username</th>
+              <th scope="col">Created</th>
+              <th scope="col">Last Login</th>
+              <th scope="col">Validations</th>
+              <th scope="col">Last Validation</th>
+              <th scope="col">Exports</th>
+              <th scope="col">Last Export</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for account in accounts %}
+              <tr>
+                <th scope="row">{{ account.username }}</th>
+                <td>{{ timestamp(account.created_at) }}</td>
+                <td>{{ timestamp(account.last_login_at) }}</td>
+                <td>{{ account.validation_count }}</td>
+                <td>{{ timestamp(account.last_validation_at) }}</td>
+                <td>{{ account.export_count }}</td>
+                <td>{{ timestamp(account.last_export_at) }}</td>
+              </tr>
+            {% else %}
+              <tr>
+                <td colspan="7">No accounts have been created.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </section>
+{% endblock %}

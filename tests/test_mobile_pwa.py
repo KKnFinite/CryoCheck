@@ -13,6 +13,7 @@ from sqlalchemy import event
 from werkzeug.datastructures import MultiDict
 
 from app.extensions import db
+from app.models import UsageTotals
 from app.services.csv_import import EXPECTED_COLUMNS
 
 
@@ -620,7 +621,7 @@ def test_android_share_target_reuses_upload_size_limit(app, client):
     assert "no-store" in response.headers["Cache-Control"]
 
 
-def test_android_share_target_performs_no_database_mutation(app, client):
+def test_android_share_target_writes_only_anonymous_usage_total(app, client):
     statements: list[str] = []
 
     def record_statement(
@@ -654,7 +655,10 @@ def test_android_share_target_performs_no_database_mutation(app, client):
         )
     ]
     assert response.status_code == 200
-    assert mutating == []
+    assert len(mutating) == 1
+    assert "usage_totals" in mutating[0]
+    with app.app_context():
+        assert db.session.get(UsageTotals, 1).anonymous_validation_count == 1
 
 
 def test_dynamic_posts_and_account_pages_are_not_cacheable(client):

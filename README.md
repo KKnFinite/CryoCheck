@@ -256,6 +256,7 @@ Configure these Render environment variables:
 - `DATABASE_URL`: the Neon production connection string, including its SSL parameters
 - `SECRET_KEY`: a secure production secret
 - `FLASK_CONFIG=production`
+- `CRYOCHECK_ADMIN_USERNAME`: the existing CryoCheck account name permitted to access the private usage dashboard; leave blank to disable admin access
 - `MAX_UPLOAD_MB`: optional CSV upload limit in megabytes; defaults to `15`
 
 The `/health` endpoint intentionally remains database-independent so Render can verify the web process during a temporary database outage. Use `flask db-check` separately when database connectivity must be confirmed. The build must fail rather than start application code against an unapplied schema migration.

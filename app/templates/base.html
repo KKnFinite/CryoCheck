@@ -82,6 +82,15 @@
             >
               Settings
             </a>
+            {% if is_admin %}
+              <a
+                class="site-nav__link{% if active_page == 'admin' %} site-nav__link--active{% endif %}"
+                href="{{ url_for('main.admin_usage') }}"
+                {% if active_page == "admin" %}aria-current="page"{% endif %}
+              >
+                Admin
+              </a>
+            {% endif %}
             {% if current_user.is_authenticated %}
               <span class="site-nav__identity">{{ current_user.username }}</span>
               <form action="{{ url_for('main.logout') }}" method="post">
@@ -161,6 +170,13 @@
             href="{{ url_for('main.settings') }}"
             {% if active_page == "settings" %}aria-current="page"{% endif %}
           >Settings</a>
+          {% if is_admin %}
+            <a
+              class="mobile-menu__link{% if active_page == 'admin' %} mobile-menu__link--active{% endif %}"
+              href="{{ url_for('main.admin_usage') }}"
+              {% if active_page == "admin" %}aria-current="page"{% endif %}
+            >Admin Usage</a>
+          {% endif %}
           {% if export_available %}
             <button
               class="mobile-menu__link"

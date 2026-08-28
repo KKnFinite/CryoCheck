@@ -43,6 +43,7 @@ class Config:
     """Settings shared by every environment."""
 
     APPLICATION_NAME = "CryoCheck"
+    CRYOCHECK_ADMIN_USERNAME = os.getenv("CRYOCHECK_ADMIN_USERNAME", "")
     SECRET_KEY = os.getenv("SECRET_KEY")
     DEBUG = False
     TESTING = False

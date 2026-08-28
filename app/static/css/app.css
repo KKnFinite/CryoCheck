@@ -1512,6 +1512,124 @@ h1 {
   gap: 2rem;
 }
 
+.admin-page {
+  display: grid;
+  min-width: 0;
+  gap: 2rem;
+}
+
+.admin-heading h1 {
+  margin-bottom: 1rem;
+  font-size: clamp(2.5rem, 5vw, 4.25rem);
+}
+
+.admin-heading .hero__intro {
+  max-width: 52rem;
+  margin-inline: 0;
+}
+
+.usage-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.usage-summary__card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.25rem 1rem;
+  align-items: baseline;
+  padding: 1.25rem 1.4rem;
+  border: 1px solid rgb(255 255 255 / 90%);
+  border-radius: var(--radius-md);
+  background: rgb(255 255 255 / 80%);
+  box-shadow: 0 14px 32px rgb(6 40 70 / 9%);
+  backdrop-filter: blur(18px);
+}
+
+.usage-summary__card > span {
+  grid-column: 1 / -1;
+  color: var(--color-muted);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.usage-summary__card > strong {
+  color: var(--color-navy-950);
+  font-size: 1.8rem;
+  line-height: 1.15;
+}
+
+.usage-summary__card > small {
+  color: var(--color-muted);
+  font-size: 0.75rem;
+  font-weight: 750;
+  text-align: right;
+}
+
+.usage-accounts {
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 90%);
+  border-radius: var(--radius-lg);
+  background: rgb(255 255 255 / 82%);
+  box-shadow: var(--shadow-panel);
+  backdrop-filter: blur(20px);
+}
+
+.usage-accounts > header {
+  padding: 1.4rem 1.6rem;
+  border-bottom: 1px solid rgb(9 34 62 / 8%);
+}
+
+.usage-accounts h2 {
+  margin: 0;
+  color: var(--color-navy-950);
+}
+
+.usage-table-wrap {
+  overflow-x: auto;
+}
+
+.usage-table-wrap:focus-visible {
+  outline: 3px solid rgb(43 145 194 / 38%);
+  outline-offset: -3px;
+}
+
+.usage-table {
+  width: 100%;
+  min-width: 64rem;
+  border-collapse: collapse;
+  color: var(--color-navy-900);
+  font-size: 0.8rem;
+  text-align: left;
+}
+
+.usage-table th,
+.usage-table td {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid rgb(9 34 62 / 7%);
+  white-space: nowrap;
+}
+
+.usage-table thead th {
+  color: var(--color-muted);
+  background: var(--color-glacier-100);
+  font-size: 0.7rem;
+  font-weight: 850;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.usage-table tbody th {
+  color: var(--color-navy-950);
+}
+
+.usage-table tbody tr:last-child > * {
+  border-bottom: 0;
+}
+
 .settings-heading {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -3013,6 +3131,46 @@ h1 {
 
   .settings-page {
     gap: 0.9rem;
+  }
+
+  .admin-page {
+    gap: 0.9rem;
+  }
+
+  .admin-heading {
+    padding: 0.2rem;
+  }
+
+  .admin-heading h1 {
+    margin-bottom: 0.5rem;
+    font-size: 1.9rem;
+  }
+
+  .admin-heading .hero__intro {
+    font-size: 0.8rem;
+    line-height: 1.45;
+  }
+
+  .usage-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem;
+  }
+
+  .usage-summary__card {
+    padding: 0.85rem;
+    border-radius: 0.75rem;
+  }
+
+  .usage-summary__card > strong {
+    font-size: 1.45rem;
+  }
+
+  .usage-accounts {
+    border-radius: 0.8rem;
+  }
+
+  .usage-accounts > header {
+    padding: 1rem;
   }
 
   .settings-heading {

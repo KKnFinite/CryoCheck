@@ -40,6 +40,10 @@ class User(UserMixin, db.Model):
         default=utc_now,
     )
     last_login_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    validation_count = db.Column(db.Integer, nullable=False, default=0)
+    last_validation_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    export_count = db.Column(db.Integer, nullable=False, default=0)
+    last_export_at = db.Column(db.DateTime(timezone=True), nullable=True)
 
     settings = db.relationship(
         "UserSettings",
@@ -100,4 +104,23 @@ class UserSettings(db.Model):
     user = db.relationship("User", back_populates="settings")
 
 
-__all__ = ["User", "UserSettings", "normalize_username", "utc_now"]
+class UsageTotals(db.Model):
+    """Singleton aggregate for anonymous usage without identifying metadata."""
+
+    __tablename__ = "usage_totals"
+
+    id = db.Column(db.Integer, primary_key=True)
+    anonymous_validation_count = db.Column(
+        db.Integer,
+        nullable=False,
+        default=0,
+    )
+
+
+__all__ = [
+    "UsageTotals",
+    "User",
+    "UserSettings",
+    "normalize_username",
+    "utc_now",
+]
